@@ -20,7 +20,15 @@
     - docker_networks
     - check
 
-- name: Create Docker networks
+- name: Check which networks already exist
+  ansible.builtin.command: docker network ls --format "{{ '{{' }}.Name{{ '}}' }}"
+  register: existing_networks
+  changed_when: false
+  tags:
+    - docker_networks
+    - creation
+
+- name: Create Docker networks (skip existing ones)
   community.docker.docker_network:
     name: "{{ item.name }}"
     driver: "{{ item.driver }}"
@@ -35,6 +43,7 @@
     internal: "{{ item.internal | default(false) }}"
     state: present
   loop: "{{ docker_networks }}"
+  when: item.name not in existing_networks.stdout_lines
   register: networks_created
   tags:
     - docker_networks

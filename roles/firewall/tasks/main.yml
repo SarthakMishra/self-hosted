@@ -50,14 +50,44 @@
     - firewall
     - cloudflare
 
+- name: Allow HTTP access from Cloudflare IPv4 ranges
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ item }}"
+    to_port: "80"
+    proto: tcp
+    comment: "Cloudflare IPv4 HTTP"
+  loop: "{{ cloudflare_ipv4_list }}"
+  when: 
+    - cloudflare_firewall_enabled | default(true)
+    - traefik_enabled | default(false)
+  tags:
+    - firewall
+    - cloudflare
+
 - name: Allow HTTPS access from Cloudflare IPv4 ranges
   community.general.ufw:
     rule: allow
     from_ip: "{{ item }}"
     to_port: "443"
     proto: tcp
-    comment: "Cloudflare IPv4"
+    comment: "Cloudflare IPv4 HTTPS"
   loop: "{{ cloudflare_ipv4_list }}"
+  when: 
+    - cloudflare_firewall_enabled | default(true)
+    - traefik_enabled | default(false)
+  tags:
+    - firewall
+    - cloudflare
+
+- name: Allow HTTP access from Cloudflare IPv6 ranges
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ item }}"
+    to_port: "80"
+    proto: tcp
+    comment: "Cloudflare IPv6 HTTP"
+  loop: "{{ cloudflare_ipv6_list }}"
   when: 
     - cloudflare_firewall_enabled | default(true)
     - traefik_enabled | default(false)
@@ -71,7 +101,7 @@
     from_ip: "{{ item }}"
     to_port: "443"
     proto: tcp
-    comment: "Cloudflare IPv6"
+    comment: "Cloudflare IPv6 HTTPS"
   loop: "{{ cloudflare_ipv6_list }}"
   when: 
     - cloudflare_firewall_enabled | default(true)

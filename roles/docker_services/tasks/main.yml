@@ -65,8 +65,6 @@
     - traefik_config
   tags: [docker_services, traefik]
 
-
-
 - name: Deploy Traefik stack
   community.docker.docker_stack:
     name: traefik
@@ -77,7 +75,7 @@
 
 - name: Wait for Traefik to be ready
   ansible.builtin.wait_for:
-    port: 443
+    port: 80
     host: "{{ ansible_default_ipv4.address }}"
     timeout: 60
   tags: [docker_services, traefik, deploy]

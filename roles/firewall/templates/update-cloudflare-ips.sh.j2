@@ -65,7 +65,8 @@ add_cloudflare_rules() {
     echo "Adding current Cloudflare IPv4 ranges..."
     while IFS= read -r ip; do
         if [ -n "$ip" ]; then
-            ufw allow from "$ip" to any port 443 comment "Cloudflare IPv4"
+            ufw allow from "$ip" to any port 80 comment "Cloudflare IPv4 HTTP"
+            ufw allow from "$ip" to any port 443 comment "Cloudflare IPv4 HTTPS"
         fi
     done <<< "$CLOUDFLARE_IPV4"
     
@@ -73,7 +74,8 @@ add_cloudflare_rules() {
     echo "Adding current Cloudflare IPv6 ranges..."
     while IFS= read -r ip; do
         if [ -n "$ip" ]; then
-            ufw allow from "$ip" to any port 443 comment "Cloudflare IPv6"
+            ufw allow from "$ip" to any port 80 comment "Cloudflare IPv6 HTTP"
+            ufw allow from "$ip" to any port 443 comment "Cloudflare IPv6 HTTPS"
         fi
     done <<< "$CLOUDFLARE_IPV6"
 }
@@ -93,7 +95,7 @@ main() {
     echo "✅ Cloudflare IP ranges updated successfully"
     echo ""
     echo "📊 Current UFW status:"
-    ufw status numbered | grep -E "(Cloudflare|443)" || echo "No Cloudflare rules found"
+    ufw status numbered | grep -E "(Cloudflare|80|443)" || echo "No Cloudflare rules found"
 }
 
 # Run main function

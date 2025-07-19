@@ -78,6 +78,27 @@
     - docker_installation
     - packages
 
+- name: Install Python packages for Ansible Docker modules (system packages)
+  ansible.builtin.apt:
+    name:
+      - python3-docker
+      - python3-requests
+    state: present
+    update_cache: true
+  tags:
+    - docker_installation
+    - python_packages
+
+- name: Install jsondiff via pip (not available as system package)
+  ansible.builtin.pip:
+    name: jsondiff
+    state: present
+    executable: pip3
+    extra_args: --break-system-packages
+  tags:
+    - docker_installation
+    - python_packages
+
 - name: Add docker user to docker group
   ansible.builtin.user:
     name: docker
