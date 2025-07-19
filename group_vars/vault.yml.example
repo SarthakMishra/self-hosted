@@ -5,10 +5,9 @@
 # WARNING: vault.yml contains sensitive data and is gitignored
 
 # =============================================================================
-# DOMAIN AND DNS CONFIGURATION
+# DOMAIN CONFIGURATION
 # =============================================================================
 vault_production_domain: "yourdomain.com"           # Your production domain
-vault_staging_domain: "staging.yourdomain.com"      # Your staging domain (optional)
 
 # =============================================================================
 # SSH PUBLIC KEYS
@@ -16,10 +15,6 @@ vault_staging_domain: "staging.yourdomain.com"      # Your staging domain (optio
 # Add your SSH public keys for secure access
 vault_production_admin_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... your-key-here"
 vault_staging_admin_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... your-staging-key-here"
-
-# Additional SSH keys (add as needed)
-# vault_additional_ssh_key_1: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... team-member-1"
-# vault_additional_ssh_key_2: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... team-member-2"
 
 # =============================================================================
 # TAILSCALE CONFIGURATION
@@ -46,34 +41,6 @@ vault_restic_password: "your-very-secure-backup-password-here"
 
 # Use a strong, unique password for backup encryption
 # This password encrypts all your backup data - keep it safe!
-
-# =============================================================================
-# BASIC AUTHENTICATION (Optional - Not Needed for Tailscale-Protected Services)
-# =============================================================================
-# For future services that might need web authentication
-# NOTE: Traefik dashboard and Glances are protected by Tailscale network access
-vault_basic_auth_user: "admin"
-vault_basic_auth_password: "your-admin-interface-password"
-
-# Generate password hash with: echo $(htpasswd -nB admin) | sed -e 's/admin://'
-# Or use: python3 -c "import crypt; print(crypt.crypt('your-password'))"
-vault_basic_auth_hash: "$2y$10$QlQkFuyF4dC3QPGLzgD8OOBhfVHPb2vIDKR9bGzP6Mq8J8.LAr5H2"  # password: admin
-
-# =============================================================================
-# ADDITIONAL SECRETS (Optional)
-# =============================================================================
-
-# Database passwords (if using databases)
-# vault_mysql_root_password: "secure-mysql-password"
-# vault_postgres_password: "secure-postgres-password"
-
-# API keys for monitoring services (if using)
-# vault_slack_webhook_url: "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
-# vault_discord_webhook_url: "https://discord.com/api/webhooks/000000000000000000/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-
-# Third-party service API keys
-# vault_github_token: "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-# vault_docker_hub_token: "dckr_pat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 # =============================================================================
 # USAGE INSTRUCTIONS

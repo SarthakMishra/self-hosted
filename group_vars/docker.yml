@@ -137,8 +137,6 @@ docker_environment:
   TRAEFIK_NETWORK: "traefik-public"
   APP_NETWORK: "app-network"
   MONITORING_NETWORK: "monitoring-network"
-  BASIC_AUTH_USER: "admin"
-  BASIC_AUTH_PASS: "changeme"
 
 # Docker Log Rotation
 docker_log_rotation:
@@ -155,12 +153,6 @@ docker_log_rotation:
 cloudflare_email: "{{ vault_cloudflare_email | default('admin@' + domain_name) }}"
 cloudflare_api_key: "{{ vault_cloudflare_api_key | default('') }}"
 cloudflare_dns_token: "{{ vault_cloudflare_dns_token | default('') }}"
-
-# Basic Authentication
-basic_auth_user: admin
-basic_auth_hash: "$2y$10$QlQkFuyF4dC3QPGLzgD8OOBhfVHPb2vIDKR9bGzP6Mq8J8.LAr5H2"  # admin:admin123
-
-
 
 # Restic Backup Configuration
 restic_backup_root: /opt/docker-swarm/backup
