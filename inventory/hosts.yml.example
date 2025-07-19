@@ -62,9 +62,14 @@ all:
 
   vars:
     # SSH Configuration
-    ansible_user: root                        # Change to your SSH user
+    ansible_user: ubuntu                      # Default for most cloud providers (AWS, DigitalOcean, etc.)
     ansible_ssh_private_key_file: ~/.ssh/id_rsa  # Path to your SSH key
     ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+    
+    # Privilege Escalation (required when not using root)
+    ansible_become: true                      # Use sudo for root privileges
+    ansible_become_method: sudo               # Use sudo method
+    ansible_become_user: root                 # Become root user
     
     # Python interpreter
     ansible_python_interpreter: /usr/bin/python3
@@ -83,7 +88,14 @@ all:
 #   - Add new nodes to 'new_workers' or 'new_managers' groups
 #   - Run scaling playbooks to add them to existing cluster
 #
+# SSH User Options:
+#   - ubuntu: Most cloud providers (AWS, DigitalOcean, Linode)
+#   - debian: Debian-based images  
+#   - admin: Some custom setups
+#   - root: Direct root access (less secure, not recommended)
+#
 # Important:
 #   - Only ONE node should have traefik_enabled: true (public access)
 #   - Use Tailscale IPs for secure networking when available
-#   - All worker nodes should have traefik_enabled: false 
+#   - All worker nodes should have traefik_enabled: false
+#   - Ubuntu user typically has passwordless sudo by default 

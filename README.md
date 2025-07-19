@@ -123,6 +123,12 @@ Complete infrastructure-as-code solution using Ansible for automated deployment 
 # Copy and customize inventory with your server details
 cp inventory/hosts.yml.example inventory/hosts.yml
 nano inventory/hosts.yml  # Add your server IPs and configuration
+
+# Configure for your SSH setup:
+# - ansible_user: ubuntu (default for AWS, DigitalOcean, Linode)
+# - ansible_user: debian (for Debian images)
+# - ansible_user: admin (for custom setups)
+# Uses sudo for privilege escalation - root login NOT required
 ```
 
 ### 2. Set Up Sensitive Variables
