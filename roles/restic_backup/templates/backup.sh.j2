@@ -109,13 +109,13 @@ main() {
     log "Starting Docker Swarm backup on $BACKUP_HOSTNAME ($BACKUP_NODE_TYPE)"
     
     # Check if we're on a manager node
-    if ! docker info --format '{{.Swarm.ControlAvailable}}' 2>/dev/null | grep -q true; then
+    if ! docker info --format '{{ "{{" }}.Swarm.ControlAvailable{{ "}}" }}' 2>/dev/null | grep -q true; then
         log "Not a manager node, skipping backup"
         exit 0
     fi
     
     # Skip if not leader to avoid conflicts
-    if docker node ls --format '{{.ManagerStatus}}' --filter "self=true" | grep -q "Leader"; then
+    if docker node ls --format '{{ "{{" }}.ManagerStatus{{ "}}" }}' | grep -q "Leader"; then
         log "This is the leader node, running backup"
     else
         log "This is not the leader node, skipping backup"
@@ -196,4 +196,4 @@ main() {
 trap 'log "Backup failed with error"; mark_sync_status "ready"; notify_healthcheck "failure"; exit 1' ERR
 
 # Run main function
-main "$@" 
+main "$@"
