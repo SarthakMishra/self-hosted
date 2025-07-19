@@ -5,6 +5,9 @@
 environment: production
 # domain_name: Set only when deploying public services - see service-deployment-guide.md
 
+# Safety checkpoint for critical operations
+safety_checkpoint: true
+
 # Admin user SSH keys for production
 ssh_public_keys:
   - "{{ vault_production_admin_ssh_key }}"

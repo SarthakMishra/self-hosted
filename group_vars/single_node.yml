@@ -1,9 +1,13 @@
 ---
 # Single Node deployment configuration
 
-# Node role
+# Node configuration
+node_type: single
 node_role: single
 swarm_role: single
+
+# Safety checkpoint for critical operations
+safety_checkpoint: true
 
 # Single node settings
 docker_swarm_manager: false  # Single node doesn't use swarm initially

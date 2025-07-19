@@ -3,7 +3,7 @@
 > [!WARNING] 
 > ⚠️ **This entire project is AI-generated. Use with caution!**
 >
-> I (the author) have no real-world experience with IT infrastructure or configuration. Please review everything carefully before using in production. Mistakes or misconfigurations are possible—double-check all settings and security!
+> I (the author) have no real-world experience with infrastructure config or automation. Please review everything carefully before using in production. Mistakes or misconfigurations are possible—double-check all settings and security!
 
 Complete infrastructure-as-code solution using Ansible for automated deployment of production-ready, self-hosted environments. This project automates the entire process from system preparation to Docker Swarm cluster setup, including essential services, security hardening, backup automation, and disaster recovery capabilities.
 
@@ -69,7 +69,7 @@ nano group_vars/vault.yml  # Add your Tailscale auth key, Cloudflare tokens, etc
 
 ```bash
 # Step 1: System preparation (security, admin user, Tailscale, firewall)
-ansible-playbook -i inventory/hosts.yml playbooks/system-preparation.yml
+ansible-playbook -i inventory/hosts.yml playbooks/system-preparation.yml --limit single_node
 
 # Step 2: Docker infrastructure (Docker Swarm, networks, Traefik, services)
 ansible-playbook -i inventory/hosts.yml playbooks/single-node-docker.yml
@@ -92,7 +92,7 @@ nano inventory/hosts.yml
 ### 2. Deploy Multi-Node Cluster
 ```bash
 # Step 1: System preparation on all nodes
-ansible-playbook -i inventory/hosts.yml playbooks/multi-node.yml
+ansible-playbook -i inventory/hosts.yml playbooks/system-preparation.yml --limit production
 
 # Step 2: Docker Swarm cluster setup
 ansible-playbook -i inventory/hosts.yml playbooks/multi-node-docker.yml
@@ -181,7 +181,7 @@ The deployment follows a **two-phase approach**: **System Preparation** followed
 **Complete Infrastructure in 2 Commands:**
 ```bash
 # Step 1: System preparation (hardening, admin user, Tailscale, firewall)
-ansible-playbook -i inventory/hosts.yml playbooks/system-preparation.yml
+ansible-playbook -i inventory/hosts.yml playbooks/system-preparation.yml --limit single_node
 
 # Step 2: Docker infrastructure (Docker Swarm, networks, services)
 ansible-playbook -i inventory/hosts.yml playbooks/single-node-docker.yml
@@ -192,7 +192,7 @@ ansible-playbook -i inventory/hosts.yml playbooks/single-node-docker.yml
 **When you need high availability or scaling:**
 ```bash
 # Step 1: System preparation on all nodes
-ansible-playbook -i inventory/hosts.yml playbooks/multi-node.yml
+ansible-playbook -i inventory/hosts.yml playbooks/system-preparation.yml --limit production
 
 # Step 2: Docker Swarm cluster setup
 ansible-playbook -i inventory/hosts.yml playbooks/multi-node-docker.yml

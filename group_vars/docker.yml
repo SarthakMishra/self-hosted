@@ -134,7 +134,7 @@ docker_directories:
 docker_environment:
   STACK_ROOT: "{{ docker_stack_root }}"
   COMPOSE_PROJECT_NAME: "swarm"
-  TRAEFIK_NETWORK: "traefik-public"
+  TRAEFIK_NETWORK: "app-network"
   APP_NETWORK: "app-network"
   MONITORING_NETWORK: "monitoring-network"
 
