@@ -32,7 +32,9 @@ vault_cloudflare_dns_token: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"   # DNS API
 
 # Get these from: https://dash.cloudflare.com/profile/api-tokens
 # - Global API Key: https://dash.cloudflare.com/profile/api-tokens (View Global API Key)
-# - DNS API Token: Create token with Zone:DNS:Edit permissions for your domain
+# - DNS API Token: Create token with Zone:DNS:Edit permissions for ALL ZONES
+#   This allows you to use any domain you add to Cloudflare for services
+#   Recommended permissions: Zone:DNS:Edit, Zone:Zone:Read for All zones
 
 # =============================================================================
 # BACKUP CONFIGURATION  

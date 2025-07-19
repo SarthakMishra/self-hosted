@@ -264,6 +264,13 @@ The deployment follows a structured, idempotent process:
 - **GitOps automation**: GitHub Actions workflows for CI/CD with multi-environment support
 - **See**: service-deployment-guide.md for complete setup and deployment procedures
 
+### Domain Management
+- **Any Cloudflare domain supported**: Use any domain added to your Cloudflare account
+- **Automatic SSL certificates**: Traefik + Cloudflare DNS challenge for all domains
+- **Flexible routing**: Subdomains, multiple domains, or path-based routing
+- **No infrastructure changes needed**: Just proper Traefik labels in service configuration
+- **See**: service-deployment-guide.md for domain strategies and examples
+
 ### Backup Management
 - **Automated Backups**: Daily at 2 AM with local repository
 - **Sync Service**: 15-minute intervals to local machine

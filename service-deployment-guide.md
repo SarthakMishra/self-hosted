@@ -122,6 +122,191 @@ docker service ps app_web
 docker service logs app_web -f
 ```
 
+## Domain Management
+
+Your infrastructure supports **any domain** added to your Cloudflare account. No infrastructure changes needed - just proper service configuration.
+
+### Domain Strategies
+
+#### 1. Single Domain with Subdomains (Most Common)
+Use one domain with different subdomains for different services:
+
+```yaml
+# Multiple services on subdomains
+services:
+  frontend:
+    deploy:
+      labels:
+        - traefik.http.routers.frontend.rule=Host(`yourdomain.com`)
+        
+  api:
+    deploy:
+      labels:
+        - traefik.http.routers.api.rule=Host(`api.yourdomain.com`)
+        
+  admin:
+    deploy:
+      labels:
+        - traefik.http.routers.admin.rule=Host(`admin.yourdomain.com`)
+        
+  blog:
+    deploy:
+      labels:
+        - traefik.http.routers.blog.rule=Host(`blog.yourdomain.com`)
+```
+
+#### 2. Multiple Root Domains
+Use completely different domains for different projects:
+
+```yaml
+# Different services on different domains
+services:
+  personal-site:
+    deploy:
+      labels:
+        - traefik.http.routers.personal.rule=Host(`johnsmith.dev`)
+        
+  business-site:
+    deploy:
+      labels:
+        - traefik.http.routers.business.rule=Host(`mybusiness.com`)
+        
+  portfolio:
+    deploy:
+      labels:
+        - traefik.http.routers.portfolio.rule=Host(`portfolio.net`)
+```
+
+#### 3. Path-Based Routing (Same Domain)
+Multiple services on the same domain with different paths:
+
+```yaml
+# Services on same domain, different paths
+services:
+  main-app:
+    deploy:
+      labels:
+        - traefik.http.routers.main.rule=Host(`yourdomain.com`)
+        - traefik.http.routers.main.priority=1
+        
+  api:
+    deploy:
+      labels:
+        - traefik.http.routers.api.rule=Host(`yourdomain.com`) && PathPrefix(`/api`)
+        - traefik.http.routers.api.priority=2
+        
+  docs:
+    deploy:
+      labels:
+        - traefik.http.routers.docs.rule=Host(`yourdomain.com`) && PathPrefix(`/docs`)
+        - traefik.http.routers.docs.priority=2
+```
+
+#### 4. Mixed Strategies
+Combine different approaches:
+
+```yaml
+# Mixed domain and path routing
+services:
+  main-site:
+    deploy:
+      labels:
+        - traefik.http.routers.main.rule=Host(`yourdomain.com`)
+        
+  api-v1:
+    deploy:
+      labels:
+        - traefik.http.routers.api-v1.rule=Host(`api.yourdomain.com`) && PathPrefix(`/v1`)
+        
+  api-v2:
+    deploy:
+      labels:
+        - traefik.http.routers.api-v2.rule=Host(`api.yourdomain.com`) && PathPrefix(`/v2`)
+        
+  separate-project:
+    deploy:
+      labels:
+        - traefik.http.routers.project.rule=Host(`myproject.net`)
+```
+
+### Adding New Domains
+
+#### Step 1: Add Domain to Cloudflare
+1. **Transfer domain** to Cloudflare or **change nameservers** to Cloudflare
+2. **Add DNS A record**: `yourdomain.com` → `your-server-ip`
+3. **Add DNS A record**: `*.yourdomain.com` → `your-server-ip` (for subdomains)
+
+#### Step 2: Deploy Service with Domain
+```yaml
+version: '3.8'
+services:
+  web:
+    image: myapp:latest
+    networks: [traefik-public]
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.myapp.rule=Host(`mynewdomain.com`)
+        - traefik.http.routers.myapp.entrypoints=websecure
+        - traefik.http.routers.myapp.tls.certresolver=cloudflare
+        - traefik.http.services.myapp.loadbalancer.server.port=80
+
+networks:
+  traefik-public:
+    external: true
+```
+
+#### Step 3: Deploy and Verify
+```bash
+# Deploy the stack
+docker stack deploy -c compose.yml myapp
+
+# Check certificate generation
+docker service logs traefik_traefik | grep mynewdomain.com
+
+# Test the service
+curl -I https://mynewdomain.com
+```
+
+### SSL Certificate Behavior
+
+- **Automatic certificates** for any domain in Traefik labels
+- **Wildcard certificates** for subdomains (*.yourdomain.com)
+- **Individual certificates** for different root domains
+- **No manual intervention** needed - Cloudflare DNS challenge handles everything
+
+### Best Practices
+
+#### Domain Organization
+```bash
+# Recommended structure:
+yourdomain.com              # Main website/landing page
+app.yourdomain.com          # Main application
+api.yourdomain.com          # API services
+admin.yourdomain.com        # Admin interfaces (Tailscale only!)
+docs.yourdomain.com         # Documentation
+status.yourdomain.com       # Status/monitoring page
+
+# Separate projects:
+myblog.com                  # Personal blog
+mystore.net                 # E-commerce site
+portfolio.dev               # Developer portfolio
+```
+
+#### Security Considerations
+```yaml
+# Public services (accessible from internet):
+labels:
+  - traefik.http.routers.public.rule=Host(`yourdomain.com`)
+  - traefik.http.routers.public.middlewares=security-headers,rate-limit
+
+# Admin services (Tailscale network only):
+labels:
+  - traefik.http.routers.admin.rule=Host(`admin.yourdomain.com`)
+  # Note: Admin services are accessed via Tailscale IP, not through Traefik
+  # This label is for documentation - actual access is http://tailscale-ip:port
+```
+
 ## Compose Template
 
 ```yaml
