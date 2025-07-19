@@ -34,7 +34,6 @@
       - chrony
       - python3
       - python3-pip
-      - glances  # System monitoring with web interface
     state: present
   tags: [system_update, phase1]
 
@@ -47,35 +46,6 @@
       APT::Periodic::Download-Upgradeable-Packages "1";
       APT::Periodic::AutocleanInterval "7";
     mode: '0644'
-  tags: [system_update, phase1]
-
-- name: Create Glances systemd service for web mode
-  ansible.builtin.copy:
-    dest: /etc/systemd/system/glances-web.service
-    content: |
-      [Unit]
-      Description=Glances Web Server
-      After=network.target
-      
-      [Service]
-      Type=simple
-      User=nobody
-      ExecStart=/usr/bin/glances -w --bind 0.0.0.0 --port 61208
-      Restart=always
-      RestartSec=10
-      
-      [Install]
-      WantedBy=multi-user.target
-    mode: '0644'
-  notify: reload systemd
-  tags: [system_update, phase1]
-
-- name: Enable and start Glances web server
-  ansible.builtin.systemd:
-    name: glances-web
-    enabled: yes
-    state: started
-    daemon_reload: yes
   tags: [system_update, phase1]
 
 - name: Configure unattended upgrades

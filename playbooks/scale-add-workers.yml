@@ -12,6 +12,12 @@
     - ../group_vars/docker.yml
     
   pre_tasks:
+    - name: Ensure connection uses Tailscale hostname
+      ansible.builtin.set_fact:
+        ansible_host: "{{ tailscale_hostname | default(inventory_hostname) }}"
+      when: tailscale_hostname is defined
+      tags: always
+
     - name: Verify new worker configuration
       ansible.builtin.assert:
         that:

@@ -14,6 +14,12 @@
     safety_mode: "{{ safety_checkpoint | default(true) }}"
     
   pre_tasks:
+    - name: Determine connection method for disaster recovery
+      ansible.builtin.set_fact:
+        ansible_host: "{{ base_host if disaster_recovery_use_ip | default(false) else (tailscale_hostname | default(inventory_hostname)) }}"
+      when: base_host is defined
+      tags: always
+
     - name: Display disaster recovery banner
       ansible.builtin.debug:
         msg:

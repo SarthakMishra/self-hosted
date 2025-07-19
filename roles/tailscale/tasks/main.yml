@@ -30,8 +30,8 @@
 - name: Install Tailscale
   ansible.builtin.apt:
     name: tailscale
-    state: "{{ 'latest' if tailscale_version == 'latest' else 'present' }}"
-    version: "{{ tailscale_version if tailscale_version != 'latest' else omit }}"
+    state: "{{ 'latest' if (tailscale_version | default('latest')) == 'latest' else 'present' }}"
+    version: "{{ (tailscale_version | default('latest')) if (tailscale_version | default('latest')) != 'latest' else omit }}"
   register: tailscale_installed
   tags:
     - tailscale
@@ -65,15 +65,15 @@
 - name: Configure Tailscale with auth key
   ansible.builtin.command: >
     tailscale up 
-    --accept-routes={{ tailscale_accept_routes | lower }}
-    --accept-dns={{ tailscale_accept_dns | lower }}
-    --hostname={{ tailscale_hostname }}
-    {% if tailscale_ssh_enabled %}--ssh{% endif %}
-    {% if tailscale_auth_key %}--authkey={{ tailscale_auth_key }}{% endif %}
+    --accept-routes={{ (tailscale_accept_routes | default(true)) | lower }}
+    --accept-dns={{ (tailscale_accept_dns | default(true)) | lower }}
+    --hostname={{ tailscale_hostname | default(inventory_hostname) }}
+    {% if (tailscale_ssh_enabled | default(true)) %}--ssh{% endif %}
+    {% if (tailscale_auth_key | default('')) %}--authkey={{ tailscale_auth_key | default('') }}{% endif %}
   register: tailscale_up_result
   when: 
     - not tailscale_authenticated
-    - tailscale_auth_key != ""
+    - (tailscale_auth_key | default('')) != ""
   notify:
     - restart tailscaled
   tags:
@@ -83,14 +83,14 @@
 - name: Configure Tailscale without auth key (manual authentication required)
   ansible.builtin.command: >
     tailscale up 
-    --accept-routes={{ tailscale_accept_routes | lower }}
-    --accept-dns={{ tailscale_accept_dns | lower }}
-    --hostname={{ tailscale_hostname }}
-    {% if tailscale_ssh_enabled %}--ssh{% endif %}
+    --accept-routes={{ (tailscale_accept_routes | default(true)) | lower }}
+    --accept-dns={{ (tailscale_accept_dns | default(true)) | lower }}
+    --hostname={{ tailscale_hostname | default(inventory_hostname) }}
+    {% if (tailscale_ssh_enabled | default(true)) %}--ssh{% endif %}
   register: tailscale_up_manual_result
   when: 
     - not tailscale_authenticated
-    - tailscale_auth_key == ""
+    - (tailscale_auth_key | default('')) == ""
   notify:
     - restart tailscaled
   tags:
@@ -135,10 +135,10 @@
   ansible.builtin.debug:
     msg:
       - "Tailscale installed and configured successfully"
-      - "Hostname: {{ tailscale_hostname }}"
+      - "Hostname: {{ tailscale_hostname | default(inventory_hostname) }}"
       - "IP Address: {{ tailscale_ip | default('Not available') }}"
-      - "SSH Access: ssh {{ admin_username }}@{{ tailscale_ip | default('TAILSCALE_IP') }}"
-      - "Auth method: {{ 'Auth key' if tailscale_auth_key else 'Manual authentication required' }}"
+      - "SSH Access: ssh {{ admin_username | default('admin') }}@{{ tailscale_ip | default('TAILSCALE_IP') }}"
+      - "Auth method: {{ 'Auth key' if (tailscale_auth_key | default('')) else 'Manual authentication required' }}"
   tags:
     - tailscale
     - configuration
@@ -151,7 +151,7 @@
       - "Please complete authentication before proceeding"
       - "Check authentication status with: tailscale status"
   when: 
-    - tailscale_auth_key == ""
+    - (tailscale_auth_key | default('')) == ""
     - (tailscale_up_manual_result is changed or not tailscale_authenticated)
   tags:
     - tailscale

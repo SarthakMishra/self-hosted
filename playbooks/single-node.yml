@@ -89,6 +89,34 @@
         - phase4
 
   post_tasks:
+    - name: Update connection to use Tailscale hostname  
+      ansible.builtin.set_fact:
+        ansible_host: "{{ tailscale_hostname | default(inventory_hostname) }}"
+      delegate_to: localhost
+      delegate_facts: true
+      when: tailscale_hostname is defined
+      tags:
+        - tailscale
+        - connection_switch
+
+    - name: Display connection switch information
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🌐 CONNECTION SWITCHED TO TAILSCALE"
+          - "================================================================"
+          - ""
+          - "✅ Single node preparation completed with secure connection"
+          - "🔄 Ansible connection switched from {{ base_host }} to {{ tailscale_hostname | default(inventory_hostname) }}"
+          - "🔒 Future deployments will use Tailscale hostname for connectivity"
+          - ""
+          - "⚡ Ready for Docker deployment with secure networking!"
+          - ""
+      when: tailscale_hostname is defined
+      tags:
+        - tailscale
+        - connection_switch
+
     - name: Single node preparation complete
       ansible.builtin.debug:
         msg:
@@ -101,11 +129,11 @@
           - "✅ Tailscale configured for secure admin access"
           - ""
           - "🌐 Access Information:"
-          - "  Admin SSH: ssh {{ admin_username }}@{{ tailscale_ip | default('TAILSCALE_IP') }}"
+          - "  Admin SSH: ssh {{ admin_username | default('admin') }}@{{ tailscale_hostname | default(inventory_hostname) }}"
           - "  Public HTTPS: https://{{ domain_name | default('your-domain.com') }}"
           - ""
           - "📋 Next Steps:"
-          - "1. Configure DNS to point to {{ ansible_default_ipv4.address }}"
+          - "1. Configure DNS to point to {{ base_host }}"
           - "2. Reboot system: sudo reboot"
           - "3. Install Docker and deploy services"
           - ""

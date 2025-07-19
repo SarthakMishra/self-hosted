@@ -11,7 +11,7 @@ docker_user_enabled: true
 # SSH Configuration  
 ssh_disable_root: true
 ssh_disable_password_auth: true
-ssh_public_keys: []  # Define in environment-specific vars or host_vars
+ssh_public_keys: []  # Empty - using Tailscale SSH instead of traditional keys
 
 # Tailscale Configuration
 tailscale_version: "latest"
@@ -32,6 +32,15 @@ cloudflare_ipv6_url: "https://www.cloudflare.com/ips-v6"
 kernel_hardening_enabled: true
 system_limits_enabled: true
 security_updates_enabled: true
+
+# User Security - Ubuntu User Management
+# ⚠️  CRITICAL: Ubuntu user is disabled at the END of system preparation
+# This prevents lockout if Tailscale/admin user setup fails
+disable_ubuntu_user: true  # Set to false to keep ubuntu user enabled
+
+# System Reboot Management
+# Automatic reboot after system preparation to apply kernel updates
+reboot_after_preparation: true  # Set to false to skip automatic reboot
 
 # Time Synchronization
 chrony_enabled: true

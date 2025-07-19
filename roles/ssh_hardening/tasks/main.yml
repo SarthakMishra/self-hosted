@@ -72,7 +72,7 @@
 
 - name: Verify admin user can use SSH keys
   ansible.builtin.stat:
-    path: "{{ admin_home }}/.ssh/authorized_keys"
+    path: "{{ admin_home | default('/home/' + (admin_username | default('admin'))) }}/.ssh/authorized_keys"
   register: admin_ssh_keys
   tags:
     - ssh_hardening
@@ -82,7 +82,7 @@
   ansible.builtin.fail:
     msg:
       - "❌ CRITICAL ERROR: No SSH keys found for admin user"
-      - "Path checked: {{ admin_home }}/.ssh/authorized_keys"
+      - "Path checked: {{ admin_home | default('/home/' + (admin_username | default('admin'))) }}/.ssh/authorized_keys"
       - "This could result in lockout after SSH hardening"
       - "Please ensure SSH keys are properly configured"
   when: 

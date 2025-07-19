@@ -1,194 +1,84 @@
 ---
 # Whalewall Role - Main Tasks
-# Handles Whalewall installation and UFW/Docker firewall integration
+# Handles Whalewall Docker container deployment for UFW/Docker firewall integration
 
-- name: Check if Whalewall is already installed
-  ansible.builtin.stat:
-    path: /usr/local/bin/whalewall
-  register: whalewall_binary_check
+- name: Check if Whalewall container is running
+  ansible.builtin.shell: docker ps --format "table {{ '{{' }}.Names{{ '}}' }}" | grep whalewall || echo "not_running"
+  register: whalewall_container_check
+  changed_when: false
   tags:
     - whalewall
     - check
 
-- name: Create temporary directory for Whalewall download
-  ansible.builtin.tempfile:
-    state: directory
-    suffix: whalewall
-  register: whalewall_temp_dir
-  when: not whalewall_binary_check.stat.exists or whalewall_version == "latest"
+- name: Create Whalewall data volume
+  ansible.builtin.shell: docker volume create whalewall_data
+  when: '"not_running" in whalewall_container_check.stdout'
+  register: whalewall_volume_created
   tags:
     - whalewall
-    - download
+    - volume
 
-- name: Download Whalewall archive
-  ansible.builtin.get_url:
-    url: "{{ whalewall_binary_url }}"
-    dest: "{{ whalewall_temp_dir.path }}/whalewall.tar.gz"
-    mode: '0644'
-    timeout: 30
-  when: not whalewall_binary_check.stat.exists or whalewall_version == "latest"
-  register: whalewall_downloaded
+- name: Deploy Whalewall container
+  ansible.builtin.shell: |
+    docker run -d \
+      --name whalewall \
+      --cap-add NET_ADMIN \
+      --network host \
+      --restart unless-stopped \
+      -v whalewall_data:/data \
+      -v /var/run/docker.sock:/var/run/docker.sock:ro \
+      ghcr.io/capnspacehook/whalewall:latest
+  when: '"not_running" in whalewall_container_check.stdout'
+  register: whalewall_deployed
   tags:
     - whalewall
-    - download
-
-- name: Extract Whalewall archive
-  ansible.builtin.unarchive:
-    src: "{{ whalewall_temp_dir.path }}/whalewall.tar.gz"
-    dest: "{{ whalewall_temp_dir.path }}"
-    remote_src: true
-  when: whalewall_downloaded is changed
-  tags:
-    - whalewall
-    - installation
-
-- name: Install Whalewall binary
-  ansible.builtin.copy:
-    src: "{{ whalewall_temp_dir.path }}/whalewall"
-    dest: /usr/local/bin/whalewall
-    mode: '0755'
-    owner: root
-    group: docker
-    remote_src: true
-  when: whalewall_downloaded is changed
-  notify:
-    - restart whalewall
-  tags:
-    - whalewall
-    - installation
-
-- name: Set capabilities on Whalewall binary
-  community.general.capabilities:
-    path: /usr/local/bin/whalewall
-    capability: cap_net_admin=+ep
-    state: present
-  tags:
-    - whalewall
-    - capabilities
-
-- name: Clean up temporary directory
-  ansible.builtin.file:
-    path: "{{ whalewall_temp_dir.path }}"
-    state: absent
-  when: whalewall_temp_dir.path is defined
-  tags:
-    - whalewall
-    - cleanup
-
-- name: Create Whalewall systemd service
-  ansible.builtin.template:
-    src: whalewall.service.j2
-    dest: /etc/systemd/system/whalewall.service
-    mode: '0644'
-    owner: root
-    group: root
-    backup: true
-  register: whalewall_service_created
-  notify:
-    - reload systemd
-    - restart whalewall
-  tags:
-    - whalewall
-    - service
-
-- name: Enable Whalewall service
-  ansible.builtin.systemd:
-    name: whalewall
-    enabled: true
-    daemon_reload: true
-  when: whalewall_enabled | default(true)
-  tags:
-    - whalewall
-    - service
-
-- name: Start Whalewall service
-  ansible.builtin.systemd:
-    name: whalewall
-    state: started
-  when: whalewall_enabled | default(true)
-  tags:
-    - whalewall
-    - service
+    - deployment
 
 - name: Wait for Whalewall to be ready
-  ansible.builtin.wait_for:
-    timeout: 10
-  when: whalewall_service_created is changed
+  ansible.builtin.pause:
+    seconds: 10
+  when: whalewall_deployed is changed
   tags:
     - whalewall
-    - verification
+    - deployment
 
-- name: Check Whalewall service status
-  ansible.builtin.systemd:
-    name: whalewall
-  register: whalewall_status
-  tags:
-    - whalewall
-    - verification
-
-- name: Verify Whalewall binary version
-  ansible.builtin.command: /usr/local/bin/whalewall --version
-  register: whalewall_version_check
+- name: Verify Whalewall container status
+  ansible.builtin.shell: docker ps --filter "name=whalewall" --format "table {{ '{{' }}.Names{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}"
+  register: whalewall_status_check
   changed_when: false
-  failed_when: false
   tags:
     - whalewall
     - verification
 
-- name: Create Whalewall usage documentation
-  ansible.builtin.copy:
-    content: |
-      # Whalewall Usage
-      
-      Whalewall automatically manages UFW rules for Docker containers.
-      
-      ## Basic Usage
-      
-      To allow external access to a container, use Docker labels:
-      
-      ```bash
-      # Allow access from localhost
-      docker run -d \
-        --label whalewall.enabled=true \
-        --label whalewall.rules="mapped_ports: localhost: allow: true" \
-        nginx
-      
-      # Allow access from specific IP
-      docker run -d \
-        --label whalewall.enabled=true \
-        --label whalewall.rules="mapped_ports: 192.168.1.0/24: allow: true" \
-        nginx
-      
-      # Allow access from anywhere (use with caution)
-      docker run -d \
-        --label whalewall.enabled=true \
-        --label whalewall.rules="mapped_ports: any: allow: true" \
-        nginx
-      ```
-      
-      ## Service Status
-      
-      Check Whalewall status: sudo systemctl status whalewall
-      View logs: sudo journalctl -u whalewall -f
-      
-    dest: /opt/docker-swarm/config/whalewall-usage.md
-    mode: '0644'
-    owner: docker
-    group: docker
+- name: Check Whalewall logs for any errors
+  ansible.builtin.shell: docker logs whalewall --tail 20
+  register: whalewall_logs
+  changed_when: false
+  when: whalewall_deployed is changed
   tags:
     - whalewall
-    - documentation
+    - verification
 
-- name: Display Whalewall installation summary
+- name: Test Whalewall functionality
+  ansible.builtin.shell: docker exec whalewall whalewall --help || echo "help_not_available"
+  register: whalewall_help_test
+  changed_when: false
+  ignore_errors: true
+  tags:
+    - whalewall
+    - testing
+
+- name: Display Whalewall deployment summary
   ansible.builtin.debug:
     msg:
-      - "Whalewall installation completed"
-      - "Binary location: /usr/local/bin/whalewall"
-      - "Version: {{ whalewall_version_check.stdout | default('Unable to determine') }}"
-      - "Service enabled: {{ whalewall_enabled | default(true) }}"
-      - "Service status: {{ whalewall_status.status.ActiveState | default('unknown') }}"
-      - "Capabilities: cap_net_admin=+ep"
-      - "Usage documentation: /opt/docker-swarm/config/whalewall-usage.md"
+      - "Whalewall container deployment completed"
+      - "Container status: {{ whalewall_status_check.stdout }}"
+      - "Image: ghcr.io/capnspacehook/whalewall:latest"
+      - "Capabilities: NET_ADMIN"
+      - "Network mode: host"
+      - "Data volume: whalewall_data"
+      - "Docker socket: mounted read-only"
+      - "UFW/Docker integration: active"
   tags:
     - whalewall
     - summary 

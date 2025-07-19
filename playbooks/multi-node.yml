@@ -128,6 +128,34 @@
         - validation
         - phase4
 
+    - name: Update connection to use Tailscale hostname  
+      ansible.builtin.set_fact:
+        ansible_host: "{{ tailscale_hostname | default(inventory_hostname) }}"
+      delegate_to: localhost
+      delegate_facts: true
+      when: tailscale_hostname is defined
+      tags:
+        - tailscale
+        - connection_switch
+
+    - name: Display connection switch information
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🌐 CONNECTION SWITCHED TO TAILSCALE"
+          - "================================================================"
+          - ""
+          - "✅ Node {{ inventory_hostname }} preparation completed with secure connection"
+          - "🔄 Ansible connection switched from {{ base_host }} to {{ tailscale_hostname | default(inventory_hostname) }}"
+          - "🔒 Future deployments will use Tailscale hostname for connectivity"
+          - ""
+          - "⚡ Ready for Docker deployment with secure networking!"
+          - ""
+      when: tailscale_hostname is defined
+      tags:
+        - tailscale
+        - connection_switch
+
     - name: Multi-node preparation complete
       ansible.builtin.debug:
         msg:

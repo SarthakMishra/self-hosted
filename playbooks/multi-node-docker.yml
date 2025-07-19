@@ -15,8 +15,24 @@
   vars:
     # Multi-node specific settings
     docker_swarm_enabled: true
+    # Automatic user switching - use admin user for Docker phase
+    ansible_user: "{{ admin_user | default('admin') }}"
     
   pre_tasks:
+    - name: Ensure connection uses Tailscale hostname
+      ansible.builtin.set_fact:
+        ansible_host: "{{ tailscale_hostname | default(inventory_hostname) }}"
+      when: tailscale_hostname is defined
+      tags: always
+
+    - name: Verify admin user connectivity
+      ansible.builtin.debug:
+        msg:
+          - "🔐 Using admin user for Docker deployment: {{ ansible_user }}"
+          - "🔄 Switched from base user ({{ base_user | default('ubuntu') }}) to admin user"
+          - "🌐 Using Tailscale hostname: {{ ansible_host }}"
+          - "✅ This happens automatically - no manual inventory changes needed"
+      tags: always
     - name: Display multi-node Docker setup banner
       ansible.builtin.debug:
         msg:

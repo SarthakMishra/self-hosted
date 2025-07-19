@@ -29,20 +29,14 @@
     - docker_installation
     - prerequisites
 
-- name: Add Docker GPG key
-  ansible.builtin.get_url:
-    url: "{{ docker_apt_key_url }}"
-    dest: "{{ docker_apt_key_file }}"
-    mode: '0644'
-    force: true
-  register: docker_gpg_key_added
-  tags:
-    - docker_installation
-    - repository
-
-- name: Convert GPG key to proper format
-  ansible.builtin.command: gpg --dearmor --output {{ docker_apt_key_file }} {{ docker_apt_key_file }}
-  when: docker_gpg_key_added is changed
+- name: Add and convert Docker GPG key
+  ansible.builtin.shell: |
+    curl -fsSL {{ docker_apt_key_url }} | gpg --dearmor -o {{ docker_apt_key_file }}
+    chmod 644 {{ docker_apt_key_file }}
+  args:
+    creates: "{{ docker_apt_key_file }}"
+  environment:
+    GNUPGHOME: /tmp/gnupg
   tags:
     - docker_installation
     - repository
@@ -60,6 +54,13 @@
     repo: "{{ docker_apt_repository }}"
     filename: docker
     state: present
+    update_cache: false
+  tags:
+    - docker_installation
+    - repository
+
+- name: Update apt cache after adding repository
+  ansible.builtin.apt:
     update_cache: true
   tags:
     - docker_installation
@@ -89,9 +90,10 @@
 
 - name: Add admin user to docker group
   ansible.builtin.user:
-    name: "{{ admin_username }}"
+    name: "{{ admin_username | default('admin') }}"
     groups: docker
     append: true
+  when: admin_username is defined
   tags:
     - docker_installation
     - user_management
@@ -127,7 +129,7 @@
       - "Docker installation completed successfully"
       - "Docker version: {{ docker_version_check.stdout }}"
       - "Docker Compose version: {{ docker_compose_version_check.stdout }}"
-      - "Users in docker group: docker, {{ admin_username }}"
+      - "Users in docker group: docker{{ ', ' + admin_username if admin_username is defined else '' }}"
       - "Hello-world test: {{ 'PASSED' if docker_hello_world_test.rc == 0 else 'FAILED' }}"
   tags:
     - docker_installation

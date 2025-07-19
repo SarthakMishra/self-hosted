@@ -125,6 +125,9 @@
       - "Cloudflare firewall: {{ cloudflare_firewall_enabled | default(true) }}"
       - "IPv4 ranges configured: {{ cloudflare_ipv4_list | length if cloudflare_firewall_enabled else 0 }}"
       - "IPv6 ranges configured: {{ cloudflare_ipv6_list | length if cloudflare_firewall_enabled else 0 }}"
+      - ""
+      - "🔒 SECURITY: SSH port 22 blocked from public internet"
+      - "🌐 ACCESS: Use Tailscale SSH for secure admin access"
   tags:
     - firewall
     - status 

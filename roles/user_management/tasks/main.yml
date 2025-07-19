@@ -4,9 +4,9 @@
 
 - name: Create admin user
   ansible.builtin.user:
-    name: "{{ admin_username }}"
-    shell: "{{ admin_shell }}"
-    home: "{{ admin_home }}"
+    name: "{{ admin_username | default('admin') }}"
+    shell: "{{ admin_shell | default('/bin/bash') }}"
+    home: "{{ admin_home | default('/home/' + (admin_username | default('admin'))) }}"
     create_home: true
     groups: sudo
     append: true
@@ -16,12 +16,24 @@
     - user_management
     - admin_user
 
+- name: Configure passwordless sudo for admin user
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers.d/admin-user
+    line: "{{ admin_username | default('admin') }} ALL=(ALL) NOPASSWD:ALL"
+    create: true
+    mode: '0440'
+    validate: 'visudo -cf %s'
+  tags:
+    - user_management
+    - admin_user
+    - sudo
+
 - name: Create admin user .ssh directory
   ansible.builtin.file:
-    path: "{{ admin_home }}/.ssh"
+    path: "{{ admin_home | default('/home/' + (admin_username | default('admin'))) }}/.ssh"
     state: directory
-    owner: "{{ admin_username }}"
-    group: "{{ admin_username }}"
+    owner: "{{ admin_username | default('admin') }}"
+    group: "{{ admin_username | default('admin') }}"
     mode: '0700'
   tags:
     - user_management
@@ -30,11 +42,11 @@
 
 - name: Add SSH public keys for admin user
   ansible.builtin.authorized_key:
-    user: "{{ admin_username }}"
+    user: "{{ admin_username | default('admin') }}"
     key: "{{ item }}"
     state: present
-  loop: "{{ ssh_public_keys }}"
-  when: ssh_public_keys | length > 0
+  loop: "{{ ssh_public_keys | default([]) }}"
+  when: (ssh_public_keys | default([])) | length > 0
   tags:
     - user_management
     - admin_user
@@ -43,13 +55,13 @@
 - name: Copy root SSH keys to admin user if no keys provided
   ansible.builtin.copy:
     src: /root/.ssh/authorized_keys
-    dest: "{{ admin_home }}/.ssh/authorized_keys"
-    owner: "{{ admin_username }}"
-    group: "{{ admin_username }}"
+    dest: "{{ admin_home | default('/home/' + (admin_username | default('admin'))) }}/.ssh/authorized_keys"
+    owner: "{{ admin_username | default('admin') }}"
+    group: "{{ admin_username | default('admin') }}"
     mode: '0600'
     remote_src: true
   when: 
-    - ssh_public_keys | length == 0
+    - (ssh_public_keys | default([])) | length == 0
     - ansible_check_mode == false
   ignore_errors: true
   tags:
@@ -58,7 +70,7 @@
     - ssh
 
 - name: Test admin user sudo access
-  ansible.builtin.command: sudo -u {{ admin_username }} sudo -n whoami
+  ansible.builtin.command: sudo -u {{ admin_username | default('admin') }} sudo -n whoami
   register: admin_sudo_test
   changed_when: false
   failed_when: admin_sudo_test.stdout != "root"
@@ -66,6 +78,9 @@
     - user_management
     - admin_user
     - validation
+
+# NOTE: Ubuntu user disabling moved to validation role (end of playbook)
+# This prevents lockout if something fails during system preparation
 
 - name: Create docker system user
   ansible.builtin.user:
@@ -96,7 +111,7 @@
 
 - name: Copy admin SSH keys to docker user
   ansible.builtin.copy:
-    src: "{{ admin_home }}/.ssh/authorized_keys"
+    src: "{{ admin_home | default('/home/' + (admin_username | default('admin'))) }}/.ssh/authorized_keys"
     dest: /home/docker/.ssh/authorized_keys
     owner: docker
     group: docker
@@ -114,9 +129,9 @@
 - name: Display admin user information
   ansible.builtin.debug:
     msg:
-      - "Admin user '{{ admin_username }}' has been created successfully"
-      - "Home directory: {{ admin_home }}"
-      - "SSH access configured: {{ ssh_public_keys | length > 0 }}"
+      - "Admin user '{{ admin_username | default('admin') }}' has been created successfully"
+      - "Home directory: {{ admin_home | default('/home/' + (admin_username | default('admin'))) }}"
+      - "SSH access configured: {{ (ssh_public_keys | default([])) | length > 0 }}"
       - "Sudo access verified: {{ admin_sudo_test.stdout == 'root' }}"
   tags:
     - user_management

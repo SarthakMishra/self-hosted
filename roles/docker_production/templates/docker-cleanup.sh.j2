@@ -27,7 +27,7 @@ docker image prune -af --filter "until={{ docker_cleanup_retention.images }}"
 
 # Clean up unused volumes (older than {{ docker_cleanup_retention.volumes }})
 echo "Cleaning unused volumes..."
-docker volume prune -f --filter "until={{ docker_cleanup_retention.volumes }}"
+docker volume prune -f
 
 # Clean up unused networks
 echo "Cleaning unused networks..."

@@ -78,7 +78,7 @@
       - "Networks created: {{ docker_networks | map(attribute='name') | join(', ') }}"
       - "Overlay networks: {{ docker_networks | selectattr('driver', 'equalto', 'overlay') | map(attribute='name') | join(', ') }}"
       - "Bridge networks: {{ docker_networks | selectattr('driver', 'equalto', 'bridge') | map(attribute='name') | join(', ') }}"
-      - "Encrypted networks: {{ docker_networks | selectattr('encrypted', 'equalto', true) | map(attribute='name') | join(', ') }}"
+      - "Encrypted networks: {{ docker_networks | selectattr('encrypted', 'defined') | selectattr('encrypted', 'equalto', true) | map(attribute='name') | join(', ') }}"
   tags:
     - docker_networks
     - summary
