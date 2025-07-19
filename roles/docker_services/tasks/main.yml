@@ -91,7 +91,7 @@
       - ""
       - "🔀 Traefik (Reverse Proxy):"
       - "  Dashboard: http://{{ tailscale_ip | default(ansible_default_ipv4.address) }}:8080"
-      - "  HTTPS Endpoint: https://{{ domain_name }}"
+      - "  HTTPS Endpoint: {{ 'https://' + domain_name if domain_name is defined else 'Configure domain in service labels' }}"
       - ""
       - "📊 Glances (System Monitoring):"
       - "  Web Interface: http://{{ tailscale_ip | default(ansible_default_ipv4.address) }}:61208"

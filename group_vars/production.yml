@@ -3,7 +3,7 @@
 
 # Environment identification
 environment: production
-domain_name: "{{ vault_production_domain }}"
+# domain_name: Set only when deploying public services - see service-deployment-guide.md
 
 # Admin user SSH keys for production
 ssh_public_keys:

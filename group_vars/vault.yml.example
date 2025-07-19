@@ -5,11 +5,6 @@
 # WARNING: vault.yml contains sensitive data and is gitignored
 
 # =============================================================================
-# DOMAIN CONFIGURATION
-# =============================================================================
-vault_production_domain: "yourdomain.com"           # Your production domain
-
-# =============================================================================
 # SSH PUBLIC KEYS
 # =============================================================================
 # Add your SSH public keys for secure access

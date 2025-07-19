@@ -150,7 +150,7 @@ docker_log_rotation:
     size: "100M"
 
 # Service Credentials (should be in vault in production)
-cloudflare_email: "{{ vault_cloudflare_email | default('admin@' + domain_name) }}"
+cloudflare_email: "{{ vault_cloudflare_email | default('admin@localhost') }}"
 cloudflare_api_key: "{{ vault_cloudflare_api_key | default('') }}"
 cloudflare_dns_token: "{{ vault_cloudflare_dns_token | default('') }}"
 

@@ -3,7 +3,7 @@
 
 # Environment identification
 environment: staging
-domain_name: "staging.{{ vault_production_domain | default('example.com') }}"
+# domain_name: Set only when deploying public services - see service-deployment-guide.md
 
 # Admin user SSH keys for staging
 ssh_public_keys:
