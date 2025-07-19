@@ -129,6 +129,10 @@ nano inventory/hosts.yml  # Add your server IPs and configuration
 # - ansible_user: debian (for Debian images)
 # - ansible_user: admin (for custom setups)
 # Uses sudo for privilege escalation - root login NOT required
+
+# Optional: Disable staging environment if not needed
+# Comment out the staging section in inventory/hosts.yml
+# The staging.yml group_vars file can be left as-is or removed
 ```
 
 ### 2. Set Up Sensitive Variables
@@ -241,16 +245,16 @@ The deployment follows a structured, idempotent process:
 - **System Hardening**: Automated security updates, UFW firewall, kernel hardening
 - **Network Security**: Tailscale mesh VPN, encrypted Docker networks
 - **Access Control**: SSH key authentication, admin user isolation
-- **Service Security**: Traefik security headers, direct CLI management
+- **Service Security**: Admin dashboards protected by Tailscale network isolation, Traefik security headers
 - **Backup Security**: Encrypted Restic repositories, secure sync protocols
 
 ## 📋 Service Management
 
 ### Services Access
-- **Traefik**: Dashboard on port 8080 (if enabled)
-- **Glances**: Web interface on port 61208
+- **Traefik**: Dashboard on port 8080 (Tailscale network only - no auth needed)
+- **Glances**: Web interface on port 61208 (Tailscale network only)
 - **Docker CLI**: Direct service management via SSH and Docker commands
-- Services: Traefik reverse proxy, direct CLI-based stack deployments
+- **Admin Access**: All dashboards accessible only via Tailscale mesh VPN for security
 
 ### Service Deployment
 - **Zero-downtime deployments**: Rolling updates via Docker Swarm

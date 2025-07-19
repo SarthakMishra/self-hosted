@@ -44,14 +44,14 @@ all:
             #   node_type: manager
             #   traefik_enabled: false
     
-    staging:
-      children:
-        staging_nodes:
-          hosts:
-            staging1:
-              ansible_host: YOUR_STAGING_IP    # Staging server IP
-              node_type: single
-              traefik_enabled: true
+    # staging:                               # OPTIONAL: Comment out if no staging needed
+    #   children:
+    #     staging_nodes:
+    #       hosts:
+    #         staging1:
+    #           ansible_host: YOUR_STAGING_IP    # Staging server IP
+    #           node_type: single
+    #           traefik_enabled: true
     
     single_node:
       hosts:

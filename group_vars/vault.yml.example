@@ -48,9 +48,10 @@ vault_restic_password: "your-very-secure-backup-password-here"
 # This password encrypts all your backup data - keep it safe!
 
 # =============================================================================
-# BASIC AUTHENTICATION (Optional)
+# BASIC AUTHENTICATION (Optional - Not Needed for Tailscale-Protected Services)
 # =============================================================================
-# For protecting admin interfaces (Traefik dashboard, etc.)
+# For future services that might need web authentication
+# NOTE: Traefik dashboard and Glances are protected by Tailscale network access
 vault_basic_auth_user: "admin"
 vault_basic_auth_password: "your-admin-interface-password"
 
