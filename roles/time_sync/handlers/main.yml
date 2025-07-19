@@ -1,0 +1,9 @@
+---
+# Time Sync Role - Handlers
+# Manages Chrony service restarts
+
+- name: restart chrony
+  ansible.builtin.systemd:
+    name: chrony
+    state: restarted
+  listen: "restart chrony" 

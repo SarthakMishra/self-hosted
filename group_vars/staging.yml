@@ -1,0 +1,20 @@
+---
+# Staging environment configuration
+
+# Environment identification
+environment: staging
+domain_name: "staging.{{ vault_production_domain | default('example.com') }}"
+
+# Admin user SSH keys for staging
+ssh_public_keys:
+  - "{{ vault_staging_admin_ssh_key }}"
+
+# Tailscale staging configuration
+tailscale_hostname: "{{ inventory_hostname }}-staging"
+
+# Relaxed settings for staging
+log_retention_days: 7
+reboot_timeout: 600
+
+# Staging-specific firewall rules
+cloudflare_firewall_enabled: false  # Allow direct access for testing 

@@ -1,0 +1,147 @@
+version: '3.8'
+
+services:
+  traefik:
+    image: traefik:v3.0
+    command:
+      # API and Dashboard
+      - --api.dashboard=true
+      - --api.insecure=false
+      
+      # Entrypoints - Only HTTPS since Cloudflare handles HTTP->HTTPS redirects
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls.certresolver=cloudflare
+      
+      # Cloudflare authenticated origin pulls for security
+      - --entrypoints.websecure.http.tls.options=cloudflare@file
+      
+      # Docker Swarm provider
+      - --providers.docker=true
+      - --providers.docker.swarmmode=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network={{ docker_traefik_network }}
+      
+      # File provider for TLS configuration
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --providers.file.watch=true
+      
+      # Cloudflare DNS Challenge (more secure than HTTP challenge)
+      - --certificatesresolvers.cloudflare.acme.email=${EMAIL}
+      - --certificatesresolvers.cloudflare.acme.storage=/certs/acme.json
+      - --certificatesresolvers.cloudflare.acme.dnschallenge=true
+      - --certificatesresolvers.cloudflare.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.cloudflare.acme.dnschallenge.delaybeforecheck=90
+      - --certificatesresolvers.cloudflare.acme.dnschallenge.disablepropagationcheck=true
+      - --certificatesresolvers.cloudflare.acme.dnschallenge.resolvers=1.1.1.1:53,1.0.0.1:53
+      
+      # Logging
+      - --log.level=INFO
+      - --accesslog=true
+      - --accesslog.filepath=/var/log/traefik/access.log
+      - --accesslog.format=json
+      
+      # Metrics
+      - --metrics.prometheus=true
+      - --metrics.prometheus.addrouterslabels=true
+      
+      # Security and performance optimizations
+      - --global.sendanonymoususage=false
+      - --global.checknewversion=false
+      - --serversTransport.insecureSkipVerify=false
+      - --serversTransport.maxIdleConnsPerHost=10
+      - --api.debug=false
+      
+    ports:
+      # No port 80 needed - Cloudflare handles HTTP->HTTPS redirects
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: host
+      # Port 8080 for Traefik dashboard - accessible ONLY via Tailscale network
+      - target: 8080
+        published: 8080
+        protocol: tcp
+        mode: host
+        
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_certs:/certs
+      - traefik_logs:/var/log/traefik
+      - {{ docker_stack_root }}/data/traefik/config:/etc/traefik:ro
+      
+    environment:
+      - TRAEFIK_DOMAIN=${DOMAIN}
+      # Cloudflare API credentials for DNS challenge
+      - CF_API_EMAIL=${CLOUDFLARE_EMAIL}
+      - CF_API_KEY=${CLOUDFLARE_API_KEY}
+      - CF_DNS_API_TOKEN=${CLOUDFLARE_DNS_TOKEN}
+      
+    networks:
+      - {{ docker_traefik_network }}
+      
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+      labels:
+        # Traefik dashboard - DISABLED for public access
+        # Dashboard is accessible ONLY via Tailscale network at: http://tailscale-ip:8080
+        - traefik.enable=false
+        
+        # Cloudflare IP whitelist middleware (defined in dynamic.yml)
+        - traefik.http.middlewares.cloudflare-ips.ipwhitelist.sourcerange=173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22
+        
+        # Enhanced Security Headers for Cloudflare
+        - traefik.http.middlewares.security-headers.headers.addvaryheader=true
+        - traefik.http.middlewares.security-headers.headers.referrerpolicy=strict-origin-when-cross-origin
+        - traefik.http.middlewares.security-headers.headers.hostsproxyheaders=X-Forwarded-Host
+        - traefik.http.middlewares.security-headers.headers.customrequestheaders.X-Forwarded-Proto=https
+        - traefik.http.middlewares.security-headers.headers.customrequestheaders.CF-Visitor={"scheme":"https"}
+        - traefik.http.middlewares.security-headers.headers.frameDeny=true
+        - traefik.http.middlewares.security-headers.headers.contentTypeNosniff=true
+        - traefik.http.middlewares.security-headers.headers.browserXssFilter=true
+        - traefik.http.middlewares.security-headers.headers.stsIncludeSubdomains=true
+        - traefik.http.middlewares.security-headers.headers.stsPreload=true
+        - traefik.http.middlewares.security-headers.headers.stsSeconds=63072000
+        - traefik.http.middlewares.security-headers.headers.forceSTSHeader=true
+        - traefik.http.middlewares.security-headers.headers.permissionsPolicy=geolocation=(),midi=(),sync-xhr=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+        
+        # Rate limiting optimized for Cloudflare
+        - traefik.http.middlewares.rate-limit.ratelimit.average=200
+        - traefik.http.middlewares.rate-limit.ratelimit.burst=100
+        - traefik.http.middlewares.rate-limit.ratelimit.period=1m
+        
+        # Service
+        - traefik.http.services.traefik.loadbalancer.server.port=8080
+        
+        # Whalewall configuration (optimized for Cloudflare-only access)
+        - whalewall.enabled=true
+        - whalewall.rules=mapped_ports:cloudflare:allow:true;localhost:allow:true;external:allow:false
+
+networks:
+  {{ docker_traefik_network }}:
+    external: true
+
+volumes:
+  traefik_certs:
+    driver: local
+  traefik_logs:
+    driver: local 

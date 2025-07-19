@@ -1,0 +1,132 @@
+---
+# Docker Production Role - Main Tasks
+# Handles production configurations: log rotation, cleanup automation, and monitoring
+
+- name: Create Docker log rotation configuration for containers
+  ansible.builtin.template:
+    src: docker-containers-logrotate.j2
+    dest: /etc/logrotate.d/docker-containers
+    mode: '0644'
+    owner: root
+    group: root
+    backup: true
+  tags:
+    - docker_production
+    - log_rotation
+
+- name: Create Docker log rotation configuration for daemon
+  ansible.builtin.template:
+    src: docker-daemon-logrotate.j2
+    dest: /etc/logrotate.d/docker-daemon
+    mode: '0644'
+    owner: root
+    group: root
+    backup: true
+  tags:
+    - docker_production
+    - log_rotation
+
+- name: Create Docker cleanup script
+  ansible.builtin.template:
+    src: docker-cleanup.sh.j2
+    dest: /usr/local/bin/docker-cleanup
+    mode: '0755'
+    owner: root
+    group: root
+  when: docker_cleanup_enabled | default(true)
+  tags:
+    - docker_production
+    - cleanup
+
+- name: Create Docker cleanup cron job
+  ansible.builtin.cron:
+    name: "Docker cleanup"
+    job: "/usr/local/bin/docker-cleanup >/dev/null 2>&1"
+    minute: "{{ docker_cleanup_schedule.split()[0] }}"
+    hour: "{{ docker_cleanup_schedule.split()[1] }}"
+    day: "{{ docker_cleanup_schedule.split()[2] }}"
+    month: "{{ docker_cleanup_schedule.split()[3] }}"
+    weekday: "{{ docker_cleanup_schedule.split()[4] }}"
+    user: root
+    state: present
+  when: docker_cleanup_enabled | default(true)
+  tags:
+    - docker_production
+    - cleanup
+
+- name: Test Docker cleanup script
+  ansible.builtin.command: /usr/local/bin/docker-cleanup
+  register: cleanup_test_result
+  changed_when: false
+  when: docker_cleanup_enabled | default(true)
+  tags:
+    - docker_production
+    - testing
+
+- name: Create Docker stack directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: docker
+    group: docker
+  loop: "{{ docker_directories }}"
+  tags:
+    - docker_production
+    - directories
+
+- name: Create Docker environment file
+  ansible.builtin.template:
+    src: docker-env.j2
+    dest: "{{ docker_stack_root }}/.env"
+    mode: '0644'
+    owner: docker
+    group: docker
+    backup: true
+  tags:
+    - docker_production
+    - environment
+
+- name: Set up Docker system monitoring
+  ansible.builtin.copy:
+    content: |
+      #!/bin/bash
+      # Docker system status check
+      echo "=== Docker System Status ==="
+      echo "Docker version: $(docker --version)"
+      echo "Docker info: $(docker info --format 'Containers: {{.Containers}} Images: {{.Images}}')"
+      echo "Swarm status: $(docker info --format '{{.Swarm.LocalNodeState}}')"
+      echo "Networks: $(docker network ls --format 'table {{.Name}}\t{{.Driver}}\t{{.Scope}}')"
+      echo "Volumes: $(docker volume ls --format 'table {{.Name}}\t{{.Driver}}')"
+      echo "Disk usage: $(docker system df)"
+    dest: /usr/local/bin/docker-status
+    mode: '0755'
+    owner: root
+    group: root
+  tags:
+    - docker_production
+    - monitoring
+
+- name: Test logrotate configuration
+  ansible.builtin.command: logrotate -d /etc/logrotate.d/docker-containers
+  register: logrotate_test
+  changed_when: false
+  failed_when: logrotate_test.rc != 0
+  tags:
+    - docker_production
+    - testing
+
+- name: Display Docker production configuration summary
+  ansible.builtin.debug:
+    msg:
+      - "Docker production configuration completed"
+      - "Log rotation: {{ 'enabled' if docker_log_rotation is defined else 'disabled' }}"
+      - "Cleanup automation: {{ 'enabled' if docker_cleanup_enabled else 'disabled' }}"
+      - "Cleanup schedule: {{ docker_cleanup_schedule if docker_cleanup_enabled else 'N/A' }}"
+      - "Stack root directory: {{ docker_stack_root }}"
+      - "Environment file: {{ docker_stack_root }}/.env"
+      - "Status script: /usr/local/bin/docker-status"
+      - "Cleanup test: {{ 'PASSED' if cleanup_test_result.rc == 0 else 'FAILED' }}"
+  tags:
+    - docker_production
+    - summary 

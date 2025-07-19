@@ -1,0 +1,181 @@
+---
+# Multi-Node System Preparation Playbook
+# Optimized for Docker Swarm cluster deployments
+
+- name: Multi-Node System Preparation
+  hosts: production
+  become: true
+  gather_facts: true
+  serial: 2  # Process 2 nodes at a time for safety
+  
+  vars:
+    # Multi-node specific settings
+    safety_checkpoint: true
+    
+  pre_tasks:
+    - name: Display multi-node preparation banner
+      ansible.builtin.debug:
+        msg:
+          - "=================================================="
+          - "🏗️  MULTI-NODE SYSTEM PREPARATION"
+          - "=================================================="
+          - ""
+          - "Target: {{ inventory_hostname }} ({{ ansible_default_ipv4.address }})"
+          - "Node Type: {{ node_type | default('unknown') }}"
+          - "Node Role: {{ swarm_role | default('unknown') }}"
+          - "Traefik: {{ traefik_enabled | default(false) }}"
+          - "Environment: {{ environment | default('production') }}"
+          - ""
+          - "🔒 Manager nodes: Traefik enabled on designated node only"
+          - "👷 Worker nodes: No public access, Tailscale only"
+          - ""
+      tags: always
+
+    - name: Verify multi-node configuration
+      ansible.builtin.assert:
+        that:
+          - node_type in ['manager', 'worker']
+          - swarm_role in ['manager', 'worker']
+        fail_msg: "Multi-node deployment requires valid node_type and swarm_role"
+        success_msg: "Multi-node configuration verified: {{ node_type }}/{{ swarm_role }}"
+      tags: always
+
+    - name: Display node-specific configuration
+      ansible.builtin.debug:
+        msg:
+          - "🔧 Node Configuration:"
+          - "  Type: {{ node_type }}"
+          - "  Role: {{ swarm_role }}"
+          - "  Traefik: {{ traefik_enabled | default(false) }}"
+          - "  Cloudflare Firewall: {{ cloudflare_firewall_enabled | default(false) }}"
+          - "  Public Access: {{ 'YES' if traefik_enabled else 'NO' }}"
+      tags: always
+
+  roles:
+    - role: system_update
+      tags: 
+        - system_update
+        - phase1
+      
+    - role: user_management  
+      tags:
+        - user_management
+        - phase1
+        
+    - role: tailscale
+      tags:
+        - tailscale
+        - phase2
+
+  post_tasks:
+    - name: Manager node checkpoint
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🚨 MANAGER NODE SECURITY CHECKPOINT"
+          - "================================================================"
+          - ""
+          - "Manager Node: {{ inventory_hostname }}"
+          - "Traefik Enabled: {{ traefik_enabled | default(false) }}"
+          - ""
+          - "⚠️  This manager will {{ 'ACCEPT' if traefik_enabled else 'BLOCK' }} public HTTPS traffic"
+          - "🔒 Only one manager should have Traefik enabled in production"
+          - ""
+      when: 
+        - node_type == "manager"
+        - safety_checkpoint | default(true)
+      tags: 
+        - checkpoint
+        - phase2
+
+    - name: Worker node checkpoint  
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "👷 WORKER NODE SECURITY CHECKPOINT"
+          - "================================================================"
+          - ""
+          - "Worker Node: {{ inventory_hostname }}"
+          - "Public Access: BLOCKED (Tailscale only)"
+          - ""
+          - "✅ Worker nodes block all incoming traffic except Tailscale"
+          - "✅ Perfect for compute workloads without public exposure"
+          - ""
+      when: 
+        - node_type == "worker"
+        - safety_checkpoint | default(true)
+      tags: 
+        - checkpoint
+        - phase2
+
+    - name: Continue with security hardening
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+      loop:
+        - firewall
+        - ssh_hardening
+        - kernel_hardening
+        - time_sync
+        - logging
+      tags:
+        - security_hardening
+        - phase3
+
+    - name: Final validation
+      ansible.builtin.include_role:
+        name: validation
+      tags:
+        - validation
+        - phase4
+
+    - name: Multi-node preparation complete
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🎉 MULTI-NODE PREPARATION COMPLETED!"
+          - "================================================================"
+          - ""
+          - "✅ Node {{ inventory_hostname }} prepared successfully"
+          - "✅ Type: {{ node_type }} | Role: {{ swarm_role }}"
+          - "✅ Tailscale configured for secure cluster communication"
+          - "{{ '✅ Cloudflare firewall configured for public access' if traefik_enabled else '✅ Public access blocked (worker node)' }}"
+          - ""
+          - "🌐 Access Information:"
+          - "  Admin SSH: ssh {{ admin_username }}@{{ tailscale_ip | default('TAILSCALE_IP') }}"
+          - "{{ ('  Public HTTPS: https://' + (domain_name | default('your-domain.com'))) if traefik_enabled else '  Public HTTPS: Not applicable (worker node)' }}"
+          - ""
+          - "📋 Next Steps for {{ inventory_hostname }}:"
+          - "1. Reboot system: sudo reboot"
+          - "2. Verify all nodes are prepared"
+          - "3. Initialize Docker Swarm cluster"
+          - "4. Deploy services to the cluster"
+          - ""
+      tags: always
+
+# Summary play for all nodes
+- name: Multi-Node Deployment Summary
+  hosts: production
+  gather_facts: false
+  run_once: true
+  
+  tasks:
+    - name: Display cluster preparation summary
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🏗️  CLUSTER PREPARATION SUMMARY"
+          - "================================================================"
+          - ""
+          - "📊 Cluster Overview:"
+          - "  Total Nodes: {{ groups['production'] | length }}"
+          - "  Manager Nodes: {{ groups['swarm_managers'] | length if groups['swarm_managers'] is defined else 0 }}"
+          - "  Worker Nodes: {{ groups['swarm_workers'] | length if groups['swarm_workers'] is defined else 0 }}"
+          - ""
+          - "🔧 Node Configuration:"
+          - "{% for host in groups['production'] %}"
+          - "  {{ host }}: {{ hostvars[host]['node_type'] | default('unknown') }} (Traefik: {{ hostvars[host]['traefik_enabled'] | default(false) }})"
+          - "{% endfor %}"
+          - ""
+          - "🚀 Ready for Docker Swarm initialization!"
+          - ""
+      tags: always 

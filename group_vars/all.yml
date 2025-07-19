@@ -1,0 +1,104 @@
+---
+# Common variables for all hosts
+# System Preparation Configuration
+
+# User Management
+admin_username: "admin"
+admin_shell: "/bin/bash"
+admin_home: "/home/{{ admin_username }}"
+docker_user_enabled: true
+
+# SSH Configuration  
+ssh_disable_root: true
+ssh_disable_password_auth: true
+ssh_public_keys: []  # Define in environment-specific vars or host_vars
+
+# Tailscale Configuration
+tailscale_version: "latest"
+tailscale_accept_routes: true
+tailscale_accept_dns: true
+tailscale_ssh_enabled: true
+tailscale_auth_key: "{{ vault_tailscale_auth_key | default('') }}"
+tailscale_hostname: "{{ inventory_hostname }}"
+
+# Firewall Configuration
+firewall_enabled: true
+firewall_reset: true
+cloudflare_firewall_enabled: true
+cloudflare_ipv4_url: "https://www.cloudflare.com/ips-v4"
+cloudflare_ipv6_url: "https://www.cloudflare.com/ips-v6"
+
+# Security Hardening
+kernel_hardening_enabled: true
+system_limits_enabled: true
+security_updates_enabled: true
+
+# Time Synchronization
+chrony_enabled: true
+chrony_replace_timesyncd: true
+chrony_servers:
+  - "0.ubuntu.pool.ntp.org"
+  - "1.ubuntu.pool.ntp.org"
+  - "2.ubuntu.pool.ntp.org"
+  - "3.ubuntu.pool.ntp.org"
+
+# Logging Configuration
+log_rotation_enabled: true
+log_retention_days: 7
+
+# System Configuration
+required_packages:
+  - curl
+  - wget
+  - gnupg
+  - lsb-release
+  - ca-certificates
+  - apt-transport-https
+  - software-properties-common
+  - ufw
+  - unattended-upgrades
+  - net-tools
+  - dnsutils
+  - rsyslog
+  - jq
+  - chrony
+
+# Docker preparation
+docker_file_limits: 1048576
+docker_vm_max_map_count: 262144
+
+# Kernel security parameters
+kernel_security_params:
+  net.ipv4.ip_forward: 1
+  fs.file-max: "{{ docker_file_limits }}"
+  vm.max_map_count: "{{ docker_vm_max_map_count }}"
+  kernel.kptr_restrict: 2
+  kernel.dmesg_restrict: 1
+  kernel.perf_event_paranoid: 3
+  kernel.unprivileged_bpf_disabled: 1
+  net.core.bpf_jit_harden: 2
+  kernel.yama.ptrace_scope: 2
+
+# System limits
+system_limits:
+  - domain: "*"
+    limit_type: "soft"
+    limit_item: "nofile"
+    value: "{{ docker_file_limits }}"
+  - domain: "*"
+    limit_type: "hard" 
+    limit_item: "nofile"
+    value: "{{ docker_file_limits }}"
+  - domain: "root"
+    limit_type: "soft"
+    limit_item: "nofile"
+    value: "{{ docker_file_limits }}"
+  - domain: "root"
+    limit_type: "hard"
+    limit_item: "nofile"
+    value: "{{ docker_file_limits }}"
+
+# Validation settings
+validation_enabled: true
+reboot_required: true
+reboot_timeout: 600 

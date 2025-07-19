@@ -1,0 +1,15 @@
+---
+# Whalewall Role - Handlers
+# Manages systemd daemon reload and Whalewall service restart
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+  listen: "reload systemd"
+
+- name: restart whalewall
+  ansible.builtin.systemd:
+    name: whalewall
+    state: restarted
+    daemon_reload: true
+  listen: "restart whalewall" 

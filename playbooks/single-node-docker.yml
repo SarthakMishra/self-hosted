@@ -1,0 +1,137 @@
+---
+# Single Node Docker Setup Playbook
+# Optimized for single server Docker Swarm deployments
+
+- name: Single Node Docker Installation and Configuration
+  hosts: single_node
+  become: true
+  gather_facts: true
+  
+  vars_files:
+    # Include Docker configuration variables
+    - ../group_vars/docker.yml
+    
+  vars:
+    # Single node specific settings
+    docker_swarm_enabled: true
+    node_type: single
+    traefik_enabled: true
+    whalewall_enabled: true
+    
+  pre_tasks:
+    - name: Display single node Docker setup banner
+      ansible.builtin.debug:
+        msg:
+          - "=================================================="
+          - "🎯 SINGLE NODE DOCKER SETUP"
+          - "=================================================="
+          - ""
+          - "Target: {{ inventory_hostname }} ({{ ansible_default_ipv4.address }})"
+          - "Deployment: Single Node Docker Swarm (All-in-One)"
+          - "Traefik: {{ traefik_enabled }}"
+          - "Whalewall: {{ whalewall_enabled }}"
+          - ""
+          - "⚠️  This creates a complete Docker environment on one server"
+          - "🐝 Single-node Swarm cluster for full orchestration features"
+          - "🌐 Encrypted networks for security"
+          - "🔥 UFW/Docker integration for firewall management"
+          - ""
+      tags: always
+
+    - name: Verify single node configuration
+      ansible.builtin.assert:
+        that:
+          - node_type == "single"
+          - traefik_enabled == true
+          - docker_swarm_enabled == true
+        fail_msg: "Single node deployment requires specific configuration"
+        success_msg: "Single node configuration verified"
+      tags: always
+
+  roles:
+    - role: docker_installation
+      tags: 
+        - docker_installation
+        - phase1
+      
+    - role: docker_configuration
+      tags:
+        - docker_configuration
+        - phase1
+        
+    - role: docker_swarm
+      tags:
+        - docker_swarm
+        - phase2
+        
+    - role: docker_networks
+      tags:
+        - docker_networks
+        - phase2
+        
+    - role: docker_production
+      tags:
+        - docker_production
+        - phase3
+        
+    - role: whalewall
+      tags:
+        - whalewall
+        - phase3
+        
+    - role: docker_validation
+      tags:
+        - docker_validation
+        - phase4
+        
+    - role: docker_services
+      tags:
+        - docker_services
+        - services
+        - phase5
+      when: deploy_docker_services | default(true)
+        
+    - role: restic_backup
+      tags:
+        - restic_backup
+        - backup
+        - phase6
+      when: deploy_restic_backup | default(true)
+
+  post_tasks:
+    - name: Single node Docker setup complete
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🎉 SINGLE NODE DOCKER SETUP COMPLETED!"
+          - "================================================================"
+          - ""
+          - "✅ Complete Docker environment on single server"
+          - "✅ Docker Swarm cluster initialized"
+          - "✅ Production-ready networking and security"
+          - "✅ Ready for service deployment"
+          - ""
+          - "🐳 Single Node Advantages:"
+          - "  • Complete Docker Swarm functionality"
+          - "  • Simplified management and monitoring"
+          - "  • Cost-effective for small to medium workloads"
+          - "  • Easy to scale horizontally when needed"
+          - ""
+          - "🌐 Network Configuration:"
+          - "  • App Network: 10.1.0.0/20 (encrypted)"
+          - "  • Monitoring Network: 10.2.0.0/20 (encrypted)"
+          - "  • Database Network: 10.3.0.0/20 (internal)"
+          - "  • Local Bridge: 172.20.0.0/16"
+          - ""
+          - "📋 Next Steps:"
+          - "1. Deploy Traefik reverse proxy"
+          - "2. Deploy monitoring stack (Netdata)"
+          - "3. Deploy application services"
+          - "4. Configure backup automation"
+          - ""
+          - "🔧 Management:"
+          - "  Stack Directory: {{ docker_stack_root }}"
+          - "  Status Command: /usr/local/bin/docker-status"
+          - "  Cleanup Command: /usr/local/bin/docker-cleanup"
+          - ""
+      tags: always 

@@ -1,0 +1,41 @@
+# Local Backup Sync Service Configuration
+# Edit this file to customize your backup sync settings
+
+# Remote Server Settings
+remote:
+  host: "your-server.example.com"    # Replace with your server hostname/IP
+  user: "admin"                      # SSH user (should match Tailscale admin user)
+  backup_path: "/opt/docker-swarm/backup"
+  
+# Sync Behavior
+sync:
+  interval_seconds: 900              # Sync every 15 minutes
+  bandwidth_limit: "10M"             # Rsync bandwidth limit
+  max_retries: 3                     # Max consecutive failures before stopping
+  verify_after_sync: true            # Verify repository integrity after sync
+  
+# Local Backup Settings
+local_backup:
+  enabled: true
+  schedule: "0 */6 * * *"            # Every 6 hours (cron format)
+  data_path: "/app/local-data"       # Path for local data to backup
+  
+# Health Check Settings
+health:
+  check_port: 8080
+  log_retention_days: 30
+  
+# Security Settings
+security:
+  ssh_key_path: "/app/config/ssh/id_rsa"
+  known_hosts_check: false          # Disable for dynamic IPs
+  connection_timeout: 30
+  
+# Advanced Settings
+advanced:
+  rsync_options:
+    - "--compress-level=6"
+    - "--partial"
+    - "--progress"
+  repository_check_percentage: 1     # Percentage of data to verify (1-100)
+  cleanup_after_sync: true          # Trigger remote cleanup after successful sync 

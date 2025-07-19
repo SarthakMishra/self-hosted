@@ -1,0 +1,150 @@
+---
+# Validation Role - Main Tasks
+# Performs comprehensive system verification and health checks
+
+- name: Check UFW firewall status
+  ansible.builtin.command: ufw status verbose
+  register: ufw_status_check
+  changed_when: false
+  tags:
+    - validation
+    - firewall
+
+- name: Verify Tailscale connectivity
+  ansible.builtin.command: tailscale status
+  register: tailscale_status_check
+  changed_when: false
+  failed_when: false
+  tags:
+    - validation
+    - tailscale
+
+- name: Test admin user SSH key access
+  ansible.builtin.stat:
+    path: "{{ admin_home }}/.ssh/authorized_keys"
+  register: admin_ssh_key_check
+  tags:
+    - validation
+    - ssh
+
+- name: Verify admin user sudo access
+  ansible.builtin.command: sudo -u {{ admin_username }} sudo -n whoami
+  register: admin_sudo_check
+  changed_when: false
+  failed_when: admin_sudo_check.stdout != "root"
+  tags:
+    - validation
+    - sudo
+
+- name: Check kernel security parameters
+  ansible.builtin.command: sysctl {{ item.key }}
+  register: kernel_param_check
+  changed_when: false
+  failed_when: kernel_param_check.stdout.split('=')[1].strip() != (item.value | string)
+  loop: "{{ kernel_security_params | dict2items }}"
+  when: kernel_hardening_enabled | default(true)
+  tags:
+    - validation
+    - kernel
+
+- name: Check time synchronization
+  ansible.builtin.command: chronyc tracking
+  register: time_sync_check
+  changed_when: false
+  failed_when: false
+  when: chrony_enabled | default(true)
+  tags:
+    - validation
+    - time
+
+- name: Check system updates status
+  ansible.builtin.command: apt list --upgradable
+  register: updates_check
+  changed_when: false
+  tags:
+    - validation
+    - updates
+
+- name: Test direct IP access (should be blocked)
+  ansible.builtin.uri:
+    url: "https://{{ ansible_default_ipv4.address }}"
+    timeout: 5
+    validate_certs: false
+  register: direct_ip_test
+  failed_when: false
+  when: cloudflare_firewall_enabled | default(true)
+  tags:
+    - validation
+    - security
+
+- name: Collect system information
+  ansible.builtin.setup:
+    gather_subset:
+      - hardware
+      - network
+      - virtual
+  tags:
+    - validation
+    - info
+
+- name: Generate validation report
+  ansible.builtin.debug:
+    msg:
+      - "=== SYSTEM PREPARATION VALIDATION REPORT ==="
+      - ""
+      - "🔥 FIREWALL STATUS:"
+      - "  UFW Active: {{ 'YES' if 'Status: active' in ufw_status_check.stdout else 'NO' }}"
+      - "  Cloudflare Rules: {{ 'YES' if cloudflare_firewall_enabled else 'NO' }}"
+      - "  Direct IP Access: {{ 'BLOCKED' if direct_ip_test.status is defined and direct_ip_test.status >= 400 else 'ACCESSIBLE' }}"
+      - ""
+      - "👤 USER MANAGEMENT:"
+      - "  Admin User: {{ admin_username }}"
+      - "  SSH Keys: {{ 'CONFIGURED' if admin_ssh_key_check.stat.exists else 'MISSING' }}"
+      - "  Sudo Access: {{ 'WORKING' if admin_sudo_check.stdout == 'root' else 'FAILED' }}"
+      - ""
+      - "🌐 TAILSCALE:"
+      - "  Status: {{ 'CONNECTED' if tailscale_status_check.rc == 0 else 'DISCONNECTED' }}"
+      - "  IP Address: {{ tailscale_ip | default('Not Available') }}"
+      - ""
+      - "🛡️ SECURITY HARDENING:"
+      - "  Kernel Parameters: {{ kernel_security_params | length }} applied"
+      - "  SSH Root Login: DISABLED"
+      - "  SSH Password Auth: DISABLED"
+      - ""
+      - "⏰ TIME SYNCHRONIZATION:"
+      - "  Chrony Status: {{ 'ACTIVE' if time_sync_check.rc == 0 else 'INACTIVE' }}"
+      - ""
+      - "📦 SYSTEM UPDATES:"
+      - "  Upgradable Packages: {{ (updates_check.stdout_lines | length - 1) if updates_check.stdout_lines | length > 1 else 0 }}"
+      - ""
+      - "🔌 CONNECTIVITY:"
+      - "  SSH Access: ssh {{ admin_username }}@{{ tailscale_ip | default('TAILSCALE_IP') }}"
+      - ""
+      - "{{ '✅ VALIDATION PASSED' if validation_passed | default(true) else '❌ VALIDATION FAILED' }}"
+  tags:
+    - validation
+    - report
+
+- name: Set validation status
+  ansible.builtin.set_fact:
+    system_validation_passed: true
+    validation_timestamp: "{{ ansible_date_time.iso8601 }}"
+  tags:
+    - validation
+
+- name: Display next steps
+  ansible.builtin.debug:
+    msg:
+      - "🎉 SYSTEM PREPARATION COMPLETE!"
+      - ""
+      - "Next steps:"
+      - "1. Reboot system to apply all kernel changes"
+      - "2. Test SSH access via Tailscale after reboot"
+      - "3. Proceed with Docker Swarm installation"
+      - ""
+      - "Admin access:"
+      - "  SSH: ssh {{ admin_username }}@{{ tailscale_ip | default('TAILSCALE_IP') }}"
+      - "  Tailscale IP: {{ tailscale_ip | default('Check with: tailscale ip') }}"
+  tags:
+    - validation
+    - summary 

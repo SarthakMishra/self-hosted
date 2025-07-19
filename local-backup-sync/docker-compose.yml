@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # Main sync service - handles reverse SSH pull from remote server
+  restic-sync:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: restic-sync
+    restart: unless-stopped
+    volumes:
+      - ./config:/app/config:ro
+      - ./data/local-repository:/app/repository
+      - ./data/logs:/app/logs
+      - ./scripts:/app/scripts:ro
+      - restic_cache:/root/.cache/restic
+    environment:
+      - SYNC_INTERVAL=${SYNC_INTERVAL:-900}  # 15 minutes
+      - REMOTE_HOST=${REMOTE_HOST}
+      - REMOTE_USER=${REMOTE_USER:-admin}
+      - REMOTE_BACKUP_PATH=${REMOTE_BACKUP_PATH:-/opt/docker-swarm/backup}
+      - LOCAL_REPO_PATH=/app/repository
+      - BANDWIDTH_LIMIT=${BANDWIDTH_LIMIT:-10M}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      - HEALTH_CHECK_PORT=8080
+    ports:
+      - "8080:8080"  # Health check endpoint
+    networks:
+      - backup-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "backup.service=restic-sync"
+      - "backup.type=primary"
+
+  # Local backup service - independent local backups
+  restic-local:
+    image: restic/restic:latest
+    container_name: restic-local
+    restart: unless-stopped
+    volumes:
+      - ./config:/app/config:ro
+      - ./data/local-repository:/app/repository
+      - ./data/local-backups:/app/local-data
+      - ./data/logs:/app/logs
+      - ./scripts:/app/scripts:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - restic_local_cache:/root/.cache/restic
+    environment:
+      - RESTIC_REPOSITORY=/app/repository
+      - RESTIC_PASSWORD_FILE=/app/config/restic-password
+      - RESTIC_CACHE_DIR=/root/.cache/restic
+      - LOCAL_BACKUP_SCHEDULE=${LOCAL_BACKUP_SCHEDULE:-0 */6 * * *}  # Every 6 hours
+    networks:
+      - backup-network
+    command: >
+      sh -c "
+      apk add --no-cache dcron curl &&
+      echo '$${LOCAL_BACKUP_SCHEDULE} /app/scripts/local-backup.sh' > /var/spool/cron/crontabs/root &&
+      crond -f
+      "
+    labels:
+      - "backup.service=restic-local" 
+      - "backup.type=local"
+
+networks:
+  backup-network:
+    driver: bridge
+    labels:
+      - "backup.network=true"
+
+volumes:
+  restic_cache:
+    driver: local
+    labels:
+      - "backup.volume=cache"
+  restic_local_cache:
+    driver: local
+    labels:
+      - "backup.volume=local-cache" 

@@ -1,0 +1,228 @@
+# Ansible inventory with real server IPs and hostnames
+inventory/hosts.yml
+inventory/production/
+inventory/staging/
+inventory/development/
+
+# Group and host variables containing sensitive data
+group_vars/*/vault.yml
+group_vars/*/secrets.yml
+host_vars/
+**/vault.yml
+**/secrets.yml
+
+# Ansible vault password files
+.vault_pass
+.vault_password
+vault_password_file
+.ansible-vault-password
+
+# SSH keys and certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+known_hosts
+authorized_keys
+ssh_host_*
+
+# Environment files with secrets
+.env
+.env.local
+.env.production
+.env.staging
+.env.development
+**/config/restic-env
+**/config/restic-password
+
+# Tailscale auth keys and configuration
+tailscale_auth_key
+*tailscale*key*
+.tailscale/
+
+# Cloudflare API keys and tokens
+cloudflare_api_key
+cloudflare_dns_token
+*cloudflare*token*
+
+# Docker secrets and environment files
+docker-swarm.env
+secrets/
+**/data/traefik/certs/
+**/data/traefik/config/acme.json
+
+# =============================================================================
+# ANSIBLE OPERATIONAL FILES
+# =============================================================================
+
+# Ansible retry files (created on failed runs)
+*.retry
+
+# Ansible log files
+ansible.log
+*.log
+
+# Ansible collections cache
+~/.ansible/
+
+# Ansible vault temporary files
+.vault_*
+
+# Ansible facts cache
+facts_cache/
+fact_cache/
+
+# =============================================================================
+# BACKUP AND DATA FILES
+# =============================================================================
+
+# Local backup sync data
+local-backup-sync/data/
+local-backup-sync/logs/
+local-backup-sync/repository/
+
+# Restic repository data
+backup/
+backups/
+repository/
+**/restic-repository/
+**/backup-repository/
+
+# Docker Swarm data volumes
+data/
+volumes/
+**/docker-swarm/data/
+
+# Log files and monitoring data
+logs/
+*.log
+**/logs/
+**/metrics/
+
+# =============================================================================
+# DEVELOPMENT AND IDE FILES
+# =============================================================================
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.mypy_cache/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# =============================================================================
+# OPERATING SYSTEM FILES
+# =============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.nfs*
+
+# =============================================================================
+# TEMPORARY AND CACHE FILES
+# =============================================================================
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+.temp/
+
+# Archives and compressed files (unless specifically needed)
+*.tar.gz
+*.zip
+*.7z
+*.rar
+
+# Cache directories
+.cache/
+cache/
+
+# =============================================================================
+# DOCKER AND CONTAINER FILES
+# =============================================================================
+
+# Docker override files
+docker-compose.override.yml
+override.yml
+
+# Docker environment files
+.dockerenv
+
+# =============================================================================
+# EXAMPLE CONFIGURATIONS (Keep these as templates)
+# =============================================================================
+
+# Example inventory (template file)
+!inventory/hosts.yml.example
+!inventory/hosts.example.yml
+
+# Example group vars (template files)
+!group_vars/all.yml.example
+!group_vars/docker.yml.example
+
+# Example environment files (template files)
+!.env.example
+!docker-swarm.env.example
+!env.example
+
+# =============================================================================
+# PROJECT-SPECIFIC ADDITIONS
+# =============================================================================
+
+# Custom scripts with sensitive data
+scripts/deploy-*
+scripts/backup-*
+!scripts/*.example.sh
+
+# Terraform state files (if using Terraform)
+*.tfstate
+*.tfstate.*
+.terraform/
+terraform.tfvars
+
+# Kubernetes config files
+kubeconfig
+*.kubeconfig
+kube-config
+
+# SSL/TLS certificates
+*.csr
+*.der
+*.p7b
+*.p7c
+*.p7r
+*.spc 

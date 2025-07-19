@@ -1,0 +1,112 @@
+---
+# Single Node System Preparation Playbook
+# Optimized for single server deployments
+
+- name: Single Node System Preparation
+  hosts: single_node
+  become: true
+  gather_facts: true
+  
+  vars:
+    # Single node specific settings
+    safety_checkpoint: true
+    node_type: single
+    traefik_enabled: true
+    cloudflare_firewall_enabled: true
+    
+  pre_tasks:
+    - name: Display single node preparation banner
+      ansible.builtin.debug:
+        msg:
+          - "=================================================="
+          - "🎯 SINGLE NODE SYSTEM PREPARATION"
+          - "=================================================="
+          - ""
+          - "Target: {{ inventory_hostname }} ({{ ansible_default_ipv4.address }})"
+          - "Deployment: Single Node (All-in-One)"
+          - "Admin User: {{ admin_username }}"
+          - "Traefik: {{ traefik_enabled }}"
+          - "Cloudflare Firewall: {{ cloudflare_firewall_enabled }}"
+          - ""
+          - "⚠️  This configuration allows public HTTPS access via Cloudflare"
+          - "🔒 SSH access will be restricted to Tailscale network only"
+          - ""
+      tags: always
+
+    - name: Verify single node configuration
+      ansible.builtin.assert:
+        that:
+          - node_type == "single"
+          - traefik_enabled == true
+        fail_msg: "Single node deployment requires traefik_enabled=true"
+        success_msg: "Single node configuration verified"
+      tags: always
+
+  roles:
+    - role: system_update
+      tags: 
+        - system_update
+        - phase1
+      
+    - role: user_management  
+      tags:
+        - user_management
+        - phase1
+        
+    - role: tailscale
+      tags:
+        - tailscale
+        - phase2
+        
+    - role: firewall
+      tags:
+        - firewall
+        - phase3
+        
+    - role: ssh_hardening
+      tags:
+        - ssh_hardening
+        - phase3
+        
+    - role: kernel_hardening
+      tags:
+        - kernel_hardening
+        - phase3
+        
+    - role: time_sync
+      tags:
+        - time_sync
+        - phase3
+        
+    - role: logging
+      tags:
+        - logging
+        - phase3
+        
+    - role: validation
+      tags:
+        - validation
+        - phase4
+
+  post_tasks:
+    - name: Single node preparation complete
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🎉 SINGLE NODE PREPARATION COMPLETED!"
+          - "================================================================"
+          - ""
+          - "✅ System prepared for Docker Swarm single-node deployment"
+          - "✅ Cloudflare firewall configured for public HTTPS access"
+          - "✅ Tailscale configured for secure admin access"
+          - ""
+          - "🌐 Access Information:"
+          - "  Admin SSH: ssh {{ admin_username }}@{{ tailscale_ip | default('TAILSCALE_IP') }}"
+          - "  Public HTTPS: https://{{ domain_name | default('your-domain.com') }}"
+          - ""
+          - "📋 Next Steps:"
+          - "1. Configure DNS to point to {{ ansible_default_ipv4.address }}"
+          - "2. Reboot system: sudo reboot"
+          - "3. Install Docker and deploy services"
+          - ""
+      tags: always 

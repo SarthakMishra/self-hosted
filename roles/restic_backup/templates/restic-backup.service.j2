@@ -1,0 +1,24 @@
+[Unit]
+Description=Restic Docker Swarm Backup
+After=docker.service
+Requires=docker.service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory={{ restic_backup_root }}
+EnvironmentFile={{ restic_backup_root }}/config/restic-env
+ExecStart={{ restic_backup_root }}/scripts/backup.sh
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=3600
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths={{ restic_backup_root }} /var/lib/docker {{ docker_stack_root }} /etc/docker
+ProtectHome=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target 

@@ -1,0 +1,168 @@
+---
+# Restic Backup Role - Main Tasks
+# Sets up local Restic repository and automated Docker Swarm backups
+
+- name: Install Restic backup tool
+  ansible.builtin.package:
+    name: restic
+    state: present
+  tags: [restic_backup, installation]
+
+- name: Create backup directory structure
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+  loop:
+    - "{{ restic_backup_root }}"
+    - "{{ restic_backup_root }}/repository"
+    - "{{ restic_backup_root }}/cache"
+    - "{{ restic_backup_root }}/config"
+    - "{{ restic_backup_root }}/scripts"
+    - "{{ restic_backup_root }}/logs"
+    - "{{ restic_backup_root }}/metrics"
+  tags: [restic_backup, setup]
+
+- name: Create Restic repository password file
+  ansible.builtin.copy:
+    content: "{{ restic_repository_password }}"
+    dest: "{{ restic_backup_root }}/config/restic-password"
+    owner: root
+    group: root
+    mode: '0600'
+  tags: [restic_backup, setup]
+
+- name: Create Restic environment configuration
+  ansible.builtin.template:
+    src: restic-env.j2
+    dest: "{{ restic_backup_root }}/config/restic-env"
+    owner: root
+    group: root
+    mode: '0600'
+  tags: [restic_backup, config]
+
+- name: Create backup exclusions file
+  ansible.builtin.template:
+    src: backup-excludes.txt.j2
+    dest: "{{ restic_backup_root }}/config/excludes.txt"
+    owner: root
+    group: root
+    mode: '0644'
+  tags: [restic_backup, config]
+
+- name: Create backup scripts
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "{{ restic_backup_root }}/scripts/{{ item }}"
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - backup.sh
+    - prune.sh
+    - check.sh
+    - monitor.sh
+    - cleanup-remote.sh
+  tags: [restic_backup, scripts]
+
+- name: Initialize Restic repository
+  ansible.builtin.shell: |
+    source {{ restic_backup_root }}/config/restic-env
+    if ! restic cat config >/dev/null 2>&1; then
+      restic init
+      echo "Repository initialized"
+    else
+      echo "Repository already exists"
+    fi
+  register: restic_init_result
+  changed_when: "'Repository initialized' in restic_init_result.stdout"
+  tags: [restic_backup, init]
+
+- name: Create systemd service for backup
+  ansible.builtin.template:
+    src: restic-backup.service.j2
+    dest: /etc/systemd/system/restic-backup.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload systemd
+  tags: [restic_backup, systemd]
+
+- name: Create systemd timer for automated backups
+  ansible.builtin.template:
+    src: restic-backup.timer.j2
+    dest: /etc/systemd/system/restic-backup.timer
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload systemd
+  tags: [restic_backup, systemd]
+
+- name: Create systemd service for maintenance
+  ansible.builtin.template:
+    src: restic-maintenance.service.j2
+    dest: /etc/systemd/system/restic-maintenance.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload systemd
+  tags: [restic_backup, systemd]
+
+- name: Create systemd timer for maintenance
+  ansible.builtin.template:
+    src: restic-maintenance.timer.j2
+    dest: /etc/systemd/system/restic-maintenance.timer
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload systemd
+  tags: [restic_backup, systemd]
+
+- name: Enable and start backup timer
+  ansible.builtin.systemd:
+    name: restic-backup.timer
+    enabled: yes
+    state: started
+    daemon_reload: yes
+  tags: [restic_backup, systemd]
+
+- name: Enable and start maintenance timer
+  ansible.builtin.systemd:
+    name: restic-maintenance.timer
+    enabled: yes
+    state: started
+    daemon_reload: yes
+  tags: [restic_backup, systemd]
+
+- name: Create log rotation for backup logs
+  ansible.builtin.template:
+    src: restic-backup-logrotate.j2
+    dest: /etc/logrotate.d/restic-backup
+    owner: root
+    group: root
+    mode: '0644'
+  tags: [restic_backup, logrotate]
+
+- name: Display backup setup summary
+  ansible.builtin.debug:
+    msg:
+      - "🔄 Restic Backup Setup Complete!"
+      - ""
+      - "📍 Repository Location: {{ restic_backup_root }}/repository"
+      - "⏰ Backup Schedule: {{ restic_backup_schedule }}"
+      - "🧹 Maintenance Schedule: {{ restic_maintenance_schedule }}"
+      - "📊 Metrics: {{ restic_backup_root }}/metrics/"
+      - ""
+      - "🛠️ Management Commands:"
+      - "  Manual Backup: sudo systemctl start restic-backup"
+      - "  Check Status: sudo systemctl status restic-backup.timer"
+      - "  View Logs: sudo journalctl -u restic-backup -f"
+      - "  Run Check: sudo {{ restic_backup_root }}/scripts/check.sh"
+      - ""
+      - "📋 Next Steps:"
+      - "  1. Set up local sync service to pull backups"
+      - "  2. Test backup with: sudo systemctl start restic-backup"
+      - "  3. Monitor logs for successful completion"
+  tags: [restic_backup, info] 

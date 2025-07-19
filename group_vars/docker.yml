@@ -1,0 +1,199 @@
+---
+# Docker Installation and Configuration Variables
+
+# Docker Installation
+docker_ce_version: "latest"  # or specific version like "5:24.0.7-1~ubuntu.22.04~jammy"
+docker_compose_version: "latest"
+
+# Docker packages to install
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+# Docker Repository Configuration
+docker_apt_repository: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+docker_apt_key_url: "https://download.docker.com/linux/ubuntu/gpg"
+docker_apt_key_file: "/usr/share/keyrings/docker-archive-keyring.gpg"
+
+# Docker Daemon Configuration
+docker_daemon_config:
+  log-driver: "json-file"
+  log-opts:
+    max-size: "10m"
+    max-file: "3"
+    compress: "true"
+  live-restore: false
+  userland-proxy: false
+  no-new-privileges: true
+  icc: true
+  features:
+    buildkit: true
+  default-ulimits:
+    nofile:
+      Name: "nofile"
+      Hard: 64000
+      Soft: 64000
+    nproc:
+      Name: "nproc"
+      Hard: 8192
+      Soft: 4096
+  storage-driver: "overlay2"
+  storage-opts:
+    - "overlay2.override_kernel_check=true"
+  exec-opts:
+    - "native.cgroupdriver=systemd"
+  metrics-addr: "127.0.0.1:9323"
+  experimental: false
+  builder:
+    gc:
+      enabled: true
+      defaultKeepStorage: "20GB"
+  max-concurrent-downloads: 3
+  max-concurrent-uploads: 5
+  default-shm-size: "64M"
+  shutdown-timeout: 15
+
+# Docker Service Configuration
+docker_service_override:
+  TimeoutStartSec: 300
+  TimeoutStopSec: 120
+  Restart: "always"
+  RestartSec: 10
+  StandardOutput: "journal"
+  StandardError: "journal"
+  NoNewPrivileges: true
+  LimitNOFILE: 1048576
+  LimitNPROC: 1048576
+  LimitCORE: "infinity"
+  KillMode: "process"
+
+# Docker Swarm Configuration
+docker_swarm_enabled: true
+docker_swarm_advertise_addr: "{{ ansible_default_ipv4.address }}"
+docker_swarm_default_addr_pool: "10.20.0.0/16"
+docker_swarm_default_addr_pool_mask_length: 24
+docker_swarm_dispatcher_heartbeat: "30s"
+docker_swarm_task_history_limit: 3
+docker_swarm_cert_expiry: "2160h"  # 90 days
+
+# Docker Networks Configuration
+docker_networks:
+  - name: "app-network"
+    driver: "overlay"
+    subnet: "10.1.0.0/20"
+    gateway: "10.1.0.1"
+    encrypted: true
+    attachable: true
+    mtu: 1450
+  - name: "monitoring-network"
+    driver: "overlay"
+    subnet: "10.2.0.0/20"
+    gateway: "10.2.0.1"
+    encrypted: true
+    attachable: true
+  - name: "database-network"
+    driver: "overlay"
+    subnet: "10.3.0.0/20"
+    gateway: "10.3.0.1"
+    encrypted: true
+    internal: true
+  - name: "local-network"
+    driver: "bridge"
+    subnet: "172.20.0.0/16"
+    gateway: "172.20.0.1"
+    bridge_name: "docker-local"
+    mtu: 1500
+
+# Docker Cleanup Configuration
+docker_cleanup_enabled: true
+docker_cleanup_schedule: "0 2 * * *"  # Daily at 2 AM
+docker_cleanup_retention:
+  containers: "24h"
+  images: "48h"
+  volumes: "72h"
+  build_cache_keep: "20GB"
+
+# Whalewall Configuration
+whalewall_enabled: true
+whalewall_version: "latest"
+whalewall_github_repo: "capnspacehook/whalewall"
+whalewall_binary_url: "https://github.com/{{ whalewall_github_repo }}/releases/latest/download/whalewall_linux_amd64.tar.gz"
+
+# Docker Directories
+docker_stack_root: "/opt/docker-swarm"
+docker_directories:
+  - "{{ docker_stack_root }}/compose"
+  - "{{ docker_stack_root }}/data"
+  - "{{ docker_stack_root }}/config"
+  - "{{ docker_stack_root }}/logs"
+
+# Docker Environment Configuration
+docker_environment:
+  STACK_ROOT: "{{ docker_stack_root }}"
+  COMPOSE_PROJECT_NAME: "swarm"
+  TRAEFIK_NETWORK: "traefik-public"
+  APP_NETWORK: "app-network"
+  MONITORING_NETWORK: "monitoring-network"
+  BASIC_AUTH_USER: "admin"
+  BASIC_AUTH_PASS: "changeme"
+
+# Docker Log Rotation
+docker_log_rotation:
+  container_logs:
+    path: "/var/lib/docker/containers/*/*.log"
+    rotate: 7
+    size: "100M"
+  daemon_logs:
+    path: "/var/log/docker.log"
+    rotate: 7
+    size: "100M"
+
+# Service Credentials (should be in vault in production)
+cloudflare_email: "{{ vault_cloudflare_email | default('admin@' + domain_name) }}"
+cloudflare_api_key: "{{ vault_cloudflare_api_key | default('') }}"
+cloudflare_dns_token: "{{ vault_cloudflare_dns_token | default('') }}"
+
+# Basic Authentication
+basic_auth_user: admin
+basic_auth_hash: "$2y$10$QlQkFuyF4dC3QPGLzgD8OOBhfVHPb2vIDKR9bGzP6Mq8J8.LAr5H2"  # admin:admin123
+
+
+
+# Restic Backup Configuration
+restic_backup_root: /opt/docker-swarm/backup
+restic_repository_password: "{{ vault_restic_password | default('change-this-password-in-production') }}"
+
+# Backup Scheduling
+restic_backup_schedule: "*-*-* 02:00:00"  # Daily at 2 AM
+restic_backup_randomized_delay: "1800"   # 30 minutes randomization
+restic_maintenance_schedule: "Sun *-*-* 03:00:00"  # Weekly on Sunday at 3 AM
+restic_maintenance_randomized_delay: "3600"  # 1 hour randomization
+
+# Retention Policy (Remote - more aggressive since we sync to local)
+restic_retention_keep_last: 5
+restic_retention_keep_daily: 7
+restic_retention_keep_weekly: 4
+restic_retention_keep_monthly: 3
+restic_retention_keep_yearly: 1
+
+# Remote Cleanup After Sync (saves space on server)
+restic_sync_enabled: true
+restic_cleanup_after_sync: true
+restic_remote_cleanup_keep_last: 3
+restic_remote_cleanup_keep_daily: 3
+restic_remote_cleanup_keep_weekly: 2
+restic_remote_cleanup_keep_monthly: 1
+
+# Monitoring Thresholds
+restic_backup_max_age_hours: 26
+restic_max_repository_size_gb: 100
+restic_disk_usage_threshold: 85
+
+# Health Check Integration (optional)
+# healthcheck_backup_url: "https://hc-ping.com/your-backup-check-uuid"
+
+# Additional Exclusions (optional)
+restic_additional_exclusions: [] 

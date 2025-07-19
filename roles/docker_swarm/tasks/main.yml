@@ -1,0 +1,137 @@
+---
+# Docker Swarm Role - Main Tasks
+# Handles Docker Swarm initialization, configuration, and token management
+
+- name: Check if Docker Swarm is already initialized
+  ansible.builtin.command: docker info --format '{{ "{{" }}.Swarm.LocalNodeState{{ "}}" }}'
+  register: swarm_status
+  changed_when: false
+  failed_when: false
+  tags:
+    - docker_swarm
+    - check
+
+- name: Display current swarm status
+  ansible.builtin.debug:
+    msg: "Current Docker Swarm status: {{ swarm_status.stdout }}"
+  tags:
+    - docker_swarm
+    - check
+
+- name: Get server IP address for Swarm advertising
+  ansible.builtin.set_fact:
+    server_ip: "{{ docker_swarm_advertise_addr }}"
+  tags:
+    - docker_swarm
+    - configuration
+
+- name: Initialize Docker Swarm (single node or first manager)
+  ansible.builtin.command: >
+    docker swarm init
+    --advertise-addr {{ server_ip }}
+    --default-addr-pool {{ docker_swarm_default_addr_pool }}
+    --default-addr-pool-mask-length {{ docker_swarm_default_addr_pool_mask_length }}
+    --data-path-addr {{ server_ip }}
+  register: swarm_init_result
+  when: 
+    - docker_swarm_enabled | default(true)
+    - swarm_status.stdout != "active"
+    - (node_type == "single" or (node_type == "manager" and inventory_hostname == groups['swarm_managers'][0]))
+  tags:
+    - docker_swarm
+    - initialization
+
+- name: Configure Swarm settings for production
+  ansible.builtin.command: >
+    docker swarm update
+    --dispatcher-heartbeat {{ docker_swarm_dispatcher_heartbeat }}
+    --task-history-limit {{ docker_swarm_task_history_limit }}
+    --cert-expiry {{ docker_swarm_cert_expiry }}
+  when: swarm_init_result is changed or swarm_status.stdout == "active"
+  tags:
+    - docker_swarm
+    - configuration
+
+- name: Get Swarm manager join token
+  ansible.builtin.command: docker swarm join-token -q manager
+  register: swarm_manager_token
+  when: 
+    - swarm_init_result is changed or swarm_status.stdout == "active"
+    - (node_type == "single" or (node_type == "manager" and inventory_hostname == groups['swarm_managers'][0]))
+  tags:
+    - docker_swarm
+    - tokens
+
+- name: Get Swarm worker join token
+  ansible.builtin.command: docker swarm join-token -q worker
+  register: swarm_worker_token
+  when: 
+    - swarm_init_result is changed or swarm_status.stdout == "active"
+    - (node_type == "single" or (node_type == "manager" and inventory_hostname == groups['swarm_managers'][0]))
+  tags:
+    - docker_swarm
+    - tokens
+
+- name: Save Swarm tokens to files
+  ansible.builtin.copy:
+    content: "{{ item.token }}"
+    dest: "/root/swarm-{{ item.type }}-token.txt"
+    mode: '0600'
+    owner: root
+    group: root
+  loop:
+    - { type: "manager", token: "{{ swarm_manager_token.stdout | default('') }}" }
+    - { type: "worker", token: "{{ swarm_worker_token.stdout | default('') }}" }
+  when: 
+    - item.token != ""
+    - (node_type == "single" or (node_type == "manager" and inventory_hostname == groups['swarm_managers'][0]))
+  tags:
+    - docker_swarm
+    - tokens
+
+- name: Verify Swarm node status
+  ansible.builtin.command: docker node ls
+  register: swarm_node_status
+  changed_when: false
+  when: swarm_status.stdout == "active" or swarm_init_result is changed
+  tags:
+    - docker_swarm
+    - verification
+
+- name: Get detailed Swarm information
+  ansible.builtin.command: docker info --format '{{ "{{" }}.Swarm{{ "}}" }}'
+  register: swarm_detailed_info
+  changed_when: false
+  when: swarm_status.stdout == "active" or swarm_init_result is changed
+  tags:
+    - docker_swarm
+    - verification
+
+- name: Display Swarm initialization summary
+  ansible.builtin.debug:
+    msg:
+      - "Docker Swarm configuration completed"
+      - "Node role: {{ node_type | default('unknown') }}"
+      - "Advertise address: {{ server_ip }}"
+      - "Swarm status: {{ 'Initialized' if swarm_init_result is changed else 'Already active' }}"
+      - "Manager token saved: {{ '/root/swarm-manager-token.txt' if swarm_manager_token.stdout is defined else 'N/A' }}"
+      - "Worker token saved: {{ '/root/swarm-worker-token.txt' if swarm_worker_token.stdout is defined else 'N/A' }}"
+  tags:
+    - docker_swarm
+    - summary
+
+- name: Display join commands for future reference
+  ansible.builtin.debug:
+    msg:
+      - "=== Docker Swarm Join Commands ==="
+      - "Manager join command:"
+      - "docker swarm join --token {{ swarm_manager_token.stdout | default('TOKEN') }} {{ server_ip }}:2377"
+      - ""
+      - "Worker join command:"
+      - "docker swarm join --token {{ swarm_worker_token.stdout | default('TOKEN') }} {{ server_ip }}:2377"
+  when: 
+    - swarm_manager_token.stdout is defined or swarm_worker_token.stdout is defined
+    - (node_type == "single" or (node_type == "manager" and inventory_hostname == groups['swarm_managers'][0]))
+  tags:
+    - docker_swarm
+    - summary 

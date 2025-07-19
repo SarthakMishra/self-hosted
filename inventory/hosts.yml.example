@@ -1,0 +1,89 @@
+---
+# Ansible Inventory Template
+# Copy this file to hosts.yml and customize with your server details
+# WARNING: hosts.yml contains sensitive server IPs and is gitignored
+
+all:
+  children:
+    production:
+      children:
+        swarm_managers:
+          hosts:
+            manager1:
+              ansible_host: YOUR_MANAGER_IP    # e.g., 10.1.0.100 or your.server.com
+              node_type: manager
+              traefik_enabled: true            # Only ONE manager should have traefik enabled
+            # manager2:                        # Uncomment for HA setup
+            #   ansible_host: YOUR_MANAGER2_IP
+            #   node_type: manager
+            #   traefik_enabled: false
+            # manager3:                        # Uncomment for HA setup  
+            #   ansible_host: YOUR_MANAGER3_IP
+            #   node_type: manager
+            #   traefik_enabled: false
+        swarm_workers:
+          hosts:
+            # worker1:                         # Uncomment to add worker nodes
+            #   ansible_host: YOUR_WORKER1_IP
+            #   node_type: worker
+            #   traefik_enabled: false
+            # worker2:
+            #   ansible_host: YOUR_WORKER2_IP
+            #   node_type: worker
+            #   traefik_enabled: false
+        new_workers:                           # For scaling operations
+          hosts:
+            # worker3:                         # Add new workers here when scaling
+            #   ansible_host: YOUR_WORKER3_IP
+            #   node_type: worker
+            #   traefik_enabled: false
+        new_managers:                          # For HA scaling
+          hosts:
+            # manager4:                        # Add new managers here when scaling
+            #   ansible_host: YOUR_MANAGER4_IP
+            #   node_type: manager
+            #   traefik_enabled: false
+    
+    staging:
+      children:
+        staging_nodes:
+          hosts:
+            staging1:
+              ansible_host: YOUR_STAGING_IP    # Staging server IP
+              node_type: single
+              traefik_enabled: true
+    
+    single_node:
+      hosts:
+        standalone:
+          ansible_host: YOUR_SERVER_IP        # Single server deployment
+          node_type: single
+          traefik_enabled: true
+
+  vars:
+    # SSH Configuration
+    ansible_user: root                        # Change to your SSH user
+    ansible_ssh_private_key_file: ~/.ssh/id_rsa  # Path to your SSH key
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+    
+    # Python interpreter
+    ansible_python_interpreter: /usr/bin/python3
+
+# Configuration Examples:
+#
+# Single Server:
+#   - Use 'single_node' group with node_type: single, traefik_enabled: true
+#
+# Multi-Node Cluster:  
+#   - Start with 1 manager (traefik_enabled: true)
+#   - Add workers as needed (traefik_enabled: false)
+#   - For HA, add 2 more managers (total 3, odd number)
+#
+# Scaling:
+#   - Add new nodes to 'new_workers' or 'new_managers' groups
+#   - Run scaling playbooks to add them to existing cluster
+#
+# Important:
+#   - Only ONE node should have traefik_enabled: true (public access)
+#   - Use Tailscale IPs for secure networking when available
+#   - All worker nodes should have traefik_enabled: false 

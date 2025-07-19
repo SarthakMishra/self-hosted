@@ -1,0 +1,106 @@
+---
+# Ansible Vault Template
+# Copy this file to vault.yml and customize with your sensitive data
+# Then encrypt it with: ansible-vault encrypt group_vars/vault.yml
+# WARNING: vault.yml contains sensitive data and is gitignored
+
+# =============================================================================
+# DOMAIN AND DNS CONFIGURATION
+# =============================================================================
+vault_production_domain: "yourdomain.com"           # Your production domain
+vault_staging_domain: "staging.yourdomain.com"      # Your staging domain (optional)
+
+# =============================================================================
+# SSH PUBLIC KEYS
+# =============================================================================
+# Add your SSH public keys for secure access
+vault_production_admin_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... your-key-here"
+vault_staging_admin_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... your-staging-key-here"
+
+# Additional SSH keys (add as needed)
+# vault_additional_ssh_key_1: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... team-member-1"
+# vault_additional_ssh_key_2: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... team-member-2"
+
+# =============================================================================
+# TAILSCALE CONFIGURATION
+# =============================================================================
+# Get auth key from: https://login.tailscale.com/admin/settings/keys
+vault_tailscale_auth_key: "tskey-auth-xxxxxxxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# =============================================================================
+# CLOUDFLARE CONFIGURATION
+# =============================================================================
+# Required for SSL certificates and firewall rules
+vault_cloudflare_email: "your-email@yourdomain.com"
+vault_cloudflare_api_key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"    # Global API Key
+vault_cloudflare_dns_token: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"   # DNS API Token
+
+# Get these from: https://dash.cloudflare.com/profile/api-tokens
+# - Global API Key: https://dash.cloudflare.com/profile/api-tokens (View Global API Key)
+# - DNS API Token: Create token with Zone:DNS:Edit permissions for your domain
+
+# =============================================================================
+# BACKUP CONFIGURATION  
+# =============================================================================
+vault_restic_password: "your-very-secure-backup-password-here"
+
+# Use a strong, unique password for backup encryption
+# This password encrypts all your backup data - keep it safe!
+
+# =============================================================================
+# BASIC AUTHENTICATION (Optional)
+# =============================================================================
+# For protecting admin interfaces (Traefik dashboard, etc.)
+vault_basic_auth_user: "admin"
+vault_basic_auth_password: "your-admin-interface-password"
+
+# Generate password hash with: echo $(htpasswd -nB admin) | sed -e 's/admin://'
+# Or use: python3 -c "import crypt; print(crypt.crypt('your-password'))"
+vault_basic_auth_hash: "$2y$10$QlQkFuyF4dC3QPGLzgD8OOBhfVHPb2vIDKR9bGzP6Mq8J8.LAr5H2"  # password: admin
+
+# =============================================================================
+# ADDITIONAL SECRETS (Optional)
+# =============================================================================
+
+# Database passwords (if using databases)
+# vault_mysql_root_password: "secure-mysql-password"
+# vault_postgres_password: "secure-postgres-password"
+
+# API keys for monitoring services (if using)
+# vault_slack_webhook_url: "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
+# vault_discord_webhook_url: "https://discord.com/api/webhooks/000000000000000000/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# Third-party service API keys
+# vault_github_token: "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+# vault_docker_hub_token: "dckr_pat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# =============================================================================
+# USAGE INSTRUCTIONS
+# =============================================================================
+#
+# 1. Copy this file to vault.yml:
+#    cp group_vars/vault.yml.example group_vars/vault.yml
+#
+# 2. Edit vault.yml with your real values:
+#    nano group_vars/vault.yml
+#
+# 3. Encrypt the file with ansible-vault:
+#    ansible-vault encrypt group_vars/vault.yml
+#
+# 4. To edit encrypted vault:
+#    ansible-vault edit group_vars/vault.yml
+#
+# 5. To view encrypted vault:
+#    ansible-vault view group_vars/vault.yml
+#
+# 6. When running playbooks, provide vault password:
+#    ansible-playbook playbook.yml --ask-vault-pass
+#    # OR store password in file and use:
+#    ansible-playbook playbook.yml --vault-password-file .vault_pass
+#
+# SECURITY NOTES:
+# - Never commit the unencrypted vault.yml file
+# - Always encrypt vault.yml before committing  
+# - Store vault password separately and securely
+# - Use unique, strong passwords for all services
+# - Regularly rotate API keys and passwords 

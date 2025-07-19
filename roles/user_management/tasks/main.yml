@@ -1,0 +1,123 @@
+---
+# User Management Role - Main Tasks  
+# Creates admin and docker users with proper SSH configuration
+
+- name: Create admin user
+  ansible.builtin.user:
+    name: "{{ admin_username }}"
+    shell: "{{ admin_shell }}"
+    home: "{{ admin_home }}"
+    create_home: true
+    groups: sudo
+    append: true
+    state: present
+  register: admin_user_created
+  tags:
+    - user_management
+    - admin_user
+
+- name: Create admin user .ssh directory
+  ansible.builtin.file:
+    path: "{{ admin_home }}/.ssh"
+    state: directory
+    owner: "{{ admin_username }}"
+    group: "{{ admin_username }}"
+    mode: '0700'
+  tags:
+    - user_management
+    - admin_user
+    - ssh
+
+- name: Add SSH public keys for admin user
+  ansible.builtin.authorized_key:
+    user: "{{ admin_username }}"
+    key: "{{ item }}"
+    state: present
+  loop: "{{ ssh_public_keys }}"
+  when: ssh_public_keys | length > 0
+  tags:
+    - user_management
+    - admin_user
+    - ssh
+
+- name: Copy root SSH keys to admin user if no keys provided
+  ansible.builtin.copy:
+    src: /root/.ssh/authorized_keys
+    dest: "{{ admin_home }}/.ssh/authorized_keys"
+    owner: "{{ admin_username }}"
+    group: "{{ admin_username }}"
+    mode: '0600'
+    remote_src: true
+  when: 
+    - ssh_public_keys | length == 0
+    - ansible_check_mode == false
+  ignore_errors: true
+  tags:
+    - user_management
+    - admin_user
+    - ssh
+
+- name: Test admin user sudo access
+  ansible.builtin.command: sudo -u {{ admin_username }} sudo -n whoami
+  register: admin_sudo_test
+  changed_when: false
+  failed_when: admin_sudo_test.stdout != "root"
+  tags:
+    - user_management
+    - admin_user
+    - validation
+
+- name: Create docker system user
+  ansible.builtin.user:
+    name: docker
+    system: true
+    shell: /bin/bash
+    home: /home/docker
+    create_home: true
+    state: present
+  when: docker_user_enabled | default(true)
+  register: docker_user_created
+  tags:
+    - user_management
+    - docker_user
+
+- name: Create docker user .ssh directory
+  ansible.builtin.file:
+    path: /home/docker/.ssh
+    state: directory
+    owner: docker
+    group: docker
+    mode: '0700'
+  when: docker_user_enabled | default(true)
+  tags:
+    - user_management
+    - docker_user
+    - ssh
+
+- name: Copy admin SSH keys to docker user
+  ansible.builtin.copy:
+    src: "{{ admin_home }}/.ssh/authorized_keys"
+    dest: /home/docker/.ssh/authorized_keys
+    owner: docker
+    group: docker
+    mode: '0600'
+    remote_src: true
+  when: 
+    - docker_user_enabled | default(true)
+    - admin_user_created is succeeded
+  ignore_errors: true
+  tags:
+    - user_management
+    - docker_user
+    - ssh
+
+- name: Display admin user information
+  ansible.builtin.debug:
+    msg:
+      - "Admin user '{{ admin_username }}' has been created successfully"
+      - "Home directory: {{ admin_home }}"
+      - "SSH access configured: {{ ssh_public_keys | length > 0 }}"
+      - "Sudo access verified: {{ admin_sudo_test.stdout == 'root' }}"
+  tags:
+    - user_management
+    - admin_user 

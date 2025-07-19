@@ -1,0 +1,47 @@
+---
+# Logging Role - Main Tasks
+# Configures log rotation and system logging
+
+- name: Configure log rotation for system logs
+  ansible.builtin.template:
+    src: system-logs.j2
+    dest: /etc/logrotate.d/system-logs
+    mode: '0644'
+    owner: root
+    group: root
+    backup: true
+  when: log_rotation_enabled | default(true)
+  tags:
+    - logging
+    - logrotate
+
+- name: Test logrotate configuration
+  ansible.builtin.command: logrotate -d /etc/logrotate.d/system-logs
+  register: logrotate_test
+  changed_when: false
+  failed_when: logrotate_test.rc != 0
+  when: log_rotation_enabled | default(true)
+  tags:
+    - logging
+    - validation
+
+- name: Ensure rsyslog is running
+  ansible.builtin.systemd:
+    name: rsyslog
+    state: started
+    enabled: true
+  tags:
+    - logging
+    - rsyslog
+
+- name: Display logging configuration summary
+  ansible.builtin.debug:
+    msg:
+      - "System logging configuration completed"
+      - "Log rotation enabled: {{ log_rotation_enabled | default(true) }}"
+      - "Log retention days: {{ log_retention_days }}"
+      - "Rsyslog service: enabled and running"
+      - "Logrotate config: /etc/logrotate.d/system-logs"
+  tags:
+    - logging
+    - summary 

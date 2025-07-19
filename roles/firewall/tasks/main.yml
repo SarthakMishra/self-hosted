@@ -1,0 +1,130 @@
+---
+# Firewall Role - Main Tasks
+# Handles UFW configuration and Cloudflare IP management
+
+- name: Reset UFW to clean state
+  community.general.ufw:
+    state: reset
+  when: firewall_reset | default(true)
+  tags:
+    - firewall
+    - ufw
+
+- name: Set UFW default policies
+  community.general.ufw:
+    direction: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - { direction: 'incoming', policy: 'deny' }
+    - { direction: 'outgoing', policy: 'allow' }
+  tags:
+    - firewall
+    - ufw
+
+- name: Fetch current Cloudflare IPv4 ranges
+  ansible.builtin.uri:
+    url: "{{ cloudflare_ipv4_url }}"
+    return_content: true
+  register: cloudflare_ipv4_ranges
+  when: cloudflare_firewall_enabled | default(true)
+  tags:
+    - firewall
+    - cloudflare
+
+- name: Fetch current Cloudflare IPv6 ranges
+  ansible.builtin.uri:
+    url: "{{ cloudflare_ipv6_url }}"
+    return_content: true
+  register: cloudflare_ipv6_ranges
+  when: cloudflare_firewall_enabled | default(true)
+  tags:
+    - firewall
+    - cloudflare
+
+- name: Parse Cloudflare IP ranges
+  ansible.builtin.set_fact:
+    cloudflare_ipv4_list: "{{ cloudflare_ipv4_ranges.content.split('\n') | reject('equalto', '') | list }}"
+    cloudflare_ipv6_list: "{{ cloudflare_ipv6_ranges.content.split('\n') | reject('equalto', '') | list }}"
+  when: cloudflare_firewall_enabled | default(true)
+  tags:
+    - firewall
+    - cloudflare
+
+- name: Allow HTTPS access from Cloudflare IPv4 ranges
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ item }}"
+    to_port: "443"
+    proto: tcp
+    comment: "Cloudflare IPv4"
+  loop: "{{ cloudflare_ipv4_list }}"
+  when: 
+    - cloudflare_firewall_enabled | default(true)
+    - traefik_enabled | default(false)
+  tags:
+    - firewall
+    - cloudflare
+
+- name: Allow HTTPS access from Cloudflare IPv6 ranges
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ item }}"
+    to_port: "443"
+    proto: tcp
+    comment: "Cloudflare IPv6"
+  loop: "{{ cloudflare_ipv6_list }}"
+  when: 
+    - cloudflare_firewall_enabled | default(true)
+    - traefik_enabled | default(false)
+  tags:
+    - firewall
+    - cloudflare
+
+- name: Create Cloudflare IP update script
+  ansible.builtin.template:
+    src: update-cloudflare-ips.sh.j2
+    dest: /usr/local/bin/update-cloudflare-ips
+    mode: '0755'
+    owner: root
+    group: root
+  when: cloudflare_firewall_enabled | default(true)
+  tags:
+    - firewall
+    - cloudflare
+    - scripts
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+  when: firewall_enabled | default(true)
+  tags:
+    - firewall
+    - ufw
+
+- name: Display firewall status
+  ansible.builtin.command: ufw status verbose
+  register: ufw_status
+  changed_when: false
+  tags:
+    - firewall
+    - status
+
+- name: Show UFW configuration
+  ansible.builtin.debug:
+    var: ufw_status.stdout_lines
+  tags:
+    - firewall
+    - status
+
+- name: Display configuration summary
+  ansible.builtin.debug:
+    msg:
+      - "Firewall configuration completed"
+      - "Node type: {{ node_type | default('unknown') }}"
+      - "Traefik enabled: {{ traefik_enabled | default(false) }}"
+      - "Cloudflare firewall: {{ cloudflare_firewall_enabled | default(true) }}"
+      - "IPv4 ranges configured: {{ cloudflare_ipv4_list | length if cloudflare_firewall_enabled else 0 }}"
+      - "IPv6 ranges configured: {{ cloudflare_ipv6_list | length if cloudflare_firewall_enabled else 0 }}"
+  tags:
+    - firewall
+    - status 

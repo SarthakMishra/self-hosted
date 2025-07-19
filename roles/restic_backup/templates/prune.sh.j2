@@ -1,0 +1,81 @@
+#!/bin/bash
+set -euo pipefail
+
+# Restic Repository Maintenance Script
+# Handles pruning, cleanup, and optimization
+
+# Source environment configuration
+source {{ restic_backup_root }}/config/restic-env
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$BACKUP_LOG_FILE"
+}
+
+main() {
+    local start_time=$(date +%s)
+    
+    log "Starting repository maintenance"
+    
+    # Check if repository is accessible
+    if ! restic cat config >/dev/null 2>&1; then
+        log "Repository not accessible, skipping maintenance"
+        exit 0
+    fi
+    
+    # Wait for any ongoing backup to complete
+    local wait_count=0
+    while [ -f "$SYNC_MARKER_FILE" ] && [ $wait_count -lt 10 ]; do
+        log "Waiting for backup/sync to complete... ($wait_count/10)"
+        sleep 300  # Wait 5 minutes
+        ((wait_count++))
+    done
+    
+    # Forget old snapshots according to retention policy
+    log "Forgetting old snapshots (keep-last: $KEEP_LAST, keep-daily: $KEEP_DAILY, keep-weekly: $KEEP_WEEKLY, keep-monthly: $KEEP_MONTHLY, keep-yearly: $KEEP_YEARLY)"
+    restic forget \
+        --verbose \
+        --tag=docker-swarm \
+        --keep-last "$KEEP_LAST" \
+        --keep-daily "$KEEP_DAILY" \
+        --keep-weekly "$KEEP_WEEKLY" \
+        --keep-monthly "$KEEP_MONTHLY" \
+        --keep-yearly "$KEEP_YEARLY" \
+        --prune
+    
+    # Check repository integrity
+    log "Checking repository integrity (read-data-subset: 5%)"
+    restic check --read-data-subset=5%
+    
+    # Display repository statistics
+    log "Repository statistics:"
+    restic stats --mode=raw-data | tee -a "$BACKUP_LOG_FILE"
+    
+    # List current snapshots
+    log "Current snapshots (latest 10):"
+    restic snapshots --compact --latest 10 | tee -a "$BACKUP_LOG_FILE"
+    
+    local duration=$(($(date +%s) - start_time))
+    log "Maintenance completed in ${duration}s"
+    
+    # Update metrics
+    cat > "$METRICS_DIR/restic_maintenance.prom" <<EOF
+# HELP restic_maintenance_duration_seconds Time taken for maintenance operation
+# TYPE restic_maintenance_duration_seconds gauge
+restic_maintenance_duration_seconds $duration
+
+# HELP restic_maintenance_last_success_timestamp Unix timestamp of last successful maintenance
+# TYPE restic_maintenance_last_success_timestamp gauge
+restic_maintenance_last_success_timestamp $(date +%s)
+
+# HELP restic_repository_size_bytes Current repository size after maintenance
+# TYPE restic_repository_size_bytes gauge
+restic_repository_size_bytes $(du -sb "$RESTIC_REPOSITORY" | cut -f1)
+
+# HELP restic_snapshots_total Total number of snapshots
+# TYPE restic_snapshots_total gauge
+restic_snapshots_total $(restic snapshots --json | jq '. | length')
+EOF
+}
+
+trap 'log "Maintenance failed with error"; exit 1' ERR
+main "$@" 

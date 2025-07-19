@@ -1,0 +1,134 @@
+---
+# Docker Installation Role - Main Tasks
+# Handles Docker CE installation, repository setup, and user configuration
+
+- name: Remove old Docker packages
+  ansible.builtin.apt:
+    name:
+      - docker
+      - docker-engine
+      - docker.io
+      - containerd
+      - runc
+    state: absent
+  tags:
+    - docker_installation
+    - cleanup
+
+- name: Install prerequisites for Docker repository
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - apt-transport-https
+    state: present
+    update_cache: true
+  tags:
+    - docker_installation
+    - prerequisites
+
+- name: Add Docker GPG key
+  ansible.builtin.get_url:
+    url: "{{ docker_apt_key_url }}"
+    dest: "{{ docker_apt_key_file }}"
+    mode: '0644'
+    force: true
+  register: docker_gpg_key_added
+  tags:
+    - docker_installation
+    - repository
+
+- name: Convert GPG key to proper format
+  ansible.builtin.command: gpg --dearmor --output {{ docker_apt_key_file }} {{ docker_apt_key_file }}
+  when: docker_gpg_key_added is changed
+  tags:
+    - docker_installation
+    - repository
+
+- name: Verify Docker GPG key fingerprint
+  ansible.builtin.command: gpg --show-keys {{ docker_apt_key_file }}
+  register: docker_gpg_verification
+  changed_when: false
+  tags:
+    - docker_installation
+    - verification
+
+- name: Add Docker repository
+  ansible.builtin.apt_repository:
+    repo: "{{ docker_apt_repository }}"
+    filename: docker
+    state: present
+    update_cache: true
+  tags:
+    - docker_installation
+    - repository
+
+- name: Install Docker packages
+  ansible.builtin.apt:
+    name: "{{ docker_packages }}"
+    state: "{{ 'latest' if docker_ce_version == 'latest' else 'present' }}"
+    update_cache: true
+  register: docker_packages_installed
+  notify:
+    - restart docker
+  tags:
+    - docker_installation
+    - packages
+
+- name: Add docker user to docker group
+  ansible.builtin.user:
+    name: docker
+    groups: docker
+    append: true
+  when: docker_user_enabled | default(true)
+  tags:
+    - docker_installation
+    - user_management
+
+- name: Add admin user to docker group
+  ansible.builtin.user:
+    name: "{{ admin_username }}"
+    groups: docker
+    append: true
+  tags:
+    - docker_installation
+    - user_management
+
+- name: Verify Docker installation
+  ansible.builtin.command: docker --version
+  register: docker_version_check
+  changed_when: false
+  tags:
+    - docker_installation
+    - verification
+
+- name: Verify Docker Compose installation
+  ansible.builtin.command: docker compose version
+  register: docker_compose_version_check
+  changed_when: false
+  tags:
+    - docker_installation
+    - verification
+
+- name: Test Docker functionality with hello-world
+  ansible.builtin.command: docker run --rm hello-world
+  register: docker_hello_world_test
+  changed_when: false
+  become_user: docker
+  tags:
+    - docker_installation
+    - testing
+
+- name: Display Docker installation summary
+  ansible.builtin.debug:
+    msg:
+      - "Docker installation completed successfully"
+      - "Docker version: {{ docker_version_check.stdout }}"
+      - "Docker Compose version: {{ docker_compose_version_check.stdout }}"
+      - "Users in docker group: docker, {{ admin_username }}"
+      - "Hello-world test: {{ 'PASSED' if docker_hello_world_test.rc == 0 else 'FAILED' }}"
+  tags:
+    - docker_installation
+    - summary 

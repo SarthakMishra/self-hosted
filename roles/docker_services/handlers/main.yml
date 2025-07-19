@@ -1,0 +1,20 @@
+---
+# Docker Services Role - Handlers
+# Manages Docker stack deployments and service restarts
+
+- name: restart docker
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+    daemon_reload: yes
+  listen: "restart docker"
+
+- name: redeploy traefik stack
+  community.docker.docker_stack:
+    name: traefik
+    compose:
+      - "{{ docker_stack_root }}/compose/traefik.yml"
+    state: present
+  listen: "redeploy traefik"
+
+ 
