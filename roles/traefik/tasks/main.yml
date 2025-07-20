@@ -106,10 +106,11 @@
     - firewall
 
 - name: Start and enable Traefik
-  community.docker.docker_compose:
-    project_src: "{{ traefik_root_dir }}"
-    state: present
-    build: false
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ traefik_root_dir }}"
+  register: traefik_start
+  changed_when: "'Creating' in traefik_start.stderr or 'Starting' in traefik_start.stderr or 'Recreating' in traefik_start.stderr"
   tags:
     - traefik
     - start

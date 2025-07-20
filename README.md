@@ -11,6 +11,7 @@ Complete infrastructure-as-code solution using Ansible for automated deployment 
 - Admin user creation with SSH configuration
 - Tailscale mesh VPN integration
 - UFW firewall configuration with Docker security fix
+- **CrowdSec security engine with community threat intelligence**
 - Docker installation with production configuration
 - Traefik reverse proxy with Let's Encrypt SSL
 - Log rotation and cleanup automation
@@ -42,10 +43,11 @@ ansible-playbook -i inventory/hosts.yml playbooks/setup.yml
 
 The playbook will:
 1. Harden the system and create admin user
-2. Reboot the server automatically
-3. Install and configure Docker
-4. **Set up Traefik reverse proxy with automatic SSL**
-5. Validate everything is working
+2. Install CrowdSec security engine with firewall integration
+3. Reboot the server automatically
+4. Install and configure Docker
+5. **Set up Traefik reverse proxy with automatic SSL**
+6. Validate everything is working
 
 ## Configuration
 
@@ -130,6 +132,7 @@ networks:
 │   ├── all.yml                   # Global variables
 │   ├── docker.yml               # Docker configuration
 │   ├── traefik.yml              # Traefik configuration
+│   ├── crowdsec.yml             # CrowdSec security configuration
 │   └── vault.yml.example       # Secrets template
 ├── playbooks/
 │   └── setup.yml                # Complete server setup
@@ -154,6 +157,7 @@ ansible-playbook playbook.yml --vault-password-file .vault_pass
 Your server will have:
 - Hardened system with admin user
 - Tailscale VPN for secure access
+- **CrowdSec security engine protecting against attacks**
 - Production-ready Docker installation
 - **Traefik reverse proxy with automatic SSL**
 - UFW firewall with Docker security fix
@@ -165,6 +169,7 @@ Your server will have:
 **Management commands:**
 - Docker status: `/usr/local/bin/docker-status`
 - Docker cleanup: `/usr/local/bin/docker-cleanup`
+- CrowdSec status: `sudo cscli collections list`
 - Default directory: `/opt/docker`
 
 **Deploy anything with automatic HTTPS** - just add Traefik labels! 🚀

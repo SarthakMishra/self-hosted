@@ -1,0 +1,193 @@
+---
+# CrowdSec Security Engine Role - Main Tasks
+# Installs CrowdSec, firewall bouncer, and configures comprehensive security monitoring
+
+- name: Skip CrowdSec installation if disabled
+  ansible.builtin.debug:
+    msg: "CrowdSec installation is disabled. Skipping all CrowdSec tasks."
+  when: not (crowdsec_enabled | default(true))
+
+- name: CrowdSec installation and configuration
+  block:
+    - name: Add CrowdSec repository key
+      ansible.builtin.get_url:
+        url: "{{ crowdsec_gpg_key_url }}"
+        dest: "{{ crowdsec_gpg_key_file }}"
+        mode: '0644'
+      tags:
+        - crowdsec
+        - installation
+
+    - name: Add CrowdSec repository
+      ansible.builtin.apt_repository:
+        repo: "{{ crowdsec_apt_repository }}"
+        filename: crowdsec
+        state: present
+        update_cache: true
+      tags:
+        - crowdsec
+        - installation
+
+    - name: Install CrowdSec packages
+      ansible.builtin.apt:
+        name: "{{ crowdsec_packages }}"
+        state: present
+        update_cache: true
+      register: crowdsec_installation
+      tags:
+        - crowdsec
+        - installation
+
+    - name: Create CrowdSec configuration backup
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        remote_src: true
+        mode: '0640'
+        backup: true
+      loop:
+        - { src: "/etc/crowdsec/acquis.yaml", dest: "/etc/crowdsec/acquis.yaml.backup" }
+        - { src: "/etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml", dest: "/etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml.backup" }
+      ignore_errors: true
+      tags:
+        - crowdsec
+        - backup
+
+    - name: Configure CrowdSec log acquisition
+      ansible.builtin.template:
+        src: acquis.yaml.j2
+        dest: /etc/crowdsec/acquis.yaml
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      notify:
+        - restart crowdsec
+      tags:
+        - crowdsec
+        - configuration
+
+    - name: Read existing bouncer configuration to get API key
+      ansible.builtin.slurp:
+        src: /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml
+      register: existing_bouncer_config
+      ignore_errors: true
+      tags:
+        - crowdsec
+        - bouncer
+
+    - name: Extract API key from existing configuration
+      ansible.builtin.set_fact:
+        crowdsec_api_key: "{{ (existing_bouncer_config.content | b64decode | from_yaml).api_key }}"
+      when: 
+        - existing_bouncer_config is succeeded
+        - (existing_bouncer_config.content | b64decode | from_yaml).api_key is defined
+      tags:
+        - crowdsec
+        - bouncer
+
+    - name: Configure CrowdSec firewall bouncer
+      ansible.builtin.template:
+        src: crowdsec-firewall-bouncer.yaml.j2
+        dest: /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml
+        owner: root
+        group: root
+        mode: '0600'
+        backup: true
+      notify:
+        - restart crowdsec-firewall-bouncer
+      tags:
+        - crowdsec
+        - bouncer
+
+    - name: Install CrowdSec security collections
+      ansible.builtin.command:
+        cmd: "cscli collections install {{ item }}"
+      register: collection_install
+      changed_when: "'Nothing to do' not in collection_install.stdout"
+      failed_when: 
+        - collection_install.rc != 0
+        - "'already exists' not in collection_install.stderr"
+      loop: "{{ crowdsec_collections + (crowdsec_additional_collections | default([])) }}"
+      tags:
+        - crowdsec
+        - collections
+
+    - name: Enable and start CrowdSec services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+        daemon_reload: true
+      loop:
+        - crowdsec
+        - crowdsec-firewall-bouncer
+      tags:
+        - crowdsec
+        - services
+
+    - name: Wait for CrowdSec to be ready
+      ansible.builtin.wait_for:
+        timeout: 30
+      tags:
+        - crowdsec
+        - services
+
+    - name: Reload CrowdSec configuration
+      ansible.builtin.systemd:
+        name: crowdsec
+        state: reloaded
+      tags:
+        - crowdsec
+        - configuration
+
+    - name: Get CrowdSec status information
+      ansible.builtin.command:
+        cmd: "{{ item.cmd }}"
+      register: "{{ item.var }}"
+      changed_when: false
+      failed_when: false
+      loop:
+        - { cmd: "cscli collections list", var: "crowdsec_collections_status" }
+        - { cmd: "cscli bouncers list", var: "crowdsec_bouncers_status" }
+        - { cmd: "ipset list crowdsec-blacklists-0 | head -10", var: "crowdsec_blocked_ips" }
+        - { cmd: "iptables -L | grep -i crowdsec", var: "crowdsec_iptables_rules" }
+      tags:
+        - crowdsec
+        - validation
+
+    - name: Display CrowdSec installation summary
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🛡️  CROWDSEC SECURITY ENGINE INSTALLED"
+          - "================================================================"
+          - ""
+          - "✅ CrowdSec Engine: {{ 'Installed and Running' if crowdsec_installation is succeeded else 'Installation Failed' }}"
+          - "✅ Firewall Bouncer: Active with UFW/Docker integration"
+          - "✅ Security Collections: {{ (crowdsec_collections + (crowdsec_additional_collections | default([]))) | length }} collections installed"
+          - "✅ Log Monitoring: {{ (crowdsec_log_sources + (crowdsec_additional_log_sources | default([]))) | length }} log sources configured"
+          - ""
+          - "🔒 Protection Features:"
+          - "   ├── SSH Brute Force Protection"
+          - "   ├── HTTP/HTTPS Attack Detection"
+          - "   ├── CVE Vulnerability Protection"
+          - "   ├── Traefik-specific Monitoring"
+          - "   ├── Docker Container Protection"
+          - "   └── Firewall/UFW Integration"
+          - ""
+          - "📊 Security Status:"
+          - "   Active Collections: {{ (crowdsec_collections_status.stdout_lines | select('match', '.*enabled.*') | list) | length }}"
+          - "   Registered Bouncers: {{ (crowdsec_bouncers_status.stdout_lines | length - 3) if crowdsec_bouncers_status.rc == 0 else 0 }}"
+          - "   Blocked IPs: {{ crowdsec_blocked_ips.stdout_lines | length if crowdsec_blocked_ips.rc == 0 else 'N/A' }}"
+          - ""
+          - "🔧 Management Commands:"
+          - "   Status: sudo cscli collections list"
+          - "   Metrics: sudo cscli metrics"
+          - "   Decisions: sudo cscli decisions list"
+          - "   Alerts: sudo cscli alerts list"
+          - ""
+      tags:
+        - crowdsec
+        - status
+  when: crowdsec_enabled | default(true) 

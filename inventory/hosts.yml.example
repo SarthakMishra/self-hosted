@@ -9,22 +9,26 @@ all:
     docker_servers:
       hosts:
         server:
-          ansible_host: YOUR_SERVER_IP        # Your server IP (e.g., 10.1.0.100 or your.domain.com)
+          ansible_host: server              # Will be dynamically updated by playbook
           node_type: server
 
   vars:
-    # SSH Configuration
-    ansible_user: ubuntu                      # Default for most cloud providers (AWS, DigitalOcean, etc.)
-    ansible_ssh_private_key_file: ~/.ssh/id_rsa  # Path to your SSH key
-    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+    # Connection settings (will be dynamically updated by playbook)
+    ansible_user: admin                     # Preferred user, but playbook will try ubuntu if admin fails
+    ansible_ssh_private_key_file: ~/.ssh/id_ed25519  # Path to your SSH key
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o ConnectTimeout=10'
     
     # Privilege Escalation (required when not using root)
-    ansible_become: true                      # Use sudo for root privileges
-    ansible_become_method: sudo               # Use sudo method
-    ansible_become_user: root                 # Become root user
+    ansible_become: true                    # Use sudo for root privileges
+    ansible_become_method: sudo             # Use sudo method
+    ansible_become_user: root               # Become root user
     
     # Python interpreter
     ansible_python_interpreter: /usr/bin/python3
+    
+    # Server Connection Configuration (loaded from vault.yml)
+    server_public_ip: "{{ vault_server_public_ip }}"
+    tailscale_magic_dns_suffix: "{{ vault_tailscale_magic_dns_suffix }}"
 
 # Configuration Guide:
 #

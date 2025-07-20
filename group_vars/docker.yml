@@ -101,4 +101,4 @@ docker_log_rotation:
   daemon_logs:
     path: "/var/log/docker.log"
     rotate: 7
-    size: "100M" 
+    size: "100M"

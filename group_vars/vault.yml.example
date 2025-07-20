@@ -12,6 +12,12 @@ vault_admin_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... your-key-here"
 # Get auth key from: https://login.tailscale.com/admin/settings/keys
 vault_tailscale_auth_key: "tskey-auth-xxxxxxxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
+# SERVER CONNECTION CONFIGURATION
+# Your server's public IP address
+vault_server_public_ip: "203.0.113.1"  # Replace with your actual server public IP
+# Your Tailscale Magic DNS suffix (found in Tailscale admin console)
+vault_tailscale_magic_dns_suffix: "tail1a2b3c.ts.net"  # Replace with your actual Tailscale suffix
+
 # TRAEFIK CONFIGURATION
 # Let's Encrypt email for SSL certificates
 vault_traefik_acme_email: "your@email.com"

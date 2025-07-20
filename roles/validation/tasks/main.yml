@@ -148,6 +148,16 @@
     - validation
     - summary
 
+- name: Verify Tailscale connection before disabling ubuntu user
+  ansible.builtin.command: tailscale status --json
+  register: tailscale_connection_check
+  changed_when: false
+  failed_when: false
+  tags:
+    - validation
+    - security
+    - tailscale_check
+
 - name: Final Security Hardening - Disable ubuntu user (FINAL STEP)
   ansible.builtin.user:
     name: ubuntu
@@ -155,6 +165,7 @@
     password_lock: true
   when: 
     - admin_sudo_check.stdout == "root"  # Admin user confirmed working
+    - tailscale_connection_check.rc == 0  # Tailscale is running and connected
     - disable_ubuntu_user | default(true)  # Can be overridden if needed
   tags:
     - validation
@@ -171,6 +182,7 @@
       - ""
       - "✅ Ubuntu user disabled for security"
       - "✅ Admin user confirmed working with sudo access"
+      - "✅ Tailscale connection verified and working"
       - "✅ SSH access restricted to admin user only"
       - ""
       - "⚠️  IMPORTANT: From now on, use admin user for SSH access:"
@@ -179,7 +191,27 @@
       - "🚨 If you lose access, you'll need console access to re-enable ubuntu user"
   when: 
     - admin_sudo_check.stdout == "root"
+    - tailscale_connection_check.rc == 0
     - disable_ubuntu_user | default(true)
+
+- name: Display security warning if ubuntu user NOT disabled
+  ansible.builtin.debug:
+    msg:
+      - "================================================================"
+      - "⚠️  SECURITY WARNING"
+      - "================================================================"
+      - ""
+      - "❌ Ubuntu user NOT disabled due to failed checks:"
+      - "   Admin user working: {{ 'YES' if admin_sudo_check.stdout == 'root' else 'NO' }}"
+      - "   Tailscale connected: {{ 'YES' if tailscale_connection_check.rc == 0 else 'NO' }}"
+      - ""
+      - "🔒 For security, manually disable ubuntu user once admin/Tailscale is working:"
+      - "   sudo usermod -s /usr/sbin/nologin ubuntu"
+      - "   sudo passwd -l ubuntu"
+      - ""
+  when: 
+    - disable_ubuntu_user | default(true)
+    - not (admin_sudo_check.stdout == "root" and tailscale_connection_check.rc == 0)
   tags:
     - validation
     - security

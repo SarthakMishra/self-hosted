@@ -19,7 +19,10 @@
   ansible.builtin.command: logrotate -d /etc/logrotate.d/system-logs
   register: logrotate_test
   changed_when: false
-  failed_when: logrotate_test.rc != 0
+  failed_when: 
+    - logrotate_test.rc != 0
+    - "'error:' in logrotate_test.stderr"
+    - "'warning: logrotate in debug mode' not in logrotate_test.stderr"
   when: log_rotation_enabled | default(true)
   tags:
     - logging

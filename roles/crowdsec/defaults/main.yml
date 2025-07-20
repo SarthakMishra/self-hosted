@@ -1,0 +1,113 @@
+---
+# CrowdSec Role Default Variables
+
+# Repository Configuration
+crowdsec_gpg_key_url: "https://packagecloud.io/crowdsec/crowdsec/gpgkey"
+crowdsec_gpg_key_file: "/usr/share/keyrings/crowdsec-archive-keyring.gpg"
+crowdsec_apt_repository: "deb [signed-by=/usr/share/keyrings/crowdsec-archive-keyring.gpg] https://packagecloud.io/crowdsec/crowdsec/any any main"
+
+# Package Installation
+crowdsec_packages:
+  - crowdsec
+  - crowdsec-firewall-bouncer-iptables
+
+# CrowdSec API Configuration
+crowdsec_api_url: "http://127.0.0.1:8080/"
+crowdsec_api_key: "auto-generated"  # Will be generated automatically by installation
+
+# Firewall Bouncer Configuration
+crowdsec_bouncer_mode: "iptables"
+crowdsec_bouncer_update_frequency: "10s"
+crowdsec_bouncer_log_mode: "file"
+crowdsec_bouncer_log_dir: "/var/log/"
+crowdsec_bouncer_log_level: "info"
+crowdsec_bouncer_log_compression: true
+crowdsec_bouncer_log_max_size: 100
+crowdsec_bouncer_log_max_backups: 3
+crowdsec_bouncer_log_max_age: 30
+
+# Security Configuration
+crowdsec_insecure_skip_verify: false
+crowdsec_disable_ipv6: false
+crowdsec_deny_action: "DROP"
+crowdsec_deny_log: true
+crowdsec_deny_log_prefix: "crowdsec drop: "
+
+# Decision Types
+crowdsec_supported_decisions_types:
+  - ban
+
+# IPSet Configuration
+crowdsec_blacklists_ipv4: "crowdsec-blacklists"
+crowdsec_blacklists_ipv6: "crowdsec6-blacklists"
+crowdsec_ipset_type: "nethash"
+
+# IPTables Chains (UFW and Docker integration)
+crowdsec_iptables_chains:
+  - INPUT
+  - FORWARD
+  - DOCKER-USER
+crowdsec_iptables_add_rule_comments: true
+
+# NFTables Configuration (not used with UFW but available)
+crowdsec_nftables_ipv4_enabled: true
+crowdsec_nftables_ipv4_set_only: false
+crowdsec_nftables_ipv4_table: "crowdsec"
+crowdsec_nftables_ipv4_chain: "crowdsec-chain"
+crowdsec_nftables_ipv4_priority: -10
+crowdsec_nftables_ipv6_enabled: true
+crowdsec_nftables_ipv6_set_only: false
+crowdsec_nftables_ipv6_table: "crowdsec6"
+crowdsec_nftables_ipv6_chain: "crowdsec6-chain"
+crowdsec_nftables_ipv6_priority: -10
+
+crowdsec_nftables_hooks:
+  - input
+  - forward
+
+# Prometheus Metrics
+crowdsec_prometheus_enabled: false
+crowdsec_prometheus_listen_addr: "127.0.0.1"
+crowdsec_prometheus_listen_port: 60601
+
+# Security Collections to Install
+crowdsec_collections:
+  - crowdsecurity/linux
+  - crowdsecurity/sshd
+  - crowdsecurity/http-cve
+  - crowdsecurity/traefik
+  - crowdsecurity/iptables
+
+# Log Sources Configuration
+crowdsec_log_sources:
+  - description: "System logs (syslog and kernel)"
+    type: "file"
+    filenames:
+      - "/var/log/syslog"
+      - "/var/log/kern.log"
+    parser_type: "syslog"
+    
+  - description: "UFW/iptables logs for firewall monitoring"
+    type: "file"
+    filenames:
+      - "/var/log/ufw.log"
+    parser_type: "iptables"
+    
+  - description: "Docker container logs via journald"
+    type: "journald"
+    journalctl_filter:
+      - "_SYSTEMD_UNIT=docker.service"
+    parser_type: "docker"
+    
+  - description: "SSH authentication logs"
+    type: "file"
+    filenames:
+      - "/var/log/auth.log"
+    parser_type: "syslog"
+    
+  - description: "Web server access logs"
+    type: "file"
+    filenames:
+      - "/var/log/nginx/access.log"
+      - "/var/log/apache2/access.log"
+    parser_type: "nginx" 
