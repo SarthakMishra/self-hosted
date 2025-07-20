@@ -13,7 +13,7 @@ services:
       - WEBSOCKET_ENABLED=true
       
       # Security
-      - SIGNUPS_ALLOWED=${VAULTWARDEN_SIGNUPS_ALLOWED:-true}
+      - SIGNUPS_ALLOWED=${VAULTWARDEN_SIGNUPS_ALLOWED:-false}
       
       # SMTP (Optional)
       - SMTP_HOST=${VAULTWARDEN_SMTP_HOST:-}
