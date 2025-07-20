@@ -37,66 +37,6 @@
     - tailscale
     - installation
 
-- name: Check if Tailscale is already authenticated
-  ansible.builtin.command: tailscale status --json
-  register: tailscale_status
-  changed_when: false
-  failed_when: false
-  tags:
-    - tailscale
-    - configuration
-
-- name: Parse Tailscale status
-  ansible.builtin.set_fact:
-    tailscale_authenticated: "{{ (tailscale_status.stdout | from_json).BackendState == 'Running' }}"
-  when: tailscale_status.rc == 0
-  tags:
-    - tailscale
-    - configuration
-
-- name: Set tailscale_authenticated to false if status check failed
-  ansible.builtin.set_fact:
-    tailscale_authenticated: false
-  when: tailscale_status.rc != 0
-  tags:
-    - tailscale
-    - configuration
-
-- name: Configure Tailscale with auth key
-  ansible.builtin.command: >
-    tailscale up 
-    --accept-routes={{ (tailscale_accept_routes | default(true)) | lower }}
-    --accept-dns={{ (tailscale_accept_dns | default(true)) | lower }}
-    --hostname={{ tailscale_hostname | default(inventory_hostname) }}
-    {% if (tailscale_ssh_enabled | default(true)) %}--ssh{% endif %}
-    {% if (tailscale_auth_key | default('')) %}--authkey={{ tailscale_auth_key | default('') }}{% endif %}
-  register: tailscale_up_result
-  when: 
-    - not tailscale_authenticated
-    - (tailscale_auth_key | default('')) != ""
-  notify:
-    - restart tailscaled
-  tags:
-    - tailscale
-    - configuration
-
-- name: Configure Tailscale without auth key (manual authentication required)
-  ansible.builtin.command: >
-    tailscale up 
-    --accept-routes={{ (tailscale_accept_routes | default(true)) | lower }}
-    --accept-dns={{ (tailscale_accept_dns | default(true)) | lower }}
-    --hostname={{ tailscale_hostname | default(inventory_hostname) }}
-    {% if (tailscale_ssh_enabled | default(true)) %}--ssh{% endif %}
-  register: tailscale_up_manual_result
-  when: 
-    - not tailscale_authenticated
-    - (tailscale_auth_key | default('')) == ""
-  notify:
-    - restart tailscaled
-  tags:
-    - tailscale
-    - configuration
-
 - name: Enable and start Tailscale service
   ansible.builtin.systemd:
     name: tailscaled
@@ -106,19 +46,112 @@
     - tailscale
     - service
 
-- name: Wait for Tailscale to be ready
+- name: Wait for Tailscale service to be ready
   ansible.builtin.wait_for:
-    timeout: 30
-  when: tailscale_up_result is changed or tailscale_up_manual_result is changed
+    timeout: 10
+  tags:
+    - tailscale
+    - service
+
+- name: Check if Tailscale is already authenticated (with timeout)
+  ansible.builtin.command: timeout 30 tailscale status --json
+  register: tailscale_status
+  changed_when: false
+  failed_when: false
   tags:
     - tailscale
     - configuration
 
+- name: Debug Tailscale status output
+  ansible.builtin.debug:
+    msg:
+      - "Tailscale status return code: {{ tailscale_status.rc }}"
+      - "Tailscale status stdout: {{ tailscale_status.stdout if tailscale_status.stdout else 'No output' }}"
+      - "Tailscale status stderr: {{ tailscale_status.stderr if tailscale_status.stderr else 'No errors' }}"
+  tags:
+    - tailscale
+    - configuration
+    - debug
+
+- name: Parse Tailscale status (with error handling)
+  ansible.builtin.set_fact:
+    tailscale_authenticated: "{{ (tailscale_status.stdout | from_json).BackendState == 'Running' }}"
+    tailscale_backend_state: "{{ (tailscale_status.stdout | from_json).BackendState | default('Unknown') }}"
+  when: 
+    - tailscale_status.rc == 0
+    - tailscale_status.stdout
+    - tailscale_status.stdout | length > 0
+    - (tailscale_status.stdout | from_json) is defined
+  tags:
+    - tailscale
+    - configuration
+
+- name: Set tailscale_authenticated to false if status check failed
+  ansible.builtin.set_fact:
+    tailscale_authenticated: false
+    tailscale_backend_state: "StatusCheckFailed"
+  when: 
+    - tailscale_status.rc != 0 or 
+      not tailscale_status.stdout or 
+      tailscale_status.stdout | length == 0
+  tags:
+    - tailscale
+    - configuration
+
+- name: Verify auth key is configured
+  ansible.builtin.assert:
+    that:
+      - (tailscale_auth_key | default('')) != ""
+      - tailscale_auth_key is defined
+    fail_msg: |
+      Tailscale auth key is not configured!
+      Please add vault_tailscale_auth_key to your group_vars/vault.yml file.
+      Get an auth key from: https://login.tailscale.com/admin/settings/keys
+    success_msg: "Tailscale auth key is configured"
+  tags:
+    - tailscale
+    - configuration
+
+- name: Configure Tailscale with auth key
+  ansible.builtin.command: >
+    timeout 60 tailscale up 
+    --accept-routes={{ (tailscale_accept_routes | default(true)) | lower }}
+    --accept-dns={{ (tailscale_accept_dns | default(true)) | lower }}
+    --hostname={{ tailscale_hostname | default(inventory_hostname) }}
+    {% if (tailscale_ssh_enabled | default(true)) %}--ssh{% endif %}
+    --authkey={{ tailscale_auth_key }}
+  register: tailscale_up_result
+  when: not tailscale_authenticated
+  tags:
+    - tailscale
+    - configuration
+
+- name: Wait for Tailscale to establish connection
+  ansible.builtin.wait_for:
+    timeout: 30
+  when: tailscale_up_result is changed
+  tags:
+    - tailscale
+    - configuration
+
+- name: Verify Tailscale connection after setup
+  ansible.builtin.command: timeout 30 tailscale status
+  register: tailscale_final_status
+  changed_when: false
+  failed_when: false
+  retries: 3
+  delay: 10
+  tags:
+    - tailscale
+    - verification
+
 - name: Get Tailscale IP address
-  ansible.builtin.command: tailscale ip --4
+  ansible.builtin.command: timeout 30 tailscale ip --4
   register: tailscale_ip_result
   changed_when: false
-  failed_when: tailscale_ip_result.rc != 0
+  failed_when: false
+  retries: 3
+  delay: 5
   tags:
     - tailscale
     - configuration
@@ -126,7 +159,9 @@
 - name: Set Tailscale IP fact
   ansible.builtin.set_fact:
     tailscale_ip: "{{ tailscale_ip_result.stdout.strip() }}"
-  when: tailscale_ip_result.rc == 0
+  when: 
+    - tailscale_ip_result.rc == 0
+    - tailscale_ip_result.stdout
   tags:
     - tailscale
     - configuration
@@ -134,25 +169,38 @@
 - name: Display Tailscale configuration
   ansible.builtin.debug:
     msg:
-      - "Tailscale installed and configured successfully"
-      - "Hostname: {{ tailscale_hostname | default(inventory_hostname) }}"
-      - "IP Address: {{ tailscale_ip | default('Not available') }}"
-      - "SSH Access: ssh {{ admin_username | default('admin') }}@{{ tailscale_ip | default('TAILSCALE_IP') }}"
-      - "Auth method: {{ 'Auth key' if (tailscale_auth_key | default('')) else 'Manual authentication required' }}"
+      - "================================================================"
+      - "🌐 TAILSCALE CONFIGURATION STATUS"
+      - "================================================================"
+      - ""
+      - "✅ Service Status: {{ 'Running' if tailscale_final_status.rc == 0 else 'Issues Detected' }}"
+      - "✅ Backend State: {{ tailscale_backend_state | default('Unknown') }}"
+      - "✅ Hostname: {{ tailscale_hostname | default(inventory_hostname) }}"
+      - "✅ IP Address: {{ tailscale_ip | default('Not available') }}"
+      - "✅ SSH Enabled: {{ tailscale_ssh_enabled | default(true) }}"
+      - ""
+      - "🔒 SSH Access:"
+      - "   ssh {{ admin_username | default('admin') }}@{{ tailscale_ip | default('TAILSCALE_IP') }}"
+      - ""
+      - "📊 Full Status:"
+      - "{{ tailscale_final_status.stdout.split('\n') if tailscale_final_status.stdout else ['Status not available'] }}"
+      - ""
   tags:
     - tailscale
     - configuration
 
-- name: Warning for manual authentication
+- name: Warning if Tailscale setup has issues
   ansible.builtin.debug:
     msg:
-      - "⚠️  MANUAL AUTHENTICATION REQUIRED ⚠️"
-      - "Tailscale needs manual authentication via browser"
-      - "Please complete authentication before proceeding"
-      - "Check authentication status with: tailscale status"
+      - "⚠️  TAILSCALE SETUP WARNING ⚠️"
+      - "Tailscale may not be fully connected"
+      - "Check status manually: tailscale status"
+      - "Check logs: journalctl -u tailscaled"
+      - "Verify network connectivity and firewall settings"
   when: 
-    - (tailscale_auth_key | default('')) == ""
-    - (tailscale_up_manual_result is changed or not tailscale_authenticated)
+    - tailscale_final_status.rc != 0 or 
+      not tailscale_ip or 
+      tailscale_backend_state != 'Running'
   tags:
     - tailscale
     - configuration 

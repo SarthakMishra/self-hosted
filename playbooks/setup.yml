@@ -1,6 +1,6 @@
 ---
 # Complete Server Setup Playbook
-# Runs system preparation, reboots, then Docker setup
+# Runs system preparation, reboots, then Docker setup, then Traefik
 
 - name: Complete Server Setup
   hosts: docker_servers
@@ -9,9 +9,7 @@
   
   vars_files:
     - ../group_vars/docker.yml
-    
-  vars:
-    ansible_user: "{{ admin_user | default('admin') }}"
+    - ../group_vars/traefik.yml
     
   pre_tasks:
     - name: Display complete setup banner
@@ -26,6 +24,7 @@
           - "1. System hardening and preparation"
           - "2. Reboot server"
           - "3. Docker installation and configuration"
+          - "4. Traefik reverse proxy setup"
           - ""
           - "⚠️  Server will reboot during this process"
           - "🔒 SSH access will be restricted to admin user"
@@ -136,6 +135,27 @@
         - docker_setup
         - phase3
 
+    - name: Display Docker setup completion
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🐳 DOCKER SETUP COMPLETED"
+          - "================================================================"
+          - ""
+          - "Docker installation complete. Setting up Traefik reverse proxy..."
+          - ""
+      tags:
+        - docker_setup
+        - phase3
+
+    # Phase 4: Traefik Setup
+    - name: Run Traefik reverse proxy setup
+      ansible.builtin.include_role:
+        name: traefik
+      tags:
+        - traefik_setup
+        - phase4
+
   post_tasks:
     - name: Complete setup finished
       ansible.builtin.debug:
@@ -147,6 +167,7 @@
           - "✅ System hardening applied"
           - "✅ Server rebooted with latest changes"
           - "✅ Docker installed and configured"
+          - "✅ Traefik reverse proxy configured"
           - "✅ Production settings applied"
           - "✅ All validations passed"
           - ""
@@ -157,7 +178,9 @@
           - "   Docker Status: /usr/local/bin/docker-status"
           - "   Docker Cleanup: /usr/local/bin/docker-cleanup"
           - "   Stack Directory: {{ docker_stack_root }}"
+          - "   Traefik Directory: {{ traefik_root_dir }}"
           - ""
           - "🚀 Your server is ready for containerized applications!"
+          - "   Deploy apps with Traefik labels for automatic SSL and routing"
           - ""
       tags: always 

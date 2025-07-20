@@ -123,6 +123,29 @@ services:
       - traefik.http.services.app.loadbalancer.server.port=3000
 ```
 
+#### Error Page Management
+
+**Global Error Pages (Default):**
+```yaml
+labels:
+  - traefik.http.routers.app.middlewares=security-headers,error-pages
+```
+
+**App Manages Own Errors:**
+```yaml
+labels:
+  - traefik.http.routers.app.middlewares=security-headers  # No error-pages
+```
+
+**App-Specific Error Endpoint:**
+```yaml
+labels:
+  - traefik.http.middlewares.app-errors.errors.status=400-599
+  - traefik.http.middlewares.app-errors.errors.service=app
+  - traefik.http.middlewares.app-errors.errors.query=/error/{status}
+  - traefik.http.routers.app.middlewares=security-headers,app-errors
+```
+
 #### Nginx Proxy Manager
 ```yaml
 services:

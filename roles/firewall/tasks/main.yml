@@ -1,6 +1,6 @@
 ---
 # Firewall Role - Main Tasks
-# Handles UFW configuration with open HTTP/HTTPS access
+# Handles UFW configuration with open HTTP/HTTPS access and Docker security fix
 
 - name: Reset UFW to clean state
   community.general.ufw:
@@ -41,6 +41,56 @@
     - firewall
     - web
 
+- name: Backup original UFW after.rules file
+  ansible.builtin.copy:
+    src: /etc/ufw/after.rules
+    dest: /etc/ufw/after.rules.backup
+    remote_src: true
+    mode: '0640'
+  tags:
+    - firewall
+    - docker
+    - backup
+
+- name: Add UFW-Docker security rules to prevent Docker from bypassing UFW
+  ansible.builtin.blockinfile:
+    path: /etc/ufw/after.rules
+    block: |
+      # BEGIN UFW AND DOCKER
+      *filter
+      :ufw-user-forward - [0:0]
+      :ufw-docker-logging-deny - [0:0]
+      :DOCKER-USER - [0:0]
+      -A DOCKER-USER -j ufw-user-forward
+
+      -A DOCKER-USER -j RETURN -s 10.0.0.0/8
+      -A DOCKER-USER -j RETURN -s 172.16.0.0/12
+      -A DOCKER-USER -j RETURN -s 192.168.0.0/16
+
+      -A DOCKER-USER -p udp -m udp --sport 53 --dport 1024:65535 -j RETURN
+
+      -A DOCKER-USER -j ufw-docker-logging-deny -p tcp -m tcp --tcp-flags FIN,SYN,RST,ACK SYN -d 192.168.0.0/16
+      -A DOCKER-USER -j ufw-docker-logging-deny -p tcp -m tcp --tcp-flags FIN,SYN,RST,ACK SYN -d 10.0.0.0/8
+      -A DOCKER-USER -j ufw-docker-logging-deny -p tcp -m tcp --tcp-flags FIN,SYN,RST,ACK SYN -d 172.16.0.0/12
+      -A DOCKER-USER -j ufw-docker-logging-deny -p udp -m udp --dport 0:32767 -d 192.168.0.0/16
+      -A DOCKER-USER -j ufw-docker-logging-deny -p udp -m udp --dport 0:32767 -d 10.0.0.0/8
+      -A DOCKER-USER -j ufw-docker-logging-deny -p udp -m udp --dport 0:32767 -d 172.16.0.0/12
+
+      -A DOCKER-USER -j RETURN
+
+      -A ufw-docker-logging-deny -m limit --limit 3/min --limit-burst 10 -j LOG --log-prefix "[UFW DOCKER BLOCK] "
+      -A ufw-docker-logging-deny -j DROP
+
+      COMMIT
+      # END UFW AND DOCKER
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - UFW DOCKER SECURITY"
+    backup: true
+  notify: restart ufw
+  tags:
+    - firewall
+    - docker
+    - security
+
 - name: Enable UFW
   community.general.ufw:
     state: enabled
@@ -70,9 +120,15 @@
       - "Firewall configuration completed"
       - "HTTP (80): Open to all"
       - "HTTPS (443): Open to all"
+      - "Docker Security: UFW-Docker rules applied"
       - ""
       - "🔒 SECURITY: SSH port 22 blocked from public internet"
       - "🌐 ACCESS: Use Tailscale SSH for secure admin access"
+      - "🐳 DOCKER: Containers blocked by default, use 'ufw route allow' to expose"
+      - ""
+      - "📋 To expose a Docker service:"
+      - "   ufw route allow proto tcp from any to any port 80"
+      - "   ufw route allow proto tcp from any to 172.17.0.2 port 3000"
   tags:
     - firewall
     - status 

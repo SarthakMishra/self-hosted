@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  traefik:
+    image: traefik:{{ traefik_version }}
+    container_name: traefik
+    restart: unless-stopped
+    
+    ports:
+      - "80:80"
+      - "443:443"
+    
+    networks:
+      - {{ traefik_network_name }}
+    
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - {{ traefik_data_dir }}:/data
+      - {{ traefik_config_dir }}:/etc/traefik
+    
+    command:
+      # Global configuration
+      - --global.checkNewVersion=false
+      - --global.sendAnonymousUsage=false
+      
+      # API and dashboard
+      - --api.dashboard=false
+      - --api.insecure=false
+      
+      # Entry points
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      
+      # HTTP to HTTPS redirect
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.web.http.redirections.entrypoint.permanent=true
+      
+      # Docker provider
+      - --providers.docker=true
+      - --providers.docker.exposedByDefault=false
+      - --providers.docker.network={{ traefik_network_name }}
+      
+      # File provider for additional configuration
+      - --providers.file.directory=/etc/traefik
+      - --providers.file.watch=true
+      
+      # Certificate resolvers - Let's Encrypt HTTP Challenge
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/data/acme.json
+      
+      # Logging
+      - --log.level={{ traefik_log_level }}
+      - --accesslog=true
+      - --accesslog.filepath=/data/access.log
+    
+    labels:
+      # Security headers middleware
+      - "traefik.http.middlewares.security-headers.headers.customRequestHeaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.security-headers.headers.customRequestHeaders.X-Forwarded-For="
+      - "traefik.http.middlewares.security-headers.headers.frameDeny=true"
+      - "traefik.http.middlewares.security-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.security-headers.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.security-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
+      - "traefik.http.middlewares.security-headers.headers.customResponseHeaders.X-Robots-Tag=noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex"
+      - "traefik.http.middlewares.security-headers.headers.customResponseHeaders.server="
+      
+      # Error pages middleware
+      - "traefik.http.middlewares.error-pages.errors.status=400-599"
+      - "traefik.http.middlewares.error-pages.errors.service=error-pages"
+      - "traefik.http.middlewares.error-pages.errors.query=/{status}.html"
+
+  # Lightweight error pages service
+  error-pages:
+    image: halverneus/static-file-server:latest
+    container_name: traefik-error-pages
+    restart: unless-stopped
+    
+    networks:
+      - {{ traefik_network_name }}
+    
+    volumes:
+      - {{ traefik_config_dir }}/error-pages:/web:ro
+    
+    environment:
+      - PORT=8080
+      - FOLDER=/web
+      - SHOW_LISTING=false
+      - FALLBACK_FILE=404.html
+    
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.error-pages.rule=Host(`error-pages.localhost`)"
+      - "traefik.http.services.error-pages.loadbalancer.server.port=8080"
+
+networks:
+  {{ traefik_network_name }}:
+    external: true 

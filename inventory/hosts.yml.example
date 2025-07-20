@@ -5,7 +5,7 @@
 
 all:
   children:
-    # Docker Server Setup
+    # Docker Server Setup with Traefik Reverse Proxy
     docker_servers:
       hosts:
         server:
@@ -28,12 +28,11 @@ all:
 
 # Configuration Guide:
 #
-# DOCKER SERVER SETUP:
+# COMPLETE SERVER SETUP (Recommended):
 #   1. Edit ansible_host with your server IP: YOUR_SERVER_IP
-#   2. Keep node_type: server for Docker deployment
-#   3. Run: ansible-playbook -i inventory/hosts.yml playbooks/system-preparation.yml
-#   4. Run: ansible-playbook -i inventory/hosts.yml playbooks/docker-setup.yml
-#   5. Done! Docker ready for your applications
+#   2. Configure vault.yml with Tailscale auth key and Traefik settings
+#   3. Run: ansible-playbook -i inventory/hosts.yml playbooks/setup.yml
+#   4. Done! Server ready with Docker + Traefik reverse proxy + SSL
 #
 # SSH User Configuration:
 #   - ansible_user: ubuntu    # AWS, DigitalOcean, Linode (default)
@@ -44,4 +43,4 @@ all:
 # Important:
 #   - Ubuntu user typically has passwordless sudo by default
 #   - Use Tailscale IPs for secure networking when available
-#   - Configure reverse proxy (Traefik, Nginx, etc.) separately after Docker setup 
+#   - Deploy apps with Traefik labels for automatic SSL and routing 
