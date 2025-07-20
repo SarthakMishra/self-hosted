@@ -1,6 +1,6 @@
 ---
 # Firewall Role - Handlers
-
+ 
 - name: restart ufw
   ansible.builtin.systemd:
     name: ufw
