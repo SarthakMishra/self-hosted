@@ -83,14 +83,8 @@ ansible-playbook -i inventory/hosts.yml playbooks/setup.yml
 # System preparation only
 ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "system_preparation"
 
-# Reboot only (after system prep)
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "reboot"
-
 # Docker setup only (after system prep + reboot)
 ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "docker_setup"
-
-# Skip reboot (for testing/development)
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --skip-tags "reboot"
 ```
 
 ## Project Structure
