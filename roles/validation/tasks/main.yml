@@ -59,16 +59,6 @@
     - validation
     - kernel
 
-- name: Check time synchronization
-  ansible.builtin.command: chronyc tracking
-  register: time_sync_check
-  changed_when: false
-  failed_when: false
-  when: chrony_enabled | default(true)
-  tags:
-    - validation
-    - time
-
 - name: Check system updates status
   ansible.builtin.command: apt list --upgradable
   register: updates_check
@@ -122,9 +112,6 @@
       - "  Kernel Hardening: {{ 'APPLIED' if kernel_config_file.stat.exists else 'NOT APPLIED' }}"
       - "  SSH Root Login: DISABLED"
       - "  SSH Password Auth: DISABLED"
-      - ""
-      - "⏰ TIME SYNCHRONIZATION:"
-      - "  Chrony Status: {{ 'ACTIVE' if time_sync_check.rc == 0 else 'INACTIVE' }}"
       - ""
       - "📦 SYSTEM UPDATES:"
       - "  Upgradable Packages: {{ (updates_check.stdout_lines | length - 1) if updates_check.stdout_lines | length > 1 else 0 }}"

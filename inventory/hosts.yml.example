@@ -5,63 +5,12 @@
 
 all:
   children:
-    # DEFAULT: Single Node Setup (Recommended for most users)
-    single_node:
+    # Docker Server Setup
+    docker_servers:
       hosts:
-        standalone:
+        server:
           ansible_host: YOUR_SERVER_IP        # Your server IP (e.g., 10.1.0.100 or your.domain.com)
-          node_type: single
-          traefik_enabled: true
-    
-    # ADVANCED: Multi-Node Cluster Setup (Uncomment when scaling)
-    # production:
-    #   children:
-    #     swarm_managers:
-    #       hosts:
-    #         # manager1:                      # Uncomment for multi-node cluster
-    #         #   ansible_host: YOUR_MANAGER_IP
-    #         #   node_type: manager
-    #         #   traefik_enabled: true        # Only ONE manager should have traefik enabled
-    #         # manager2:                      # Uncomment for HA setup (3+ managers)
-    #         #   ansible_host: YOUR_MANAGER2_IP
-    #         #   node_type: manager
-    #         #   traefik_enabled: false
-    #         # manager3:                      # Uncomment for HA setup
-    #         #   ansible_host: YOUR_MANAGER3_IP
-    #         #   node_type: manager
-    #         #   traefik_enabled: false
-    #     swarm_workers:
-    #       hosts:
-    #         # worker1:                       # Uncomment to add worker nodes
-    #         #   ansible_host: YOUR_WORKER1_IP
-    #         #   node_type: worker
-    #         #   traefik_enabled: false
-    #         # worker2:
-    #         #   ansible_host: YOUR_WORKER2_IP
-    #         #   node_type: worker
-    #         #   traefik_enabled: false
-    #     new_workers:                         # For scaling operations
-    #       hosts:
-    #         # worker3:                       # Add new workers here when scaling
-    #         #   ansible_host: YOUR_WORKER3_IP
-    #         #   node_type: worker
-    #         #   traefik_enabled: false
-    #     new_managers:                        # For HA scaling
-    #       hosts:
-    #         # manager4:                      # Add new managers here when scaling
-    #         #   ansible_host: YOUR_MANAGER4_IP
-    #         #   node_type: manager
-    #         #   traefik_enabled: false
-    
-    # OPTIONAL: Staging Environment (Uncomment if needed)
-    # staging:
-    #   children:
-    #     staging_nodes:
-    #       hosts:
-    #         # staging1:
-    #         #   ansible_host: YOUR_STAGING_IP
-    #         #   node_type: single
-    #         #   traefik_enabled: true
+          node_type: server
 
   vars:
     # SSH Configuration
@@ -79,19 +28,12 @@ all:
 
 # Configuration Guide:
 #
-# DEFAULT SETUP - Single Node (Recommended):
+# DOCKER SERVER SETUP:
 #   1. Edit ansible_host with your server IP: YOUR_SERVER_IP
-#   2. Keep node_type: single and traefik_enabled: true
+#   2. Keep node_type: server for Docker deployment
 #   3. Run: ansible-playbook -i inventory/hosts.yml playbooks/system-preparation.yml
-#   4. Run: ansible-playbook -i inventory/hosts.yml playbooks/single-node-docker.yml
-#   5. Done! Full Docker Swarm with Traefik on one server
-#
-# ADVANCED SETUP - Multi-Node Cluster:
-#   1. Uncomment 'production' section above
-#   2. Add your manager/worker IPs
-#   3. Comment out 'single_node' section
-#   4. Only ONE node should have traefik_enabled: true
-#   5. Run multi-node playbooks instead
+#   4. Run: ansible-playbook -i inventory/hosts.yml playbooks/docker-setup.yml
+#   5. Done! Docker ready for your applications
 #
 # SSH User Configuration:
 #   - ansible_user: ubuntu    # AWS, DigitalOcean, Linode (default)
@@ -100,7 +42,6 @@ all:
 #   - ansible_user: root      # Direct root (not recommended)
 #
 # Important:
-#   - Only ONE node should have traefik_enabled: true (public access)
+#   - Ubuntu user typically has passwordless sudo by default
 #   - Use Tailscale IPs for secure networking when available
-#   - All worker nodes should have traefik_enabled: false
-#   - Ubuntu user typically has passwordless sudo by default 
+#   - Configure reverse proxy (Traefik, Nginx, etc.) separately after Docker setup 

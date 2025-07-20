@@ -1,6 +1,6 @@
 ---
 # Firewall Role - Main Tasks
-# Handles UFW configuration and Cloudflare IP management
+# Handles UFW configuration with open HTTP/HTTPS access
 
 - name: Reset UFW to clean state
   community.general.ufw:
@@ -21,107 +21,25 @@
     - firewall
     - ufw
 
-- name: Fetch current Cloudflare IPv4 ranges
-  ansible.builtin.uri:
-    url: "{{ cloudflare_ipv4_url }}"
-    return_content: true
-  register: cloudflare_ipv4_ranges
-  when: cloudflare_firewall_enabled | default(true)
-  tags:
-    - firewall
-    - cloudflare
-
-- name: Fetch current Cloudflare IPv6 ranges
-  ansible.builtin.uri:
-    url: "{{ cloudflare_ipv6_url }}"
-    return_content: true
-  register: cloudflare_ipv6_ranges
-  when: cloudflare_firewall_enabled | default(true)
-  tags:
-    - firewall
-    - cloudflare
-
-- name: Parse Cloudflare IP ranges
-  ansible.builtin.set_fact:
-    cloudflare_ipv4_list: "{{ cloudflare_ipv4_ranges.content.split('\n') | reject('equalto', '') | list }}"
-    cloudflare_ipv6_list: "{{ cloudflare_ipv6_ranges.content.split('\n') | reject('equalto', '') | list }}"
-  when: cloudflare_firewall_enabled | default(true)
-  tags:
-    - firewall
-    - cloudflare
-
-- name: Allow HTTP access from Cloudflare IPv4 ranges
+- name: Allow HTTP access from anywhere
   community.general.ufw:
     rule: allow
-    from_ip: "{{ item }}"
     to_port: "80"
     proto: tcp
-    comment: "Cloudflare IPv4 HTTP"
-  loop: "{{ cloudflare_ipv4_list }}"
-  when: 
-    - cloudflare_firewall_enabled | default(true)
-    - traefik_enabled | default(false)
+    comment: "HTTP access"
   tags:
     - firewall
-    - cloudflare
+    - web
 
-- name: Allow HTTPS access from Cloudflare IPv4 ranges
+- name: Allow HTTPS access from anywhere
   community.general.ufw:
     rule: allow
-    from_ip: "{{ item }}"
     to_port: "443"
     proto: tcp
-    comment: "Cloudflare IPv4 HTTPS"
-  loop: "{{ cloudflare_ipv4_list }}"
-  when: 
-    - cloudflare_firewall_enabled | default(true)
-    - traefik_enabled | default(false)
+    comment: "HTTPS access"
   tags:
     - firewall
-    - cloudflare
-
-- name: Allow HTTP access from Cloudflare IPv6 ranges
-  community.general.ufw:
-    rule: allow
-    from_ip: "{{ item }}"
-    to_port: "80"
-    proto: tcp
-    comment: "Cloudflare IPv6 HTTP"
-  loop: "{{ cloudflare_ipv6_list }}"
-  when: 
-    - cloudflare_firewall_enabled | default(true)
-    - traefik_enabled | default(false)
-  tags:
-    - firewall
-    - cloudflare
-
-- name: Allow HTTPS access from Cloudflare IPv6 ranges
-  community.general.ufw:
-    rule: allow
-    from_ip: "{{ item }}"
-    to_port: "443"
-    proto: tcp
-    comment: "Cloudflare IPv6 HTTPS"
-  loop: "{{ cloudflare_ipv6_list }}"
-  when: 
-    - cloudflare_firewall_enabled | default(true)
-    - traefik_enabled | default(false)
-  tags:
-    - firewall
-    - cloudflare
-
-- name: Create Cloudflare IP update script
-  ansible.builtin.template:
-    src: update-cloudflare-ips.sh.j2
-    dest: /usr/local/bin/update-cloudflare-ips
-    mode: '0755'
-    owner: root
-    group: root
-  when: cloudflare_firewall_enabled | default(true)
-  tags:
-    - firewall
-    - cloudflare
-    - scripts
+    - web
 
 - name: Enable UFW
   community.general.ufw:
@@ -150,11 +68,8 @@
   ansible.builtin.debug:
     msg:
       - "Firewall configuration completed"
-      - "Node type: {{ node_type | default('unknown') }}"
-      - "Traefik enabled: {{ traefik_enabled | default(false) }}"
-      - "Cloudflare firewall: {{ cloudflare_firewall_enabled | default(true) }}"
-      - "IPv4 ranges configured: {{ cloudflare_ipv4_list | length if cloudflare_firewall_enabled else 0 }}"
-      - "IPv6 ranges configured: {{ cloudflare_ipv6_list | length if cloudflare_firewall_enabled else 0 }}"
+      - "HTTP (80): Open to all"
+      - "HTTPS (443): Open to all"
       - ""
       - "🔒 SECURITY: SSH port 22 blocked from public internet"
       - "🌐 ACCESS: Use Tailscale SSH for secure admin access"

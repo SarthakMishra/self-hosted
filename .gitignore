@@ -35,8 +35,6 @@ ssh_host_*
 .env.production
 .env.staging
 .env.development
-**/config/restic-env
-**/config/restic-password
 
 # Tailscale auth keys and configuration
 tailscale_auth_key
@@ -49,10 +47,7 @@ cloudflare_dns_token
 *cloudflare*token*
 
 # Docker secrets and environment files
-docker-swarm.env
 secrets/
-**/data/traefik/certs/
-**/data/traefik/config/acme.json
 
 # =============================================================================
 # ANSIBLE OPERATIONAL FILES
@@ -74,33 +69,6 @@ ansible.log
 # Ansible facts cache
 facts_cache/
 fact_cache/
-
-# =============================================================================
-# BACKUP AND DATA FILES
-# =============================================================================
-
-# Local backup sync data
-local-backup-sync/data/
-local-backup-sync/logs/
-local-backup-sync/repository/
-
-# Restic repository data
-backup/
-backups/
-repository/
-**/restic-repository/
-**/backup-repository/
-
-# Docker Swarm data volumes
-data/
-volumes/
-**/docker-swarm/data/
-
-# Log files and monitoring data
-logs/
-*.log
-**/logs/
-**/metrics/
 
 # =============================================================================
 # DEVELOPMENT AND IDE FILES
@@ -182,6 +150,11 @@ override.yml
 # Docker environment files
 .dockerenv
 
+# Log files and monitoring data
+logs/
+**/logs/
+**/metrics/
+
 # =============================================================================
 # EXAMPLE CONFIGURATIONS (Keep these as templates)
 # =============================================================================
@@ -196,17 +169,11 @@ override.yml
 
 # Example environment files (template files)
 !.env.example
-!docker-swarm.env.example
 !env.example
 
 # =============================================================================
 # PROJECT-SPECIFIC ADDITIONS
 # =============================================================================
-
-# Custom scripts with sensitive data
-scripts/deploy-*
-scripts/backup-*
-!scripts/*.example.sh
 
 # Terraform state files (if using Terraform)
 *.tfstate

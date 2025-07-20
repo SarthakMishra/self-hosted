@@ -4,68 +4,10 @@
 # Then encrypt it with: ansible-vault encrypt group_vars/vault.yml
 # WARNING: vault.yml contains sensitive data and is gitignored
 
-# =============================================================================
 # SSH PUBLIC KEYS
-# =============================================================================
 # Add your SSH public keys for secure access
-vault_production_admin_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... your-key-here"
-vault_staging_admin_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... your-staging-key-here"
+vault_admin_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... your-key-here"
 
-# =============================================================================
 # TAILSCALE CONFIGURATION
-# =============================================================================
 # Get auth key from: https://login.tailscale.com/admin/settings/keys
 vault_tailscale_auth_key: "tskey-auth-xxxxxxxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-
-# =============================================================================
-# CLOUDFLARE CONFIGURATION
-# =============================================================================
-# Required for SSL certificates and firewall rules
-vault_cloudflare_email: "your-email@yourdomain.com"
-vault_cloudflare_api_key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"    # Global API Key
-vault_cloudflare_dns_token: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"   # DNS API Token
-
-# Get these from: https://dash.cloudflare.com/profile/api-tokens
-# - Global API Key: https://dash.cloudflare.com/profile/api-tokens (View Global API Key)
-# - DNS API Token: Create token with Zone:DNS:Edit permissions for ALL ZONES
-#   This allows you to use any domain you add to Cloudflare for services
-#   Recommended permissions: Zone:DNS:Edit, Zone:Zone:Read for All zones
-
-# =============================================================================
-# BACKUP CONFIGURATION  
-# =============================================================================
-vault_restic_password: "your-very-secure-backup-password-here"
-
-# Use a strong, unique password for backup encryption
-# This password encrypts all your backup data - keep it safe!
-
-# =============================================================================
-# USAGE INSTRUCTIONS
-# =============================================================================
-#
-# 1. Copy this file to vault.yml:
-#    cp group_vars/vault.yml.example group_vars/vault.yml
-#
-# 2. Edit vault.yml with your real values:
-#    nano group_vars/vault.yml
-#
-# 3. Encrypt the file with ansible-vault:
-#    ansible-vault encrypt group_vars/vault.yml
-#
-# 4. To edit encrypted vault:
-#    ansible-vault edit group_vars/vault.yml
-#
-# 5. To view encrypted vault:
-#    ansible-vault view group_vars/vault.yml
-#
-# 6. When running playbooks, provide vault password:
-#    ansible-playbook playbook.yml --ask-vault-pass
-#    # OR store password in file and use:
-#    ansible-playbook playbook.yml --vault-password-file .vault_pass
-#
-# SECURITY NOTES:
-# - Never commit the unencrypted vault.yml file
-# - Always encrypt vault.yml before committing  
-# - Store vault password separately and securely
-# - Use unique, strong passwords for all services
-# - Regularly rotate API keys and passwords 

@@ -20,7 +20,7 @@ TAILSCALE_HOSTNAME={{ tailscale_hostname }}
 {% endif %}
 
 # Node Configuration
-NODE_TYPE={{ node_type | default('single') }}
+NODE_TYPE={{ node_type | default('server') }}
 TRAEFIK_ENABLED={{ traefik_enabled | default(false) }}
 
 # Update these values before deploying production services 

@@ -19,14 +19,6 @@
     - docker_validation
     - daemon
 
-- name: Check Docker Swarm status
-  ansible.builtin.command: docker info --format '{{ "{{" }}.Swarm.LocalNodeState{{ "}}" }}'
-  register: docker_swarm_status_check
-  changed_when: false
-  tags:
-    - docker_validation
-    - swarm
-
 - name: Verify Docker networks
   ansible.builtin.command: docker network ls --format "{{ '{{' }}.Name{{ '}}' }}"
   register: docker_networks_check
@@ -76,16 +68,6 @@
     - docker_validation
     - configuration
 
-- name: Check Whalewall service status
-  ansible.builtin.systemd:
-    name: whalewall
-  register: whalewall_service_status
-  failed_when: false
-  when: whalewall_enabled | default(true)
-  tags:
-    - docker_validation
-    - whalewall
-
 - name: Check Docker cleanup script
   ansible.builtin.stat:
     path: /usr/local/bin/docker-cleanup
@@ -121,13 +103,8 @@
       - "  Daemon Version: {{ docker_daemon_check.stdout | default('unknown') }}"
       - "  Socket Permissions: {{ docker_socket_permissions.stat.mode | default('unknown') }}"
       - ""
-      - "🐝 DOCKER SWARM:"
-      - "  Swarm Status: {{ docker_swarm_status_check.stdout | default('unknown') }}"
-      - "  Node Type: {{ node_type | default('unknown') }}"
-      - ""
       - "🌐 DOCKER NETWORKS:"
       - "  Available Networks: {{ docker_networks_check.stdout_lines | length | default(0) }}"
-      - "  Expected Networks: {{ docker_networks | map(attribute='name') | join(', ') }}"
       - ""
       - "👤 USER PERMISSIONS:"
       - "  Docker User Groups: {{ docker_user_groups.stdout | default('unknown') }}"
@@ -136,9 +113,6 @@
       - "⚙️ CONFIGURATION:"
       - "  Daemon Config: {{ 'Present' if docker_daemon_config_check.stat.exists else 'Missing' }}"
       - "  Service Override: {{ 'Present' if docker_service_override_check.stat.exists else 'Missing' }}"
-      - ""
-      - "🔥 WHALEWALL:"
-      - "  Service Status: {{ whalewall_service_status.status.ActiveState | default('Not installed') if whalewall_enabled else 'Disabled' }}"
       - ""
       - "🧹 CLEANUP & MONITORING:"
       - "  Cleanup Script: {{ 'Present' if docker_cleanup_script_check.stat.exists else 'Missing' }}"
@@ -167,17 +141,17 @@
     msg:
       - "🎉 DOCKER SETUP VALIDATION COMPLETE!"
       - ""
-      - "Ready for production deployment:"
+      - "Ready for application deployment:"
       - "1. Docker service running and configured"
-      - "2. Swarm {{ 'initialized' if docker_swarm_status_check.stdout == 'active' else 'ready for initialization' }}"
-      - "3. Networks configured and encrypted"
-      - "4. Cleanup automation enabled"
-      - "5. UFW/Docker integration via Whalewall"
+      - "2. Production-ready configurations applied"
+      - "3. Cleanup automation enabled"
+      - "4. Logging and monitoring configured"
       - ""
       - "Next steps:"
-      - "1. Deploy production services (Traefik, monitoring, etc.)"
-      - "2. Configure service-specific networking"
-      - "3. Set up monitoring and alerting"
+      - "1. Deploy your applications with docker-compose"
+      - "2. Set up reverse proxy (Traefik, Nginx, etc.) separately"
+      - "3. Configure monitoring and alerting"
+      - "4. Set up backup automation"
       - ""
       - "Management commands:"
       - "  Docker status: /usr/local/bin/docker-status"

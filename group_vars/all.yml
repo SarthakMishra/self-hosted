@@ -24,9 +24,6 @@ tailscale_hostname: "{{ inventory_hostname }}"
 # Firewall Configuration
 firewall_enabled: true
 firewall_reset: true
-cloudflare_firewall_enabled: true
-cloudflare_ipv4_url: "https://www.cloudflare.com/ips-v4"
-cloudflare_ipv6_url: "https://www.cloudflare.com/ips-v6"
 
 # Security Hardening
 kernel_hardening_enabled: true
@@ -42,20 +39,14 @@ disable_ubuntu_user: true  # Set to false to keep ubuntu user enabled
 # Automatic reboot after system preparation to apply kernel updates
 reboot_after_preparation: true  # Set to false to skip automatic reboot
 
-# Time Synchronization
-chrony_enabled: true
-chrony_replace_timesyncd: true
-chrony_servers:
-  - "0.ubuntu.pool.ntp.org"
-  - "1.ubuntu.pool.ntp.org"
-  - "2.ubuntu.pool.ntp.org"
-  - "3.ubuntu.pool.ntp.org"
-
-# Logging Configuration
+# Logging configuration
 log_rotation_enabled: true
-log_retention_days: 7
+log_retention_days: 14
 
 # System Configuration
+node_type: server
+safety_checkpoint: true
+
 required_packages:
   - curl
   - wget
@@ -70,7 +61,6 @@ required_packages:
   - dnsutils
   - rsyslog
   - jq
-  - chrony
 
 # Docker preparation
 docker_file_limits: 1048576

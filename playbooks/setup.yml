@@ -1,0 +1,163 @@
+---
+# Complete Server Setup Playbook
+# Runs system preparation, reboots, then Docker setup
+
+- name: Complete Server Setup
+  hosts: docker_servers
+  become: true
+  gather_facts: true
+  
+  vars_files:
+    - ../group_vars/docker.yml
+    
+  vars:
+    ansible_user: "{{ admin_user | default('admin') }}"
+    
+  pre_tasks:
+    - name: Display complete setup banner
+      ansible.builtin.debug:
+        msg:
+          - "=================================================="
+          - "🚀 COMPLETE SERVER SETUP"
+          - "=================================================="
+          - ""
+          - "Target: {{ inventory_hostname }} ({{ ansible_default_ipv4.address }})"
+          - "This will:"
+          - "1. System hardening and preparation"
+          - "2. Reboot server"
+          - "3. Docker installation and configuration"
+          - ""
+          - "⚠️  Server will reboot during this process"
+          - "🔒 SSH access will be restricted to admin user"
+          - "🌐 Tailscale will be configured for secure access"
+          - ""
+      tags: always
+
+    - name: Check minimum system requirements
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "Ubuntu"
+          - ansible_distribution_major_version | int >= 20
+          - ansible_memtotal_mb >= 1024
+          - ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='size_available') | first > 5000000000
+        fail_msg: "Requirements: Ubuntu 20.04+, 1GB RAM, 5GB disk space"
+        success_msg: "System requirements met"
+      tags: always
+
+  tasks:
+    # Phase 1: System Preparation
+    - name: Run system preparation roles
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+      loop:
+        - system_update
+        - user_management
+        - tailscale
+        - firewall
+        - ssh_hardening
+        - kernel_hardening
+        - logging
+        - validation
+      tags:
+        - system_preparation
+        - phase1
+
+    - name: Display pre-reboot status
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "✅ SYSTEM PREPARATION COMPLETED"
+          - "================================================================"
+          - ""
+          - "System hardening complete. Rebooting server to apply changes..."
+          - "Server will restart and Docker setup will continue automatically."
+          - ""
+      tags:
+        - system_preparation
+        - phase1
+
+    # Phase 2: Reboot
+    - name: Reboot server to apply system changes
+      ansible.builtin.reboot:
+        reboot_timeout: 600
+        connect_timeout: 30
+        test_command: uptime
+        msg: "Rebooting to apply system preparation changes"
+      tags:
+        - reboot
+        - phase2
+
+    - name: Wait for server to be fully ready
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+        delay: 30
+      tags:
+        - reboot
+        - phase2
+
+    - name: Verify server is back online
+      ansible.builtin.setup:
+      tags:
+        - reboot
+        - phase2
+
+    - name: Update connection to use Tailscale hostname after reboot
+      ansible.builtin.set_fact:
+        ansible_host: "{{ tailscale_hostname | default(inventory_hostname) }}"
+      when: tailscale_hostname is defined
+      tags:
+        - reboot
+        - phase2
+
+    - name: Display post-reboot status
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🔄 SERVER REBOOT COMPLETED"
+          - "================================================================"
+          - ""
+          - "Server is back online. Starting Docker installation..."
+          - "Connection: {{ ansible_host }}"
+          - ""
+      tags:
+        - reboot
+        - phase2
+
+    # Phase 3: Docker Setup
+    - name: Run Docker installation roles
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+      loop:
+        - docker_installation
+        - docker_configuration
+        - docker_production
+        - docker_validation
+      tags:
+        - docker_setup
+        - phase3
+
+  post_tasks:
+    - name: Complete setup finished
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🎉 COMPLETE SERVER SETUP FINISHED!"
+          - "================================================================"
+          - ""
+          - "✅ System hardening applied"
+          - "✅ Server rebooted with latest changes"
+          - "✅ Docker installed and configured"
+          - "✅ Production settings applied"
+          - "✅ All validations passed"
+          - ""
+          - "🔒 SSH Access (via Tailscale):"
+          - "   ssh {{ admin_username | default('admin') }}@{{ tailscale_ip | default('TAILSCALE_IP') }}"
+          - ""
+          - "🔧 Management Commands:"
+          - "   Docker Status: /usr/local/bin/docker-status"
+          - "   Docker Cleanup: /usr/local/bin/docker-cleanup"
+          - "   Stack Directory: {{ docker_stack_root }}"
+          - ""
+          - "🚀 Your server is ready for containerized applications!"
+          - ""
+      tags: always 

@@ -95,7 +95,6 @@
       echo "=== Docker System Status ==="
       echo "Docker version: $(docker --version)"
       echo "Docker info: $(docker info --format 'Containers: {{ '{{' }}.Containers{{ '}}' }} Images: {{ '{{' }}.Images{{ '}}' }}')"
-      echo "Swarm status: $(docker info --format '{{ '{{' }}.Swarm.LocalNodeState{{ '}}' }}')"
       echo "Networks: $(docker network ls --format 'table {{ '{{' }}.Name{{ '}}' }}\t{{ '{{' }}.Driver{{ '}}' }}\t{{ '{{' }}.Scope{{ '}}' }}')"
       echo "Volumes: $(docker volume ls --format 'table {{ '{{' }}.Name{{ '}}' }}\t{{ '{{' }}.Driver{{ '}}' }}')"
       echo "Disk usage: $(docker system df)"
