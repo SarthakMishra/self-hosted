@@ -1,11 +1,13 @@
 # Self-Hosted Infrastructure
 
-Complete automation for self-hosted home server deployment.
+> [!WARNING] 
+> ⚠️ **This entire project is AI-generated. Use with caution!**
+
+Complete automation for self-hosted server deployment.
 
 ## 📦 Components
 
-- **`home-server/`** - Ansible automation (nginx-proxy + dnsmasq + Cloudflare tunnel)
-- **`packer/`** - Custom Ubuntu image builder with pre-configuration
+- **`*-server/`** - Ansible automation (playbooks, roles, vars)
 - **`service-templates/`** - Ready-to-deploy Docker services
 
 ### Home Server
