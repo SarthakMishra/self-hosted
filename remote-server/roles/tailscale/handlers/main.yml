@@ -1,0 +1,9 @@
+---
+# Tailscale Role - Handlers
+# Manages Tailscale service restarts
+
+- name: restart tailscaled
+  ansible.builtin.systemd:
+    name: tailscaled
+    state: restarted
+  listen: "restart tailscaled" 

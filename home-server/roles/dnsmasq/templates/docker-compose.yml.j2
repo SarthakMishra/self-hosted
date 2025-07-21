@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  dnsmasq:
+    image: jpillora/dnsmasq:{{ dnsmasq_version }}
+    container_name: dnsmasq
+    restart: unless-stopped
+    
+    # Expose DNS ports
+    ports:
+      - "{{ dnsmasq_port }}:53/udp"
+      - "{{ dnsmasq_port }}:53/tcp"
+    
+    # Custom DNSmasq configuration
+    command: >
+      --log-queries=extra
+      --log-facility=-
+      --address=/.{{ domain_suffix }}/{{ nginx_proxy_host_ip }}
+      --server=8.8.8.8
+      --server=8.8.4.4
+      --server=1.1.1.1
+      --server=1.0.0.1
+      --cache-size={{ dnsmasq_cache_size }}
+      --dns-forward-max=150
+      --stop-dns-rebind
+      --rebind-localhost-ok
+      --domain-needed
+      --bogus-priv
+      --expand-hosts
+      --domain={{ domain_suffix }}
+    
+    networks:
+      - {{ dnsmasq_network_name }}
+    
+    labels:
+      - "local.enable=true"
+      - "local.description=DNS server for .{{ domain_suffix }} domains"
+      - "local.service=dns"
+
+networks:
+  {{ dnsmasq_network_name }}:
+    driver: bridge
+    external: true 

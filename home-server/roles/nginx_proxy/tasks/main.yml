@@ -1,0 +1,101 @@
+---
+# Nginx Proxy Role - Local Domain Routing
+# Replaces Traefik for internal .home domain access
+
+- name: Create nginx-proxy directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ admin_username }}"
+    group: "{{ admin_username }}"
+    mode: '0755'
+  loop:
+    - "{{ nginx_proxy_root_dir }}"
+    - "{{ nginx_proxy_config_dir }}"
+    - "{{ nginx_proxy_ssl_dir }}"
+  tags:
+    - nginx_proxy
+    - directories
+
+- name: Create nginx-proxy docker-compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ nginx_proxy_root_dir }}/docker-compose.yml"
+    owner: "{{ admin_username }}"
+    group: "{{ admin_username }}"
+    mode: '0644'
+    backup: true
+  notify: restart nginx-proxy
+  tags:
+    - nginx_proxy
+    - configuration
+
+- name: Create nginx-proxy environment file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ nginx_proxy_root_dir }}/.env"
+    owner: "{{ admin_username }}"
+    group: "{{ admin_username }}"
+    mode: '0600'
+    backup: true
+  notify: restart nginx-proxy
+  tags:
+    - nginx_proxy
+    - configuration
+
+- name: Create custom nginx configuration for .home domains
+  ansible.builtin.template:
+    src: custom.conf.j2
+    dest: "{{ nginx_proxy_config_dir }}/custom.conf"
+    owner: "{{ admin_username }}"
+    group: "{{ admin_username }}"
+    mode: '0644'
+  notify: restart nginx-proxy
+  tags:
+    - nginx_proxy
+    - configuration
+
+- name: Start and enable nginx-proxy
+  become_user: "{{ admin_username }}"
+  community.docker.docker_compose_v2:
+    project_src: "{{ nginx_proxy_root_dir }}"
+    state: present
+    remove_orphans: true
+  tags:
+    - nginx_proxy
+    - start
+
+- name: Verify nginx-proxy is running
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ nginx_proxy_internal_port }}"
+    method: GET
+    status_code: [200, 503]  # 503 is expected when no backends are configured
+  retries: 5
+  delay: 10
+  tags:
+    - nginx_proxy
+    - validation
+
+- name: Display nginx-proxy setup status
+  ansible.builtin.debug:
+    msg:
+      - "================================================================"
+      - "🌐 NGINX-PROXY SETUP COMPLETED"
+      - "================================================================"
+      - ""
+      - "✅ Nginx-proxy is running and ready for local services"
+      - "✅ Configured for .{{ domain_suffix }} domain routing"
+      - "✅ Internal access: http://127.0.0.1:{{ nginx_proxy_internal_port }}"
+      - ""
+      - "🔧 Service Configuration:"
+      - "   Domain Suffix: .{{ domain_suffix }}"
+      - "   Network: {{ nginx_proxy_network_name }}"
+      - "   Config Dir: {{ nginx_proxy_config_dir }}"
+      - ""
+      - "📝 To add services:"
+      - "   Add VIRTUAL_HOST=service.{{ domain_suffix }} to your containers"
+      - "   Services will be automatically available at http://service.{{ domain_suffix }}"
+      - ""
+  tags:
+    - nginx_proxy
+    - status 

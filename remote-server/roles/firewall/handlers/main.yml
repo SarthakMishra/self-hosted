@@ -1,0 +1,8 @@
+---
+# Firewall Role - Handlers
+ 
+- name: restart ufw
+  ansible.builtin.systemd:
+    name: ufw
+    state: restarted
+  listen: "restart ufw" 

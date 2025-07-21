@@ -1,0 +1,18 @@
+---
+# DNSmasq Handlers
+
+- name: restart dnsmasq
+  become_user: "{{ admin_username }}"
+  community.docker.docker_compose_v2:
+    project_src: "{{ dnsmasq_root_dir }}"
+    state: present
+    restarted: true
+  listen: "restart dnsmasq"
+
+- name: reload dnsmasq
+  become_user: "{{ admin_username }}"
+  community.docker.docker_compose_v2:
+    project_src: "{{ dnsmasq_root_dir }}"
+    state: present
+    recreate: smart
+  listen: "reload dnsmasq" 

@@ -1,0 +1,93 @@
+---
+# Netdata Monitoring Role - Main Tasks
+# Installs Netdata monitoring agent with telemetry disabled
+
+- name: Check if Netdata is already installed
+  ansible.builtin.command: which netdata
+  register: netdata_check
+  failed_when: false
+  changed_when: false
+  tags:
+    - netdata
+    - check
+
+- name: Download Netdata installation script
+  ansible.builtin.get_url:
+    url: "{{ netdata_installer_url }}"
+    dest: "{{ netdata_installer_path }}"
+    mode: '0755'
+    owner: root
+    group: root
+  when: netdata_check.rc != 0
+  tags:
+    - netdata
+    - download
+
+- name: Install Netdata with stable channel and telemetry disabled
+  ansible.builtin.command:
+    cmd: "{{ netdata_installer_path }} {{ netdata_installer_args }}"
+  register: netdata_install
+  when: netdata_check.rc != 0
+  tags:
+    - netdata
+    - install
+
+- name: Clean up installation script
+  ansible.builtin.file:
+    path: "{{ netdata_installer_path }}"
+    state: absent
+  tags:
+    - netdata
+    - cleanup
+
+- name: Ensure Netdata service is running and enabled
+  ansible.builtin.systemd:
+    name: netdata
+    state: started
+    enabled: true
+  tags:
+    - netdata
+    - service
+
+- name: Configure UFW rule for Netdata (Tailscale only)
+  community.general.ufw:
+    rule: allow
+    src: "{{ tailscale_network_range }}"
+    to_port: "{{ netdata_port }}"
+    proto: tcp
+    comment: "Netdata monitoring (Tailscale only)"
+  when: netdata_restrict_to_tailscale | default(true)
+  tags:
+    - netdata
+    - firewall
+
+- name: Get Netdata version
+  ansible.builtin.command: netdata -v
+  register: netdata_version
+  changed_when: false
+  tags:
+    - netdata
+    - info
+
+- name: Display Netdata installation summary
+  ansible.builtin.debug:
+    msg:
+      - "================================================================"
+      - "📊 NETDATA MONITORING INSTALLED"
+      - "================================================================"
+      - ""
+      - "✅ Netdata Agent: {{ netdata_version.stdout.split()[1] if netdata_version.stdout.split() | length > 1 else 'Installed' }}"
+      - "✅ Service Status: Running and enabled"
+      - "✅ Telemetry: Disabled"
+      - "✅ Auto-updates: Enabled"
+      - ""
+      - "🌐 Access URLs:"
+      - "   Tailscale: http://{{ tailscale_ip | default('TAILSCALE_IP') }}:{{ netdata_port }}"
+      - "   Local: http://{{ ansible_default_ipv4.address }}:{{ netdata_port }}"
+      - ""
+      - "🔒 Security: Access restricted to Tailscale network only"
+      - "📈 Monitoring: System metrics, Docker containers, and more"
+      - ""
+  tags:
+    - netdata
+    - status 

@@ -23,6 +23,8 @@
       - git
       - vim
       - htop
+      - iotop
+      - iftop
       - unzip
       - software-properties-common
       - apt-transport-https

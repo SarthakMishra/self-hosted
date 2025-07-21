@@ -1,0 +1,121 @@
+---
+# Docker Configuration Role - Main Tasks
+# Handles Docker daemon configuration and service optimization
+
+- name: Create Docker configuration directory
+  ansible.builtin.file:
+    path: /etc/docker
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  tags:
+    - docker_configuration
+    - directories
+
+- name: Create Docker daemon configuration
+  ansible.builtin.template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    mode: '0644'
+    owner: root
+    group: root
+    backup: true
+  register: docker_daemon_config_created
+  notify:
+    - restart docker
+  tags:
+    - docker_configuration
+    - daemon
+
+- name: Create Docker service override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  tags:
+    - docker_configuration
+    - service
+
+- name: Create Docker service override configuration
+  ansible.builtin.template:
+    src: override.conf.j2
+    dest: /etc/systemd/system/docker.service.d/override.conf
+    mode: '0644'
+    owner: root
+    group: root
+    backup: true
+  register: docker_service_override_created
+  notify:
+    - reload systemd
+    - restart docker
+  tags:
+    - docker_configuration
+    - service
+
+- name: Set proper permissions on Docker socket
+  ansible.builtin.file:
+    path: /var/run/docker.sock
+    mode: '0660'
+    owner: root
+    group: docker
+  ignore_errors: true  # Socket may not exist yet
+  tags:
+    - docker_configuration
+    - security
+
+- name: Enable Docker service
+  ansible.builtin.systemd:
+    name: docker
+    enabled: true
+    daemon_reload: true
+  tags:
+    - docker_configuration
+    - service
+
+- name: Start Docker service
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+  tags:
+    - docker_configuration
+    - service
+
+- name: Wait for Docker to be ready
+  ansible.builtin.wait_for:
+    path: /var/run/docker.sock
+    timeout: 60
+  tags:
+    - docker_configuration
+    - verification
+
+- name: Verify Docker socket permissions
+  ansible.builtin.stat:
+    path: /var/run/docker.sock
+  register: docker_socket_stat
+  tags:
+    - docker_configuration
+    - verification
+
+- name: Test Docker daemon configuration
+  ansible.builtin.command: docker info --format '{{ "{{" }}.ServerVersion{{ "}}" }}'
+  register: docker_info_test
+  changed_when: false
+  tags:
+    - docker_configuration
+    - verification
+
+- name: Display Docker configuration summary
+  ansible.builtin.debug:
+    msg:
+      - "Docker daemon configuration applied"
+      - "Configuration file: /etc/docker/daemon.json"
+      - "Service override: /etc/systemd/system/docker.service.d/override.conf"
+      - "Docker socket permissions: {{ docker_socket_stat.stat.mode }}"
+      - "Docker server version: {{ docker_info_test.stdout }}"
+      - "Service status: {{ 'running' if docker_info_test.rc == 0 else 'failed' }}"
+  tags:
+    - docker_configuration
+    - summary 

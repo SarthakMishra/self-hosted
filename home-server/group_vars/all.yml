@@ -1,0 +1,107 @@
+---
+# Common variables for all hosts
+# System Preparation Configuration
+
+# User Management
+admin_username: "admin"
+admin_shell: "/bin/bash"
+admin_home: "/home/{{ admin_username }}"
+docker_user_enabled: true
+
+# SSH Configuration  
+ssh_disable_root: true
+ssh_disable_password_auth: true
+ssh_public_keys: []  # Empty - using Tailscale SSH instead of traditional keys
+
+# Tailscale Configuration
+tailscale_version: "latest"
+tailscale_accept_routes: true
+tailscale_accept_dns: true
+tailscale_ssh_enabled: true
+tailscale_auth_key: "{{ vault_tailscale_auth_key | default('') }}"
+tailscale_hostname: "{{ inventory_hostname }}"
+
+# Firewall Configuration
+firewall_enabled: true
+firewall_reset: true
+
+# Home Server Network Configuration
+# No external web ports (80/443) exposed - all external access via Cloudflare tunnel
+expose_web_ports: false
+
+# Security Hardening
+kernel_hardening_enabled: true
+system_limits_enabled: true
+security_updates_enabled: true
+
+# User Security - Ubuntu User Management
+# ⚠️  CRITICAL: Ubuntu user is disabled at the END of system preparation
+# This prevents lockout if Tailscale/admin user setup fails
+disable_ubuntu_user: true  # Set to false to keep ubuntu user enabled
+
+# System Reboot Management
+# Automatic reboot after system preparation to apply kernel updates
+reboot_after_preparation: true  # Set to false to skip automatic reboot
+
+# Logging configuration
+log_rotation_enabled: true
+log_retention_days: 14
+
+# System Configuration
+node_type: server
+safety_checkpoint: true
+
+required_packages:
+  - curl
+  - wget
+  - gnupg
+  - lsb-release
+  - ca-certificates
+  - apt-transport-https
+  - software-properties-common
+  - ufw
+  - unattended-upgrades
+  - net-tools
+  - dnsutils
+  - rsyslog
+  - jq
+
+# Docker preparation
+docker_file_limits: 1048576
+docker_vm_max_map_count: 262144
+
+# Kernel security parameters
+kernel_security_params:
+  net.ipv4.ip_forward: 1
+  fs.file-max: "{{ docker_file_limits }}"
+  vm.max_map_count: "{{ docker_vm_max_map_count }}"
+  kernel.kptr_restrict: 2
+  kernel.dmesg_restrict: 1
+  kernel.perf_event_paranoid: 3
+  kernel.unprivileged_bpf_disabled: 1
+  net.core.bpf_jit_harden: 2
+  kernel.yama.ptrace_scope: 2
+
+# System limits
+system_limits:
+  - domain: "*"
+    limit_type: "soft"
+    limit_item: "nofile"
+    value: "{{ docker_file_limits }}"
+  - domain: "*"
+    limit_type: "hard" 
+    limit_item: "nofile"
+    value: "{{ docker_file_limits }}"
+  - domain: "root"
+    limit_type: "soft"
+    limit_item: "nofile"
+    value: "{{ docker_file_limits }}"
+  - domain: "root"
+    limit_type: "hard"
+    limit_item: "nofile"
+    value: "{{ docker_file_limits }}"
+
+# Validation settings
+validation_enabled: true
+reboot_required: true
+reboot_timeout: 600 

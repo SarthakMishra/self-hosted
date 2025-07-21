@@ -1,13 +1,13 @@
 # Ansible inventory with real server IPs and hostnames
-inventory/hosts.yml
-inventory/production/
-inventory/staging/
-inventory/development/
+**/inventory/hosts.yml
+**/inventory/production/
+**/inventory/staging/
+**/inventory/development/
 
 # Group and host variables containing sensitive data
-group_vars/*/vault.yml
-group_vars/*/secrets.yml
-host_vars/
+**/group_vars/*/vault.yml
+**/group_vars/*/secrets.yml
+**/host_vars/
 **/vault.yml
 **/secrets.yml
 

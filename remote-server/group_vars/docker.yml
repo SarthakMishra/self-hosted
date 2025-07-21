@@ -1,0 +1,104 @@
+---
+# Docker Installation and Configuration Variables
+
+# Docker Installation
+docker_ce_version: "latest"  # or specific version like "5:24.0.7-1~ubuntu.22.04~jammy"
+docker_compose_version: "latest"
+
+# Docker packages to install
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+# Docker Repository Configuration
+docker_apt_repository: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+docker_apt_key_url: "https://download.docker.com/linux/ubuntu/gpg"
+docker_apt_key_file: "/usr/share/keyrings/docker-archive-keyring.gpg"
+
+# Docker Daemon Configuration
+docker_daemon_config:
+  log-driver: "json-file"
+  log-opts:
+    max-size: "10m"
+    max-file: "3"
+    compress: "true"
+  live-restore: true
+  userland-proxy: false
+  no-new-privileges: true
+  icc: true
+  features:
+    buildkit: true
+  default-ulimits:
+    nofile:
+      Name: "nofile"
+      Hard: 64000
+      Soft: 64000
+    nproc:
+      Name: "nproc"
+      Hard: 8192
+      Soft: 4096
+  storage-driver: "overlay2"
+  storage-opts:
+    - "overlay2.override_kernel_check=true"
+  exec-opts:
+    - "native.cgroupdriver=systemd"
+  metrics-addr: "127.0.0.1:9323"
+  experimental: false
+  builder:
+    gc:
+      enabled: true
+      defaultKeepStorage: "20GB"
+  max-concurrent-downloads: 3
+  max-concurrent-uploads: 5
+  default-shm-size: "64M"
+  shutdown-timeout: 15
+
+# Docker Service Configuration
+docker_service_override:
+  TimeoutStartSec: 300
+  TimeoutStopSec: 120
+  Restart: "always"
+  RestartSec: 10
+  StandardOutput: "journal"
+  StandardError: "journal"
+  NoNewPrivileges: true
+  LimitNOFILE: 1048576
+  LimitNPROC: 1048576
+  LimitCORE: "infinity"
+  KillMode: "process"
+
+# Docker Cleanup Configuration
+docker_cleanup_enabled: true
+docker_cleanup_schedule: "0 2 * * *"  # Daily at 2 AM
+docker_cleanup_retention:
+  containers: "24h"
+  images: "48h"
+  volumes: "72h"
+  build_cache_keep: "20GB"
+
+# Docker Directories
+docker_stack_root: "/opt/docker"
+docker_directories:
+  - "{{ docker_stack_root }}/compose"
+  - "{{ docker_stack_root }}/data"
+  - "{{ docker_stack_root }}/config"
+  - "{{ docker_stack_root }}/logs"
+
+# Docker Environment Configuration
+docker_environment:
+  STACK_ROOT: "{{ docker_stack_root }}"
+  COMPOSE_PROJECT_NAME: "docker"
+
+# Docker Log Rotation
+docker_log_rotation:
+  container_logs:
+    path: "/var/lib/docker/containers/*/*.log"
+    rotate: 7
+    size: "100M"
+  daemon_logs:
+    path: "/var/log/docker.log"
+    rotate: 7
+    size: "100M"

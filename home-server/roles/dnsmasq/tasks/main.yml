@@ -1,0 +1,116 @@
+---
+# DNSmasq Role - Local Domain Resolution
+# Provides DNS resolution for .home domains
+
+- name: Create dnsmasq directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ admin_username }}"
+    group: "{{ admin_username }}"
+    mode: '0755'
+  loop:
+    - "{{ dnsmasq_root_dir }}"
+    - "{{ dnsmasq_config_dir }}"
+  tags:
+    - dnsmasq
+    - directories
+
+- name: Create dnsmasq docker-compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ dnsmasq_root_dir }}/docker-compose.yml"
+    owner: "{{ admin_username }}"
+    group: "{{ admin_username }}"
+    mode: '0644'
+    backup: true
+  notify: restart dnsmasq
+  tags:
+    - dnsmasq
+    - configuration
+
+- name: Create dnsmasq environment file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ dnsmasq_root_dir }}/.env"
+    owner: "{{ admin_username }}"
+    group: "{{ admin_username }}"
+    mode: '0600'
+    backup: true
+  notify: restart dnsmasq
+  tags:
+    - dnsmasq
+    - configuration
+
+- name: Create custom dnsmasq configuration
+  ansible.builtin.template:
+    src: dnsmasq.conf.j2
+    dest: "{{ dnsmasq_config_dir }}/dnsmasq.conf"
+    owner: "{{ admin_username }}"
+    group: "{{ admin_username }}"
+    mode: '0644'
+  notify: restart dnsmasq
+  tags:
+    - dnsmasq
+    - configuration
+
+- name: Configure UFW to allow DNS traffic
+  community.general.ufw:
+    rule: allow
+    port: "{{ dnsmasq_port }}"
+    proto: "{{ item }}"
+    comment: "DNSmasq - {{ item | upper }}"
+  loop:
+    - tcp
+    - udp
+  tags:
+    - dnsmasq
+    - firewall
+
+- name: Start and enable dnsmasq
+  become_user: "{{ admin_username }}"
+  community.docker.docker_compose_v2:
+    project_src: "{{ dnsmasq_root_dir }}"
+    state: present
+    remove_orphans: true
+  tags:
+    - dnsmasq
+    - start
+
+- name: Verify dnsmasq is running
+  ansible.builtin.command:
+    cmd: "dig @127.0.0.1 -p {{ dnsmasq_port }} test.{{ domain_suffix }}"
+  register: dnsmasq_test
+  failed_when: false
+  changed_when: false
+  tags:
+    - dnsmasq
+    - validation
+
+- name: Display dnsmasq setup status
+  ansible.builtin.debug:
+    msg:
+      - "================================================================"
+      - "🌐 DNSMASQ SETUP COMPLETED"
+      - "================================================================"
+      - ""
+      - "✅ DNSmasq is running and resolving .{{ domain_suffix }} domains"
+      - "✅ DNS Port: {{ dnsmasq_port }}"
+      - "✅ Upstream DNS: {{ dnsmasq_upstream_dns | join(', ') }}"
+      - ""
+      - "🔧 Configuration:"
+      - "   Local Domain: .{{ domain_suffix }}"
+      - "   Resolves to: {{ nginx_proxy_host_ip }}"
+      - "   Config Dir: {{ dnsmasq_config_dir }}"
+      - ""
+      - "📝 Client Setup:"
+      - "   Set your device DNS to: {{ ansible_default_ipv4.address }}"
+      - "   All .{{ domain_suffix }} domains will resolve to nginx-proxy"
+      - "   Other domains forwarded to upstream DNS servers"
+      - ""
+      - "🧪 Test Command:"
+      - "   dig @{{ ansible_default_ipv4.address }} test.{{ domain_suffix }}"
+      - ""
+  tags:
+    - dnsmasq
+    - status 

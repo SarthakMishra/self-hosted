@@ -1,0 +1,33 @@
+---
+# Ansible Vault Template
+# Copy this file to vault.yml and customize with your sensitive data
+# Then encrypt it with: ansible-vault encrypt group_vars/vault.yml
+# WARNING: vault.yml contains sensitive data and is gitignored
+
+# SSH PUBLIC KEYS
+# Add your SSH public keys for secure access
+vault_admin_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... your-key-here"
+
+# TAILSCALE CONFIGURATION
+# Get auth key from: https://login.tailscale.com/admin/settings/keys
+vault_tailscale_auth_key: "tskey-auth-xxxxxxxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# SERVER CONNECTION CONFIGURATION
+# Your server's public IP address
+vault_server_public_ip: "203.0.113.1"  # Replace with your actual server public IP
+# Your Tailscale Magic DNS suffix (found in Tailscale admin console)
+vault_tailscale_magic_dns_suffix: "tail1a2b3c.ts.net"  # Replace with your actual Tailscale suffix
+
+# CLOUDFLARED TUNNEL CONFIGURATION
+# Cloudflare tunnel ID (get from: cloudflared tunnel create home-server)
+vault_cloudflared_tunnel_id: "12345678-1234-5678-9abc-123456789abc"
+
+# Cloudflare API token (needs Tunnel:Edit and DNS:Edit permissions)
+# Create at: https://dash.cloudflare.com/profile/api-tokens
+vault_cloudflared_api_token: "your-cloudflare-api-token-here"
+
+# Cloudflare account ID (found in right sidebar of Cloudflare dashboard)
+vault_cloudflared_account_id: "your-cloudflare-account-id-here"
+
+# External domain for Cloudflare tunnel access
+vault_cloudflared_external_domain: "gooffy.in"

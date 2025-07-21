@@ -1,0 +1,16 @@
+---
+# Handlers for system_update role
+
+- name: reboot if kernel updated
+  ansible.builtin.reboot:
+    reboot_timeout: 300
+  when: apt_upgrade_result.changed and "linux-image" in apt_upgrade_result.stdout
+
+- name: restart rsyslog
+  ansible.builtin.systemd:
+    name: rsyslog
+    state: restarted
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: yes 

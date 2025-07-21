@@ -1,0 +1,76 @@
+---
+# DNSmasq Configuration for Home Server
+# Provides local DNS resolution for .home domains
+
+# DNSmasq Version
+dnsmasq_version: "latest"
+
+# DNSmasq Directories
+dnsmasq_root_dir: "{{ docker_stack_root }}/dnsmasq"
+dnsmasq_config_dir: "{{ dnsmasq_root_dir }}/config"
+
+# Network Configuration
+dnsmasq_port: 53
+dnsmasq_network_name: "home-network"
+
+# DNS Configuration
+dnsmasq_upstream_dns:
+  - "8.8.8.8"
+  - "8.8.4.4"
+  - "1.1.1.1"
+  - "1.0.0.1"
+
+# Domain Resolution
+dnsmasq_local_domain: "{{ domain_suffix }}"
+dnsmasq_resolve_to: "{{ nginx_proxy_host_ip }}"
+
+# Cache Configuration
+dnsmasq_cache_size: 1000
+dnsmasq_ttl: 300
+
+# Logging Configuration
+dnsmasq_log_queries: true
+dnsmasq_log_dhcp: false
+
+# Advanced Configuration
+dnsmasq_custom_config: |
+  # No DHCP - DNS only
+  port=53
+  
+  # Enable logging
+  log-queries=extra
+  log-facility=-
+  
+  # Domain-specific resolution
+  address=/.{{ domain_suffix }}/{{ nginx_proxy_host_ip }}
+  
+  # Upstream DNS servers
+  server=8.8.8.8
+  server=8.8.4.4
+  server=1.1.1.1
+  server=1.0.0.1
+  
+  # Cache configuration
+  cache-size={{ dnsmasq_cache_size }}
+  
+  # Performance settings
+  dns-forward-max=150
+  
+  # Security settings
+  stop-dns-rebind
+  rebind-localhost-ok
+  
+  # Local domain handling
+  domain-needed
+  bogus-priv
+  expand-hosts
+  domain={{ domain_suffix }}
+
+# UFW Firewall Rules
+dnsmasq_ufw_rules:
+  - port: "{{ dnsmasq_port }}"
+    proto: "tcp"
+    comment: "DNSmasq DNS TCP"
+  - port: "{{ dnsmasq_port }}"
+    proto: "udp" 
+    comment: "DNSmasq DNS UDP" 

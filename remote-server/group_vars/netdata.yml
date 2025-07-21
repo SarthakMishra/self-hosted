@@ -1,0 +1,17 @@
+---
+# Netdata Monitoring Configuration
+
+# Installation Configuration
+netdata_installer_url: "https://get.netdata.cloud/kickstart.sh"
+netdata_installer_path: "/tmp/netdata-kickstart.sh"
+netdata_installer_args: "--stable-channel --disable-telemetry"
+
+# Service Configuration
+netdata_port: 19999
+
+# Security Configuration
+netdata_restrict_to_tailscale: true
+tailscale_network_range: "100.64.0.0/10"  # Tailscale CGNAT range
+
+# Integration with other services
+netdata_monitor_docker: true 
