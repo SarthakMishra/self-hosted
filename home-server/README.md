@@ -27,7 +27,14 @@ Complete infrastructure-as-code solution using Ansible for automated deployment 
 - SSH access to target server
 - Ubuntu 20.04+ or Debian 11+ server
 - Cloudflare account with domain managed by Cloudflare
-- Cloudflare API token with Tunnel:Edit and DNS:Edit permissions
+
+### Cloudflare Setup
+
+1. **Enable Zero Trust** (free): Go to your Cloudflare dashboard → Zero Trust
+2. **Create Tunnel**: Networks → Tunnels → Create a tunnel → Cloudflared
+3. **Get Tunnel ID**: Copy the tunnel ID from the tunnel overview page
+4. **Get API Token**: My Profile → API Tokens → Create Token (needs Tunnel:Edit and DNS:Edit permissions)
+5. **Get Account ID**: Found in the right sidebar of your Cloudflare dashboard
 
 ### Setup
 
@@ -67,20 +74,53 @@ all:
           node_type: server
   vars:
     ansible_user: ubuntu
-    ansible_ssh_private_key_file: ~/.ssh/id_rsa
+    ansible_ssh_private_key_file: "{{ vault_ansible_ssh_private_key_file }}"
     ansible_become: true
 ```
 
 ### group_vars/vault.yml
 ```yaml
+# SSH Configuration (Option 1: Private key file)
+vault_ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
+vault_admin_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI..."
+
+# SSH Configuration (Option 2: SSH agent - comment out private key line above)
+# vault_admin_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI..."
+
+# Tailscale Configuration
 vault_tailscale_auth_key: "tskey-auth-xxxxx"
-vault_admin_ssh_key: "ssh-rsa AAAAB3..."
+
 # Cloudflare tunnel configuration:
 vault_cloudflared_tunnel_id: "12345678-1234-5678-9abc-123456789abc"
 vault_cloudflared_api_token: "your-cloudflare-api-token"
 vault_cloudflared_account_id: "your-cloudflare-account-id"
 vault_cloudflared_external_domain: "yourdomain.com"
 ```
+
+### SSH Agent Authentication (Recommended)
+
+For enhanced security, use an SSH agent instead of private key files:
+
+**Bitwarden SSH Agent:**
+```bash
+# 1. Store SSH keys in Bitwarden vault
+# 2. Enable SSH agent in Bitwarden desktop client
+# 3. Comment out vault_ansible_ssh_private_key_file in vault.yml
+# 4. Run playbook - Bitwarden will prompt for authorization
+```
+
+**Traditional SSH Agent:**
+```bash
+# 1. Start SSH agent and add keys
+ssh-agent bash
+ssh-add ~/.ssh/id_ed25519
+
+# 2. Comment out vault_ansible_ssh_private_key_file in vault.yml
+# 3. Run playbook with SSH_AUTH_SOCK available
+```
+
+**Example Configuration:**
+See `examples/vault-ssh-agent.yml` for a complete vault.yml template configured for SSH agent authentication.
 
 ## Deployment Options
 

@@ -15,7 +15,7 @@ all:
   vars:
     # Connection settings (will be dynamically updated by playbook)
     ansible_user: admin                     # Preferred user, but playbook will try ubuntu if admin fails
-    ansible_ssh_private_key_file: ~/.ssh/id_ed25519  # Path to your SSH key
+    ansible_ssh_private_key_file: "{{ vault_ansible_ssh_private_key_file | default(omit) }}"  # SSH key or SSH agent
     ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o ConnectTimeout=10'
     
     # Privilege Escalation (required when not using root)

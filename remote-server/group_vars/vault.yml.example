@@ -6,7 +6,7 @@
 
 # SSH PUBLIC KEYS
 # Add your SSH public keys for secure access
-vault_admin_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... your-key-here"
+vault_admin_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... your-key-here"
 
 # TAILSCALE CONFIGURATION
 # Get auth key from: https://login.tailscale.com/admin/settings/keys

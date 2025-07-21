@@ -69,7 +69,7 @@ all:
 ### group_vars/vault.yml
 ```yaml
 vault_tailscale_auth_key: "tskey-auth-xxxxx"
-vault_admin_ssh_key: "ssh-rsa AAAAB3..."
+vault_admin_ssh_public_key: "ssh-rsa AAAAB3..."
 # Traefik configuration:
 vault_traefik_acme_email: "your@email.com"
 ```
