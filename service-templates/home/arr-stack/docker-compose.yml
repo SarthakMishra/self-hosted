@@ -1,0 +1,166 @@
+---
+services:
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_HTML=${LOG_HTML:-false}
+      - CAPTCHA_SOLVER=${CAPTCHA_SOLVER:-none}
+      - TZ=${TZ_MAIN}
+      - VIRTUAL_HOST=flaresolverr.home
+    networks:
+      - home-network
+    restart: unless-stopped
+
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - VPN_SERVICE_PROVIDER=custom
+      - VPN_TYPE=wireguard
+      - TZ=${TZ_MAIN}
+      - FIREWALL_VPN_INPUT_PORTS=${PROWLARR_PORT},${QBITTORRENT_PORT}
+    volumes:
+      - gluetun-data:/gluetun
+      - ./wg0.conf:/gluetun/wireguard/wg0.conf
+    ports:
+      - "${PROWLARR_PORT}:${PROWLARR_PORT}"  # Direct access for VPN service
+      - "${QBITTORRENT_PORT}:${QBITTORRENT_PORT}"  # qBittorrent web UI
+      - "${QBITTORRENT_TORRENT_PORT}:${QBITTORRENT_TORRENT_PORT}"  # qBittorrent torrenting
+      - "${QBITTORRENT_TORRENT_PORT}:${QBITTORRENT_TORRENT_PORT}/udp"  # qBittorrent torrenting UDP
+    networks:
+      - home-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/openvpn/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:develop
+    container_name: prowlarr
+    environment:
+      - PUID=${PUID_PROWLARR}
+      - PGID=${PGID_SHARED}
+      - UMASK=002
+      - TZ=${TZ_MAIN}
+      - VIRTUAL_HOST=prowlarr.home
+      - VIRTUAL_PORT=${PROWLARR_PORT}
+    volumes:
+      - ${BASE_CONFIG_PATH}/prowlarr-config:/config
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
+    restart: unless-stopped
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      - PUID=${PUID_QBITTORRENT}
+      - PGID=${PGID_SHARED}
+      - UMASK=002
+      - TZ=${TZ_MAIN}
+      - WEBUI_PORT=${QBITTORRENT_PORT}
+      - TORRENTING_PORT=${QBITTORRENT_TORRENT_PORT}
+      - VIRTUAL_HOST=qbittorrent.home
+      - VIRTUAL_PORT=${QBITTORRENT_PORT}
+    volumes:
+      - ${BASE_CONFIG_PATH}/qbittorrent-config:/config
+      - ${BASE_DATA_PATH}/downloads:/downloads
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
+    restart: unless-stopped
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment:
+      - PUID=${PUID_SONARR}
+      - PGID=${PGID_SHARED}
+      - UMASK=002
+      - TZ=${TZ_MAIN}
+      - VIRTUAL_HOST=sonarr.home
+    volumes:
+      - ${BASE_CONFIG_PATH}/sonarr-config:/config
+      - ${BASE_DATA_PATH}:/data
+    restart: unless-stopped
+    networks:
+      - home-network
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment:
+      - PUID=${PUID_RADARR}
+      - PGID=${PGID_SHARED}
+      - UMASK=002
+      - TZ=${TZ_MAIN}
+      - VIRTUAL_HOST=radarr.home
+    volumes:
+      - ${BASE_CONFIG_PATH}/radarr-config:/config
+      - ${BASE_DATA_PATH}:/data
+    restart: unless-stopped
+    networks:
+      - home-network
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    environment:
+      - PUID=${PUID_BAZARR}
+      - PGID=${PGID_SHARED}
+      - UMASK=002
+      - TZ=${TZ_MAIN}
+      - VIRTUAL_HOST=bazarr.home
+    volumes:
+      - ${BASE_CONFIG_PATH}/bazarr-config:/config
+      - ${BASE_DATA_PATH}:/data
+    restart: unless-stopped
+    networks:
+      - home-network
+
+  plex:
+    image: plexinc/pms-docker
+    container_name: plex
+    environment:
+      - TZ=${TZ_MAIN}
+      - VIRTUAL_HOST=plex.home
+      - VIRTUAL_PORT=${PLEX_PORT}
+    volumes:
+      - ${BASE_CONFIG_PATH}/plex-config:/config
+      - ${BASE_DATA_PATH}/media:/data
+    ports:
+      - "${PLEX_PORT}:${PLEX_PORT}"  # Keep for direct access and client discovery
+    networks:
+      - home-network
+    restart: unless-stopped
+
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    environment:
+      - LOG_LEVEL=debug
+      - TZ=${TZ_JELLYSEERR}
+      - PORT=${JELLYSEERR_PORT}
+      - VIRTUAL_HOST=jellyseerr.home
+    volumes:
+      - ${BASE_CONFIG_PATH}/jellyseerr-config:/app/config
+    restart: unless-stopped
+    networks:
+      - home-network
+
+networks:
+  home-network:
+    external: true
+
+volumes:
+  gluetun-data:

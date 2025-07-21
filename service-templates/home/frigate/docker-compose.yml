@@ -1,0 +1,42 @@
+---
+services:
+
+  frigate:
+    container_name: frigate
+    restart: unless-stopped
+    stop_grace_period: 30s
+    image: ghcr.io/blakeblackshear/frigate:stable-tensorrt
+    environment:
+      - YOLO_MODELS=${YOLO_MODELS}
+      - USE_FP16=${USE_FP16}
+      - TZ=${TZ_MAIN}
+      - VIRTUAL_HOST=frigate.home
+      - VIRTUAL_PORT=${FRIGATE_PORT}
+      # Camera credentials for config file substitution
+      - CAMERA_USER_1=${CAMERA_USER_1}
+      - CAMERA_PASS_1=${CAMERA_PASS_1}
+      - CAMERA_IP_1=${CAMERA_IP_1}
+      - CAMERA_USER_2=${CAMERA_USER_2}
+      - CAMERA_PASS_2=${CAMERA_PASS_2}
+      - CAMERA_IP_2=${CAMERA_IP_2}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities:
+                - gpu
+    volumes:
+      - ${BASE_CONFIG_PATH}/frigate-config:/config
+      - ${BASE_DATA_PATH}/media/cctv:/media/frigate
+      - ./frigate_config.yaml:/config/config.yaml:ro
+    ports:
+      - "${FRIGATE_PORT}:${FRIGATE_PORT}"        # Keep for RTMP streams and API access
+      - "${FRIGATE_RTSP_PORT}:${FRIGATE_RTSP_PORT}"  # Keep for RTSP restreaming
+    networks:
+      - home-network
+
+networks:
+  home-network:
+    external: true

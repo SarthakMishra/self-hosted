@@ -13,11 +13,11 @@ nginx_proxy_ssl_dir: "{{ nginx_proxy_root_dir }}/certs"
 # Network Configuration
 nginx_proxy_network_name: "home-network"
 nginx_proxy_internal_port: 80
-nginx_proxy_host_ip: "127.0.0.1"
+nginx_proxy_host_ip: "{{ ansible_default_ipv4.address }}"  # Use server's actual IP
 
 # Domain Configuration
 domain_suffix: "home"
-default_host: "home.local"
+default_host: "home"
 
 # Security Configuration
 nginx_proxy_enable_ssl: false  # No SSL needed for local .home domains
@@ -50,5 +50,5 @@ nginx_proxy_custom_config: |
   set_real_ip_from 192.168.0.0/16;
   set_real_ip_from 10.0.0.0/8;
 
-# No UFW rules needed - nginx-proxy only binds to localhost
-# External access is handled by cloudflared tunnel 
+# Bind configuration - allow access from local network and Tailscale
+nginx_proxy_bind_ip: "0.0.0.0"  # Allow access from network (secured by firewall) 

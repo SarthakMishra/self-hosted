@@ -193,3 +193,6 @@ kube-config
 *.p7c
 *.p7r
 *.spc 
+
+# Miscc
+wg0.conf

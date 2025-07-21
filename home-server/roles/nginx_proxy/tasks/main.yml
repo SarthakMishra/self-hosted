@@ -2,6 +2,38 @@
 # Nginx Proxy Role - Local Domain Routing
 # Replaces Traefik for internal .home domain access
 
+- name: Create shared Docker network for home services
+  become_user: "{{ admin_username }}"
+  community.docker.docker_network:
+    name: "{{ nginx_proxy_network_name }}"
+    driver: bridge
+    state: present
+  tags:
+    - nginx_proxy
+    - network
+
+- name: Configure UFW to allow nginx-proxy access from local network
+  community.general.ufw:
+    rule: allow
+    port: "{{ nginx_proxy_internal_port }}"
+    proto: tcp
+    src: "192.168.0.0/16"
+    comment: "Nginx-proxy local network access"
+  tags:
+    - nginx_proxy
+    - firewall
+
+- name: Configure UFW to allow nginx-proxy access from Tailscale
+  community.general.ufw:
+    rule: allow
+    port: "{{ nginx_proxy_internal_port }}"
+    proto: tcp
+    src: "100.64.0.0/10"
+    comment: "Nginx-proxy Tailscale access"
+  tags:
+    - nginx_proxy
+    - firewall
+
 - name: Create nginx-proxy directories
   ansible.builtin.file:
     path: "{{ item }}"
@@ -67,7 +99,7 @@
 
 - name: Verify nginx-proxy is running
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ nginx_proxy_internal_port }}"
+    url: "http://{{ nginx_proxy_host_ip }}:{{ nginx_proxy_internal_port }}"
     method: GET
     status_code: [200, 503]  # 503 is expected when no backends are configured
   retries: 5
@@ -85,15 +117,18 @@
       - ""
       - "✅ Nginx-proxy is running and ready for local services"
       - "✅ Configured for .{{ domain_suffix }} domain routing"
-      - "✅ Internal access: http://127.0.0.1:{{ nginx_proxy_internal_port }}"
+      - "✅ Network access: http://{{ nginx_proxy_host_ip }}:{{ nginx_proxy_internal_port }}"
+      - "✅ Shared network created: {{ nginx_proxy_network_name }}"
       - ""
       - "🔧 Service Configuration:"
       - "   Domain Suffix: .{{ domain_suffix }}"
       - "   Network: {{ nginx_proxy_network_name }}"
       - "   Config Dir: {{ nginx_proxy_config_dir }}"
+      - "   Bind IP: {{ nginx_proxy_bind_ip }}"
       - ""
       - "📝 To add services:"
       - "   Add VIRTUAL_HOST=service.{{ domain_suffix }} to your containers"
+      - "   Connect containers to network: {{ nginx_proxy_network_name }}"
       - "   Services will be automatically available at http://service.{{ domain_suffix }}"
       - ""
   tags:

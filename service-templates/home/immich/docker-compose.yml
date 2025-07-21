@@ -1,0 +1,81 @@
+---
+services:
+
+  immich:
+    container_name: immich
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION}
+    volumes:
+      - ${BASE_DATA_PATH}/media/photos:/usr/src/app/upload
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - VIRTUAL_HOST=immich.home
+      - VIRTUAL_PORT=${IMMICH_PORT}
+      # nginx-proxy configurations for large uploads and timeouts
+      - NGINX_PROXY_PASS_HEADER=upgrade
+      - NGINX_PROXY_PASS_HEADER=connection
+      - NGINX_PROXY_SET_HEADER=Connection upgrade
+      - NGINX_PROXY_SET_HEADER=Upgrade $$http_upgrade
+      - NGINX_CLIENT_MAX_BODY_SIZE=${NGINX_CLIENT_MAX_BODY_SIZE}
+      - NGINX_PROXY_READ_TIMEOUT=${NGINX_PROXY_READ_TIMEOUT}
+      - NGINX_PROXY_SEND_TIMEOUT=${NGINX_PROXY_SEND_TIMEOUT}
+    networks:
+      - home-network
+    depends_on:
+      - immich-redis
+      - immich-database
+    restart: always
+    healthcheck:
+      disable: false
+
+  immich-machine-learning:
+    container_name: immich_machine_learning
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION}-cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities:
+                - gpu
+    volumes:
+      - ${BASE_CONFIG_PATH}/immich-config/ml-cache:/cache
+    networks:
+      - home-network
+    restart: always
+    healthcheck:
+      disable: false
+
+  immich-redis:
+    container_name: immich_redis
+    image: docker.io/valkey/valkey:8-bookworm@sha256:fec42f399876eb6faf9e008570597741c87ff7662a54185593e74b09ce83d177
+    healthcheck:
+      test: redis-cli ping || exit 1
+    networks:
+      home-network:
+        aliases:
+          - redis
+    restart: always
+
+  immich-database:
+    container_name: immich_postgres
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+    volumes:
+      - immich-postgres-data:/var/lib/postgresql/data
+    restart: always
+    networks:
+      home-network:
+        aliases:
+          - database
+
+networks:
+  home-network:
+    external: true
+
+volumes:
+  immich-postgres-data:

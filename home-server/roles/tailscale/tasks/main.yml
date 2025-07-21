@@ -112,13 +112,14 @@
     - tailscale
     - configuration
 
-- name: Configure Tailscale with auth key
+- name: Configure Tailscale with auth key and DNS advertising
   ansible.builtin.command: >
     timeout 60 tailscale up 
     --accept-routes={{ (tailscale_accept_routes | default(true)) | lower }}
     --accept-dns={{ (tailscale_accept_dns | default(true)) | lower }}
     --hostname={{ tailscale_hostname | default(inventory_hostname) }}
     {% if (tailscale_ssh_enabled | default(true)) %}--ssh{% endif %}
+    --advertise-connector={{ (tailscale_dns_connector | default(false)) | lower }}
     --authkey={{ tailscale_auth_key }}
   register: tailscale_up_result
   when: not tailscale_authenticated
@@ -181,6 +182,11 @@
       - ""
       - "🔒 SSH Access:"
       - "   ssh {{ admin_username | default('admin') }}@{{ tailscale_ip | default('TAILSCALE_IP') }}"
+      - ""
+      - "🌐 DNS Configuration:"
+      - "   Configure Tailscale MagicDNS to use: {{ tailscale_ip | default('TAILSCALE_IP') }}:53"
+      - "   Search domains: {{ domain_suffix }}"
+      - "   This enables .{{ domain_suffix }} domains on all Tailscale devices"
       - ""
       - "📊 Full Status:"
       - "{{ tailscale_final_status.stdout.split('\n') if tailscale_final_status.stdout else ['Status not available'] }}"

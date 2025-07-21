@@ -1,0 +1,39 @@
+---
+# Tailscale Configuration for Home Server
+# Handles VPN mesh networking and MagicDNS integration
+
+# Tailscale Installation
+tailscale_version: "latest"
+
+# Network Configuration
+tailscale_accept_routes: true
+tailscale_accept_dns: true
+tailscale_ssh_enabled: true
+
+# Authentication
+tailscale_auth_key: "{{ vault_tailscale_auth_key | default('') }}"
+tailscale_hostname: "{{ inventory_hostname }}"
+
+# MagicDNS Configuration
+tailscale_magic_dns_enabled: true
+tailscale_dns_suffix: "{{ vault_tailscale_magic_dns_suffix | default('') }}"
+
+# DNS Integration with DNSmasq
+# Configure Tailscale to use server as DNS for .home domains
+tailscale_custom_dns_enabled: true
+tailscale_dns_server: "{{ ansible_default_ipv4.address }}"
+tailscale_dns_domains:
+  - "{{ domain_suffix }}"  # .home domains
+
+# Split DNS Configuration
+# Tailscale handles .ts.net domains, server handles .home domains
+tailscale_split_dns:
+  enabled: true
+  local_domains:
+    - "{{ domain_suffix }}"
+  local_dns_server: "{{ ansible_default_ipv4.address }}"
+
+# Security Configuration
+tailscale_exit_node: false
+tailscale_advertise_routes: []
+tailscale_accept_risk: "lose-ssh" 

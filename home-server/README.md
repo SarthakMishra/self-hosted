@@ -180,6 +180,87 @@ networks:
 - **Local**: `http://myapp.home` (no SSL needed, resolved by local DNS)
 - **External**: `https://myapp.gooffy.in` (automatic SSL + security via Cloudflare)
 
+## DNS Configuration
+
+### 🎯 Recommended Setup: Tailscale MagicDNS
+
+This is the **best approach** because it works automatically on all your devices (phone, laptop, etc.) when connected to Tailscale.
+
+#### Step 1: Deploy Your Server
+```bash
+# Deploy with the Ansible playbook (includes Tailscale + dnsmasq)
+ansible-playbook -i inventory/hosts.yml playbooks/setup.yml
+```
+
+#### Step 2: Configure Tailscale Admin Console
+1. Go to [Tailscale Admin Console → DNS](https://login.tailscale.com/admin/dns)
+2. **Enable MagicDNS** (toggle it on)
+3. Click **Add nameserver**
+4. Add: `100.x.x.x:53` (your server's Tailscale IP from playbook output)
+5. **Restrict to domain**: `home`
+6. Click **Save**
+
+#### Step 3: Configure Search Domains
+In the same DNS settings:
+1. **Search domains**: Add `home`
+2. **Save**
+
+#### Step 4: Test on Any Device
+```bash
+# On any device connected to Tailscale
+nslookup sonarr.home
+# Should resolve to your server IP
+
+# Browse to services
+curl http://sonarr.home
+curl http://plex.home
+```
+
+### 🌟 Why This is the Best Approach
+
+✅ **Automatic**: Works on all Tailscale devices (phone, laptop, etc.)  
+✅ **Secure**: Only works when connected to your Tailscale network  
+✅ **No Router Changes**: Doesn't affect your home network  
+✅ **Remote Access**: Works from anywhere with Tailscale  
+✅ **Split DNS**: `.home` goes to your server, everything else normal  
+
+### 🔧 How It Works
+
+```
+Your Phone/Laptop (with Tailscale)
+        ↓ DNS Query: "plex.home"
+    Tailscale MagicDNS
+        ↓ Routes .home queries to your server
+    Your Server DNSmasq (port 53)
+        ↓ Resolves to server IP
+    nginx-proxy (port 80)
+        ↓ Routes to Plex container
+    Plex responds
+```
+
+### 📱 Result
+
+On any device with Tailscale:
+- `http://sonarr.home` → works automatically
+- `http://plex.home` → works automatically  
+- `http://immich.home` → works automatically
+- No DNS configuration needed per device!
+
+**This is the cleanest, most automated solution.** Your `.home` domains will work on your phone, laptop, and any device connected to Tailscale! 🚀
+
+### Alternative DNS Configuration Options
+
+If you prefer not to use Tailscale MagicDNS, you have these options:
+
+**Option 1: Router DHCP Configuration**
+- Configure your router to use the server as DNS server for all devices
+- Set Primary DNS to your home server IP (e.g., `192.168.1.100`)
+- Set Secondary DNS to `8.8.8.8` (fallback)
+
+**Option 2: Manual Device DNS**
+- Set DNS on each device individually to your server IP
+- Works for device-specific control but requires manual configuration
+
 ## Project Structure
 
 ```

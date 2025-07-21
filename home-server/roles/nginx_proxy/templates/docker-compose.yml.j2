@@ -6,9 +6,9 @@ services:
     container_name: nginx-proxy
     restart: unless-stopped
     
-    # Only bind to localhost - no external access
+    # Bind to configurable IP for network access
     ports:
-      - "127.0.0.1:{{ nginx_proxy_internal_port }}:80"
+      - "{{ nginx_proxy_bind_ip }}:{{ nginx_proxy_internal_port }}:80"
     
     volumes:
       # Docker socket for service discovery
@@ -44,4 +44,4 @@ services:
 networks:
   {{ nginx_proxy_network_name }}:
     driver: bridge
-    external: false 
+    external: true 
