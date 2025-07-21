@@ -275,8 +275,27 @@ If you prefer not to use Tailscale MagicDNS, you have these options:
 ├── playbooks/
 │   └── setup.yml                # Complete server setup
 ├── roles/                       # Ansible roles including nginx-proxy, dnsmasq, cloudflared
+├── docs/                        # Documentation guides
+│   └── mergerfs/               # MergerFS setup guide  
 └── service-templates/           # Example application templates
 ```
+
+## Documentation
+
+### Storage Setup
+
+**[MergerFS Guide](docs/mergerfs/)** - Pool multiple drives into a single mount point
+- Perfect for home servers with mixed drive sizes (1TB + 2TB drives)  
+- No RAID overhead, easy expansion, individual drive failure isolation
+- Optimized configuration for media servers and Docker services
+
+### Service Deployment
+
+Ready-to-deploy Docker services are available in `service-templates/`:
+- **arr-stack** - Sonarr, Radarr, Prowlarr, qBittorrent with VPN
+- **immich** - Photo management and AI tagging
+- **frigate** - NVR with AI object detection  
+- **adguard** - DNS-based ad blocking
 
 ## Security
 

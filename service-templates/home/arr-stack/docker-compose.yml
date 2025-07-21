@@ -5,10 +5,10 @@ services:
     image: ghcr.io/flaresolverr/flaresolverr:latest
     container_name: flaresolverr
     environment:
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-      - LOG_HTML=${LOG_HTML:-false}
-      - CAPTCHA_SOLVER=${CAPTCHA_SOLVER:-none}
-      - TZ=${TZ_MAIN}
+      - LOG_LEVEL=info
+      - LOG_HTML=false
+      - CAPTCHA_SOLVER=none
+      - TZ=UTC
       - VIRTUAL_HOST=flaresolverr.home
     networks:
       - home-network
@@ -24,16 +24,16 @@ services:
     environment:
       - VPN_SERVICE_PROVIDER=custom
       - VPN_TYPE=wireguard
-      - TZ=${TZ_MAIN}
-      - FIREWALL_VPN_INPUT_PORTS=${PROWLARR_PORT},${QBITTORRENT_PORT}
+      - TZ=UTC
+      - FIREWALL_VPN_INPUT_PORTS=9696,8080
     volumes:
       - gluetun-data:/gluetun
       - ./wg0.conf:/gluetun/wireguard/wg0.conf
     ports:
-      - "${PROWLARR_PORT}:${PROWLARR_PORT}"  # Direct access for VPN service
-      - "${QBITTORRENT_PORT}:${QBITTORRENT_PORT}"  # qBittorrent web UI
-      - "${QBITTORRENT_TORRENT_PORT}:${QBITTORRENT_TORRENT_PORT}"  # qBittorrent torrenting
-      - "${QBITTORRENT_TORRENT_PORT}:${QBITTORRENT_TORRENT_PORT}/udp"  # qBittorrent torrenting UDP
+      - "9696:9696"  # Direct access for VPN service
+      - "8080:8080"  # qBittorrent web UI
+      - "6881:6881"  # qBittorrent torrenting
+      - "6881:6881/udp"  # qBittorrent torrenting UDP
     networks:
       - home-network
     restart: unless-stopped
@@ -47,14 +47,14 @@ services:
     image: lscr.io/linuxserver/prowlarr:develop
     container_name: prowlarr
     environment:
-      - PUID=${PUID_PROWLARR}
-      - PGID=${PGID_SHARED}
+      - PUID=1000
+      - PGID=1000
       - UMASK=002
-      - TZ=${TZ_MAIN}
+      - TZ=UTC
       - VIRTUAL_HOST=prowlarr.home
-      - VIRTUAL_PORT=${PROWLARR_PORT}
+      - VIRTUAL_PORT=9696
     volumes:
-      - ${BASE_CONFIG_PATH}/prowlarr-config:/config
+      - /opt/docker/config/prowlarr-config:/config
     network_mode: "service:gluetun"
     depends_on:
       - gluetun
@@ -64,17 +64,17 @@ services:
     image: lscr.io/linuxserver/qbittorrent:latest
     container_name: qbittorrent
     environment:
-      - PUID=${PUID_QBITTORRENT}
-      - PGID=${PGID_SHARED}
+      - PUID=1000
+      - PGID=1000
       - UMASK=002
-      - TZ=${TZ_MAIN}
-      - WEBUI_PORT=${QBITTORRENT_PORT}
-      - TORRENTING_PORT=${QBITTORRENT_TORRENT_PORT}
+      - TZ=UTC
+      - WEBUI_PORT=8080
+      - TORRENTING_PORT=6881
       - VIRTUAL_HOST=qbittorrent.home
-      - VIRTUAL_PORT=${QBITTORRENT_PORT}
+      - VIRTUAL_PORT=8080
     volumes:
-      - ${BASE_CONFIG_PATH}/qbittorrent-config:/config
-      - ${BASE_DATA_PATH}/downloads:/downloads
+      - /opt/docker/config/qbittorrent-config:/config
+      - /opt/docker/data/downloads:/downloads
     network_mode: "service:gluetun"
     depends_on:
       - gluetun
@@ -84,14 +84,14 @@ services:
     image: lscr.io/linuxserver/sonarr:latest
     container_name: sonarr
     environment:
-      - PUID=${PUID_SONARR}
-      - PGID=${PGID_SHARED}
+      - PUID=1000
+      - PGID=1000
       - UMASK=002
-      - TZ=${TZ_MAIN}
+      - TZ=UTC
       - VIRTUAL_HOST=sonarr.home
     volumes:
-      - ${BASE_CONFIG_PATH}/sonarr-config:/config
-      - ${BASE_DATA_PATH}:/data
+      - /opt/docker/config/sonarr-config:/config
+      - /opt/docker/data:/data
     restart: unless-stopped
     networks:
       - home-network
@@ -100,14 +100,14 @@ services:
     image: lscr.io/linuxserver/radarr:latest
     container_name: radarr
     environment:
-      - PUID=${PUID_RADARR}
-      - PGID=${PGID_SHARED}
+      - PUID=1000
+      - PGID=1000
       - UMASK=002
-      - TZ=${TZ_MAIN}
+      - TZ=UTC
       - VIRTUAL_HOST=radarr.home
     volumes:
-      - ${BASE_CONFIG_PATH}/radarr-config:/config
-      - ${BASE_DATA_PATH}:/data
+      - /opt/docker/config/radarr-config:/config
+      - /opt/docker/data:/data
     restart: unless-stopped
     networks:
       - home-network
@@ -116,14 +116,14 @@ services:
     image: lscr.io/linuxserver/bazarr:latest
     container_name: bazarr
     environment:
-      - PUID=${PUID_BAZARR}
-      - PGID=${PGID_SHARED}
+      - PUID=1000
+      - PGID=1000
       - UMASK=002
-      - TZ=${TZ_MAIN}
+      - TZ=UTC
       - VIRTUAL_HOST=bazarr.home
     volumes:
-      - ${BASE_CONFIG_PATH}/bazarr-config:/config
-      - ${BASE_DATA_PATH}:/data
+      - /opt/docker/config/bazarr-config:/config
+      - /opt/docker/data:/data
     restart: unless-stopped
     networks:
       - home-network
@@ -132,14 +132,14 @@ services:
     image: plexinc/pms-docker
     container_name: plex
     environment:
-      - TZ=${TZ_MAIN}
+      - TZ=UTC
       - VIRTUAL_HOST=plex.home
-      - VIRTUAL_PORT=${PLEX_PORT}
+      - VIRTUAL_PORT=32400
     volumes:
-      - ${BASE_CONFIG_PATH}/plex-config:/config
-      - ${BASE_DATA_PATH}/media:/data
+      - /opt/docker/config/plex-config:/config
+      - /opt/docker/data/media:/data
     ports:
-      - "${PLEX_PORT}:${PLEX_PORT}"  # Keep for direct access and client discovery
+      - "32400:32400"  # Keep for direct access and client discovery
     networks:
       - home-network
     restart: unless-stopped
@@ -149,11 +149,11 @@ services:
     container_name: jellyseerr
     environment:
       - LOG_LEVEL=debug
-      - TZ=${TZ_JELLYSEERR}
-      - PORT=${JELLYSEERR_PORT}
+      - TZ=UTC
+      - PORT=5055
       - VIRTUAL_HOST=jellyseerr.home
     volumes:
-      - ${BASE_CONFIG_PATH}/jellyseerr-config:/app/config
+      - /opt/docker/config/jellyseerr-config:/app/config
     restart: unless-stopped
     networks:
       - home-network

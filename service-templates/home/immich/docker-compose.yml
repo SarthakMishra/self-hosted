@@ -3,21 +3,21 @@ services:
 
   immich:
     container_name: immich
-    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION}
+    image: ghcr.io/immich-app/immich-server:release
     volumes:
-      - ${BASE_DATA_PATH}/media/photos:/usr/src/app/upload
+      - /opt/docker/data/media/photos:/usr/src/app/upload
       - /etc/localtime:/etc/localtime:ro
     environment:
       - VIRTUAL_HOST=immich.home
-      - VIRTUAL_PORT=${IMMICH_PORT}
+      - VIRTUAL_PORT=2283
       # nginx-proxy configurations for large uploads and timeouts
       - NGINX_PROXY_PASS_HEADER=upgrade
       - NGINX_PROXY_PASS_HEADER=connection
       - NGINX_PROXY_SET_HEADER=Connection upgrade
       - NGINX_PROXY_SET_HEADER=Upgrade $$http_upgrade
-      - NGINX_CLIENT_MAX_BODY_SIZE=${NGINX_CLIENT_MAX_BODY_SIZE}
-      - NGINX_PROXY_READ_TIMEOUT=${NGINX_PROXY_READ_TIMEOUT}
-      - NGINX_PROXY_SEND_TIMEOUT=${NGINX_PROXY_SEND_TIMEOUT}
+      - NGINX_CLIENT_MAX_BODY_SIZE=50000M
+      - NGINX_PROXY_READ_TIMEOUT=600s
+      - NGINX_PROXY_SEND_TIMEOUT=600s
     networks:
       - home-network
     depends_on:
@@ -29,7 +29,7 @@ services:
 
   immich-machine-learning:
     container_name: immich_machine_learning
-    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION}-cuda
+    image: ghcr.io/immich-app/immich-machine-learning:release-cuda
     deploy:
       resources:
         reservations:
@@ -39,7 +39,7 @@ services:
               capabilities:
                 - gpu
     volumes:
-      - ${BASE_CONFIG_PATH}/immich-config/ml-cache:/cache
+      - /opt/docker/config/immich-config/ml-cache:/cache
     networks:
       - home-network
     restart: always
@@ -62,8 +62,8 @@ services:
     image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: immich
+      POSTGRES_DB: immich
       POSTGRES_INITDB_ARGS: '--data-checksums'
     volumes:
       - immich-postgres-data:/var/lib/postgresql/data

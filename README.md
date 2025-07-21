@@ -12,10 +12,10 @@ Complete automation for self-hosted server deployment.
 
 ### Home Server
 - [Server Setup](home-server/README.md) - Complete deployment guide 
-- [Service Deployment](home-server/service-deployment-guide.md) - Deploy apps
+- [Service Deployment](home-server/docs/service-deployment-guide.md) - Deploy apps
 - [Docker Compose Templates](service-templates/home)
 
 ### Remote Server
 - [Server Setup](remote-server/README.md) - Complete deployment guide 
-- [Service Deployment](remote-server/service-deployment-guide.md) - Deploy apps
+- [Service Deployment](remote-server/docs/service-deployment-guide.md) - Deploy apps
 - [Docker Compose Templates](service-templates/remote)

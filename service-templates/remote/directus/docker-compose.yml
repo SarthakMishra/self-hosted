@@ -30,7 +30,7 @@ services:
       - directus-internal
 
   directus:
-    image: directus/directus:${DIRECTUS_VERSION}
+    image: directus/directus:latest
     volumes:
       - ./uploads:/directus/uploads
       - ./extensions:/directus/extensions

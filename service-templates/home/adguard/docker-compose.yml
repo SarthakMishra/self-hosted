@@ -1,0 +1,24 @@
+---
+services:
+  adguardhome:
+    image: adguard/adguardhome
+    container_name: adguardhome
+    environment:
+      - VIRTUAL_HOST=adguard.home
+      - VIRTUAL_PORT=80
+    ports:
+      - "53:53/tcp"    # DNS
+      - "53:53/udp"    # DNS
+      - "784:784/udp"  # DNS-over-QUIC
+      - "853:853/tcp"  # DNS-over-TLS
+      - "3000:3000/tcp"  # Initial setup
+    volumes:
+      - ./workdir:/opt/adguardhome/work
+      - ./confdir:/opt/adguardhome/conf
+    networks:
+      - home-network
+    restart: unless-stopped
+
+networks:
+  home-network:
+    external: true
