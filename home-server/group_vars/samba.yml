@@ -1,0 +1,93 @@
+---
+# Samba Configuration for Home Server
+# Secure SMB/CIFS file sharing for MergerFS pool
+
+# Samba Installation
+samba_packages:
+  - samba
+  - samba-common-bin
+  - cifs-utils
+
+# Samba Service Configuration
+samba_services:
+  - smbd
+  - nmbd
+
+# Network Configuration
+samba_workgroup: "HOME"
+samba_server_string: "Home Server"
+samba_netbios_name: "homeserver"
+
+# Security Settings
+samba_security_level: "user"
+samba_map_to_guest: "never"
+samba_guest_account: "nobody"
+samba_server_min_protocol: "SMB2"
+samba_client_min_protocol: "SMB2"
+samba_smb_encrypt: "desired"  # desired|required|off
+samba_server_signing: "mandatory"
+samba_ntlm_auth: "disabled"
+samba_lanman_auth: "no"
+
+# User Configuration
+samba_username: "samba"
+samba_user_shell: "/usr/sbin/nologin"
+samba_user_home: "/nonexistent"
+samba_user_system: true
+
+# Share Configuration
+samba_shares:
+  - name: "storage"
+    comment: "MergerFS Pooled Storage"
+    path: "{{ mergerfs_pool_path | default('/srv/storage') }}"
+    valid_users: "{{ samba_username }}"
+    read_only: false
+    browseable: true
+    create_mask: "0664"
+    directory_mask: "0775"
+    force_user: "{{ samba_username }}"
+    force_group: "{{ samba_username }}"
+
+# Firewall Configuration
+samba_firewall_enabled: true
+samba_allowed_networks:
+  - "192.168.0.0/16"    # Private networks
+  - "10.0.0.0/8"
+  - "172.16.0.0/12"
+  - "100.64.0.0/10"     # Tailscale range
+
+# Interactive Configuration
+samba_interactive_mode: true
+samba_password_min_length: 8
+samba_require_strong_password: true
+
+# Performance Settings
+samba_socket_options: "TCP_NODELAY IPTOS_LOWDELAY SO_RCVBUF=524288 SO_SNDBUF=524288"
+samba_use_sendfile: true
+samba_read_raw: true
+samba_write_raw: true
+
+# Logging Configuration
+samba_log_level: 2
+samba_log_file: "/var/log/samba/log.%m"
+samba_max_log_size: 1000
+
+# Backup Configuration
+samba_backup_config: true
+samba_config_backup_dir: "/etc/samba/backups"
+
+# Integration Settings
+samba_depends_on_mergerfs: true
+samba_create_media_dirs: true
+samba_media_subdirs:
+  - "media/movies"
+  - "media/tv"
+  - "media/music"
+  - "media/photos"
+  - "downloads"
+  - "backups"
+  - "docker"
+
+# Validation Settings
+samba_verify_setup: true
+samba_test_connection: true 

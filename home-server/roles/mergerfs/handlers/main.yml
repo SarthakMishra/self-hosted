@@ -1,0 +1,25 @@
+---
+# MergerFS Handlers
+
+- name: reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  listen: "reload systemd"
+
+- name: remount drives
+  ansible.builtin.command: mount -a
+  listen: "remount drives"
+
+- name: remount mergerfs pool
+  block:
+    - name: unmount mergerfs pool
+      ansible.builtin.mount:
+        path: "{{ mergerfs_pool_path }}"
+        state: unmounted
+      ignore_errors: true
+      
+    - name: mount mergerfs pool
+      ansible.builtin.mount:
+        path: "{{ mergerfs_pool_path }}"
+        state: mounted
+  listen: "remount mergerfs pool" 

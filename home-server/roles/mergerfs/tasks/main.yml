@@ -1,0 +1,443 @@
+---
+# MergerFS Role - Main Tasks
+# Interactive storage pool setup with multiple drive support
+
+- name: Check system architecture for MergerFS package selection
+  ansible.builtin.set_fact:
+    mergerfs_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
+  tags:
+    - mergerfs
+    - installation
+
+- name: Download latest MergerFS package
+  ansible.builtin.get_url:
+    url: "https://github.com/trapexit/mergerfs/releases/download/{{ mergerfs_version }}/mergerfs_{{ mergerfs_version }}.debian-{{ mergerfs_debian_codename }}_{{ mergerfs_arch }}.deb"
+    dest: "/tmp/mergerfs.deb"
+    mode: '0644'
+  tags:
+    - mergerfs
+    - installation
+
+- name: Install MergerFS package
+  ansible.builtin.apt:
+    deb: "/tmp/mergerfs.deb"
+    state: present
+  tags:
+    - mergerfs
+    - installation
+
+- name: Clean up MergerFS package file
+  ansible.builtin.file:
+    path: "/tmp/mergerfs.deb"
+    state: absent
+  tags:
+    - mergerfs
+    - installation
+
+- name: Install mergerfs-tools for balancing
+  ansible.builtin.apt:
+    name: mergerfs-tools
+    state: present
+    update_cache: true
+  ignore_errors: true  # Not always available in all repositories
+  tags:
+    - mergerfs
+    - tools
+
+- name: Detect all available block devices
+  ansible.builtin.shell: |
+    lsblk -J -o NAME,SIZE,TYPE,MOUNTPOINT,FSTYPE,UUID | jq -r '
+      .blockdevices[] | 
+      select(.type == "disk") | 
+      select(.name | test("^({{ mergerfs_exclude_devices | join("|") }})"; "i") | not) |
+      select((.mountpoint // "") | test("^({{ mergerfs_exclude_mount_points | join("|") }})$") | not) |
+      select((.size | rtrimstr("G") | tonumber) >= {{ mergerfs_min_drive_size_gb }}) |
+      "\(.name)|\(.size)|\(.mountpoint // "")|\(.fstype // "")|\(.uuid // "")"
+    '
+  register: available_drives_raw
+  changed_when: false
+  tags:
+    - mergerfs
+    - detection
+
+- name: Parse available drives information
+  ansible.builtin.set_fact:
+    available_drives: "{{ available_drives_raw.stdout_lines | map('split', '|') | map('list') | list }}"
+  when: available_drives_raw.stdout_lines | length > 0
+  tags:
+    - mergerfs
+    - detection
+
+- name: Display detected drives
+  ansible.builtin.debug:
+    msg:
+      - "================================================================"
+      - "🔍 DETECTED STORAGE DRIVES"
+      - "================================================================"
+      - ""
+      - "Available drives for MergerFS pool:"
+      - ""
+      - "{% for drive in available_drives | default([]) %}"
+      - "{{ loop.index }}. /dev/{{ drive[0] }} - {{ drive[1] }} ({{ 'Mounted at ' + drive[2] if drive[2] else 'Unmounted' }}) {{ '- ' + drive[3] if drive[3] else '' }}"
+      - "{% endfor %}"
+      - ""
+      - "⚠️  WARNING: Only select drives you want to dedicate to storage pool"
+      - "🔒 System drives are automatically excluded"
+      - ""
+  when: available_drives is defined and available_drives | length > 0
+  tags:
+    - mergerfs
+    - detection
+
+- name: Fail if no suitable drives found
+  ansible.builtin.fail:
+    msg: |
+      ❌ No suitable drives found for MergerFS pool!
+      
+      Requirements:
+      - Must be block devices (not partitions)
+      - Minimum {{ mergerfs_min_drive_size_gb }}GB size
+      - Not system drives (/, /boot, etc.)
+      - Not already in use by critical services
+      
+      Check your drive configuration and try again.
+  when: available_drives is not defined or available_drives | length == 0
+  tags:
+    - mergerfs
+    - validation
+
+- name: Interactive drive selection
+  ansible.builtin.pause:
+    prompt: |
+      
+      ================================================================
+      📦 MERGERFS DRIVE SELECTION
+      ================================================================
+      
+      Select drives for your MergerFS storage pool by entering drive numbers.
+      
+      Available drives:
+      {% for drive in available_drives %}
+      {{ loop.index }}. /dev/{{ drive[0] }} - {{ drive[1] }} ({{ 'Mounted at ' + drive[2] if drive[2] else 'Unmounted' }}) {{ '- ' + drive[3] if drive[3] else '' }}
+      {% endfor %}
+      
+      Enter drive numbers separated by commas (e.g., 1,2,3):
+      Enter 'all' to select all drives:
+      Enter 'cancel' to skip MergerFS setup:
+  register: drive_selection
+  when: mergerfs_interactive_mode | default(true)
+  tags:
+    - mergerfs
+    - interactive
+
+- name: Skip MergerFS setup if cancelled
+  ansible.builtin.meta: end_play
+  when: 
+    - mergerfs_interactive_mode | default(true)
+    - drive_selection.user_input | lower == 'cancel'
+  tags:
+    - mergerfs
+    - interactive
+
+- name: Process drive selection
+  ansible.builtin.set_fact:
+    selected_drive_indices: |
+      {%- if drive_selection.user_input | lower == 'all' -%}
+      {{ range(1, available_drives | length + 1) | list }}
+      {%- else -%}
+      {{ drive_selection.user_input.split(',') | map('trim') | map('int') | list }}
+      {%- endif -%}
+  when: mergerfs_interactive_mode | default(true)
+  tags:
+    - mergerfs
+    - interactive
+
+- name: Validate drive selection
+  ansible.builtin.assert:
+    that:
+      - item | int > 0
+      - item | int <= (available_drives | length)
+    fail_msg: "Invalid drive selection: {{ item }}. Must be between 1 and {{ available_drives | length }}"
+  loop: "{{ selected_drive_indices | default([]) }}"
+  when: mergerfs_interactive_mode | default(true)
+  tags:
+    - mergerfs
+    - validation
+
+- name: Build selected drives list
+  ansible.builtin.set_fact:
+    selected_drives: |
+      {%- set drives = [] -%}
+      {%- for index in selected_drive_indices | default([]) -%}
+      {%- set _ = drives.append(available_drives[index | int - 1]) -%}
+      {%- endfor -%}
+      {{ drives }}
+  when: mergerfs_interactive_mode | default(true)
+  tags:
+    - mergerfs
+    - selection
+
+- name: Display selected drives
+  ansible.builtin.debug:
+    msg:
+      - "================================================================"
+      - "✅ SELECTED DRIVES FOR MERGERFS POOL"
+      - "================================================================"
+      - ""
+      - "{% for drive in selected_drives | default([]) %}"
+      - "{{ loop.index }}. /dev/{{ drive[0] }} - {{ drive[1] }} {{ '(' + drive[3] + ')' if drive[3] else '(unformatted)' }}"
+      - "{% endfor %}"
+      - ""
+      - "Total capacity: ~{{ selected_drives | map(attribute=1) | map('regex_replace', '[^0-9.]', '') | map('float') | sum | round(1) }}GB"
+      - ""
+  when: selected_drives is defined and selected_drives | length > 0
+  tags:
+    - mergerfs
+    - confirmation
+
+- name: Check if drives need formatting
+  ansible.builtin.set_fact:
+    drives_need_formatting: "{{ selected_drives | selectattr(3, 'equalto', '') | list }}"
+  when: selected_drives is defined
+  tags:
+    - mergerfs
+    - formatting
+
+- name: Confirm destructive formatting operation
+  ansible.builtin.pause:
+    prompt: |
+      
+      ⚠️  WARNING: DESTRUCTIVE OPERATION
+      ================================================================
+      
+      The following drives will be FORMATTED (ALL DATA WILL BE LOST):
+      {% for drive in drives_need_formatting | default([]) %}
+      - /dev/{{ drive[0] }} ({{ drive[1] }})
+      {% endfor %}
+      
+      This operation is IRREVERSIBLE and will destroy all existing data!
+      
+      Type 'yes' to continue or 'no' to cancel:
+  register: format_confirmation
+  when: 
+    - mergerfs_confirm_destructive | default(true)
+    - drives_need_formatting is defined
+    - drives_need_formatting | length > 0
+  tags:
+    - mergerfs
+    - confirmation
+
+- name: Cancel if formatting not confirmed
+  ansible.builtin.fail:
+    msg: "❌ MergerFS setup cancelled - formatting not confirmed"
+  when:
+    - format_confirmation is defined
+    - format_confirmation.user_input | lower != 'yes'
+  tags:
+    - mergerfs
+    - safety
+
+- name: Create partitions on selected drives
+  ansible.builtin.shell: |
+    if ! fdisk -l /dev/{{ item[0] }} | grep -q "/dev/{{ item[0] }}1"; then
+      echo "Creating partition on /dev/{{ item[0] }}"
+      echo -e "n\np\n1\n\n\nw" | fdisk /dev/{{ item[0] }}
+      sleep 2
+    fi
+  loop: "{{ drives_need_formatting | default([]) }}"
+  when: drives_need_formatting is defined and drives_need_formatting | length > 0
+  tags:
+    - mergerfs
+    - partitioning
+
+- name: Format drives with ext4 filesystem
+  ansible.builtin.filesystem:
+    fstype: "{{ mergerfs_filesystem }}"
+    dev: "/dev/{{ item[0] }}1"
+    force: true
+  loop: "{{ drives_need_formatting | default([]) }}"
+  when: drives_need_formatting is defined and drives_need_formatting | length > 0
+  tags:
+    - mergerfs
+    - formatting
+
+- name: Get UUIDs of all drive partitions
+  ansible.builtin.shell: "blkid -s UUID -o value /dev/{{ item[0] }}1"
+  register: drive_uuids
+  loop: "{{ selected_drives | default([]) }}"
+  changed_when: false
+  tags:
+    - mergerfs
+    - uuid
+
+- name: Create mount points for individual drives
+  ansible.builtin.file:
+    path: "{{ mergerfs_mount_base }}/{{ mergerfs_drive_prefix }}{{ loop.index }}"
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  loop: "{{ selected_drives | default([]) }}"
+  tags:
+    - mergerfs
+    - mountpoints
+
+- name: Create MergerFS pool directory
+  ansible.builtin.file:
+    path: "{{ mergerfs_pool_path }}"
+    state: directory
+    mode: "{{ mergerfs_pool_mode }}"
+    owner: "{{ mergerfs_pool_owner }}"
+    group: "{{ mergerfs_pool_group }}"
+  tags:
+    - mergerfs
+    - mountpoints
+
+- name: Add individual drive mounts to fstab
+  ansible.builtin.mount:
+    path: "{{ mergerfs_mount_base }}/{{ mergerfs_drive_prefix }}{{ loop.index }}"
+    src: "UUID={{ item.stdout }}"
+    fstype: "{{ mergerfs_filesystem }}"
+    opts: "{{ mergerfs_mount_opts }}"
+    dump: "0"
+    passno: "2"
+    state: present
+  loop: "{{ drive_uuids.results | default([]) }}"
+  when: drive_uuids is defined
+  notify: remount drives
+  tags:
+    - mergerfs
+    - fstab
+
+- name: Add MergerFS pool mount to fstab
+  ansible.builtin.mount:
+    path: "{{ mergerfs_pool_path }}"
+    src: "{{ mergerfs_mount_base }}/{{ mergerfs_drive_prefix }}*"
+    fstype: "fuse.mergerfs"
+    opts: "{{ mergerfs_mount_options | join(',') }}"
+    dump: "0"
+    passno: "0"
+    state: present
+  notify: remount mergerfs pool
+  tags:
+    - mergerfs
+    - fstab
+
+- name: Mount individual drives
+  ansible.builtin.mount:
+    path: "{{ mergerfs_mount_base }}/{{ mergerfs_drive_prefix }}{{ loop.index }}"
+    state: mounted
+  loop: "{{ selected_drives | default([]) }}"
+  tags:
+    - mergerfs
+    - mounting
+
+- name: Mount MergerFS pool
+  ansible.builtin.mount:
+    path: "{{ mergerfs_pool_path }}"
+    state: mounted
+  tags:
+    - mergerfs
+    - mounting
+
+- name: Set ownership of mounted pool
+  ansible.builtin.file:
+    path: "{{ mergerfs_pool_path }}"
+    owner: "{{ mergerfs_pool_owner }}"
+    group: "{{ mergerfs_pool_group }}"
+    mode: "{{ mergerfs_pool_mode }}"
+    recurse: false
+  tags:
+    - mergerfs
+    - permissions
+
+- name: Create subdirectory structure
+  ansible.builtin.file:
+    path: "{{ mergerfs_pool_path }}/{{ item }}"
+    state: directory
+    owner: "{{ mergerfs_pool_owner }}"
+    group: "{{ mergerfs_pool_group }}"
+    mode: "{{ mergerfs_pool_mode }}"
+  loop: "{{ mergerfs_subdirectories | default([]) }}"
+  when: mergerfs_create_subdirs | default(true)
+  tags:
+    - mergerfs
+    - structure
+
+- name: Create test files for verification
+  ansible.builtin.copy:
+    content: "MergerFS test file created on {{ ansible_date_time.iso8601 }}"
+    dest: "{{ mergerfs_pool_path }}/mergerfs_test_{{ ansible_date_time.epoch }}.txt"
+    owner: "{{ mergerfs_pool_owner }}"
+    group: "{{ mergerfs_pool_group }}"
+    mode: "0644"
+  when: mergerfs_test_files | default(true)
+  tags:
+    - mergerfs
+    - testing
+
+- name: Verify MergerFS pool capacity
+  ansible.builtin.shell: "df -h {{ mergerfs_pool_path }}"
+  register: pool_capacity
+  changed_when: false
+  tags:
+    - mergerfs
+    - verification
+
+- name: Check individual drive usage
+  ansible.builtin.shell: "df -h {{ mergerfs_mount_base }}/{{ mergerfs_drive_prefix }}*"
+  register: individual_drives
+  changed_when: false
+  tags:
+    - mergerfs
+    - verification
+
+- name: Verify test file distribution
+  ansible.builtin.shell: "find {{ mergerfs_mount_base }}/{{ mergerfs_drive_prefix }}* -name 'mergerfs_test_*.txt' 2>/dev/null || true"
+  register: test_file_location
+  changed_when: false
+  when: mergerfs_test_files | default(true)
+  tags:
+    - mergerfs
+    - verification
+
+- name: Display MergerFS setup completion
+  ansible.builtin.debug:
+    msg:
+      - "================================================================"
+      - "🎉 MERGERFS STORAGE POOL SETUP COMPLETED!"
+      - "================================================================"
+      - ""
+      - "✅ MergerFS Version: {{ mergerfs_version }}"
+      - "✅ Drives in Pool: {{ selected_drives | length if selected_drives is defined else 0 }}"
+      - "✅ Pool Mount Point: {{ mergerfs_pool_path }}"
+      - "✅ Individual Mounts: {{ mergerfs_mount_base }}/{{ mergerfs_drive_prefix }}1-{{ selected_drives | length if selected_drives is defined else 0 }}"
+      - ""
+      - "📊 Pool Capacity:"
+      - "{{ pool_capacity.stdout_lines | join('\n') | indent(2, true) }}"
+      - ""
+      - "💾 Individual Drives:"
+      - "{{ individual_drives.stdout_lines | join('\n') | indent(2, true) }}"
+      - ""
+      - "{% if test_file_location is defined and test_file_location.stdout %}"
+      - "🧪 Test File Location: {{ test_file_location.stdout }}"
+      - "{% endif %}"
+      - ""
+      - "📁 Directory Structure:"
+      - "{% for subdir in mergerfs_subdirectories | default([]) %}"
+      - "   {{ mergerfs_pool_path }}/{{ subdir }}"
+      - "{% endfor %}"
+      - ""
+      - "🔧 Management Commands:"
+      - "   Check status: df -h {{ mergerfs_pool_path }}"
+      - "   View drives: df -h {{ mergerfs_mount_base }}/{{ mergerfs_drive_prefix }}*"
+      - "   Balance pool: mergerfs.balance {{ mergerfs_pool_path }}"
+      - ""
+      - "🚀 Your unified storage pool is ready!"
+      - "   Access all drives through: {{ mergerfs_pool_path }}"
+      - "   Files automatically distributed across drives"
+      - "   Add more drives anytime with zero downtime"
+      - ""
+  tags:
+    - mergerfs
+    - completion 

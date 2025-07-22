@@ -1,0 +1,41 @@
+---
+# Samba Handlers
+
+- name: reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  listen: "reload systemd"
+
+- name: restart samba services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+    enabled: true
+  loop: "{{ samba_services }}"
+  listen: "restart samba"
+
+- name: reload samba configuration
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: reloaded
+  loop: "{{ samba_services }}"
+  failed_when: false
+  listen: "reload samba"
+
+- name: restart smbd
+  ansible.builtin.systemd:
+    name: smbd
+    state: restarted
+  listen: "restart smbd"
+
+- name: restart nmbd
+  ansible.builtin.systemd:
+    name: nmbd
+    state: restarted
+  listen: "restart nmbd"
+
+- name: reload firewall
+  ansible.builtin.systemd:
+    name: ufw
+    state: reloaded
+  listen: "reload firewall" 

@@ -13,6 +13,8 @@ Complete infrastructure-as-code solution using Ansible for automated deployment 
 - UFW firewall configuration with Docker security fix
 
 - Docker installation with production configuration
+- **MergerFS storage pool setup (interactive drive selection)**
+- **Samba file sharing setup (interactive password configuration)**
 - Nginx-proxy for local `.home` domain routing
 - DNSmasq for local DNS resolution 
 - Cloudflared tunnel for secure external access (automated service discovery)
@@ -55,11 +57,12 @@ The playbook will:
 1. Harden the system and create admin user
 2. Reboot the server automatically
 3. Install and configure Docker
-4. **Set up nginx-proxy for local .home domains**
-5. **Configure DNSmasq for local DNS resolution**
-6. **Deploy Cloudflared tunnel for secure external access**
-7. Install Netdata monitoring
-8. Validate everything is working
+4. **Set up MergerFS storage pool (interactive drive selection)**
+5. **Set up nginx-proxy for local .home domains**
+6. **Configure DNSmasq for local DNS resolution**
+7. **Deploy Cloudflared tunnel for secure external access**
+8. Install Netdata monitoring
+9. Validate everything is working
 
 ## Configuration
 
@@ -141,19 +144,47 @@ ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "reboot"
 # Docker setup only (after system prep + reboot)
 ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "docker_setup"
 
+# MergerFS storage pool setup only
+ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "mergerfs_setup"
+
+# Samba file sharing setup only
+ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "samba_setup"
+
 # Local network setup only (nginx-proxy + dnsmasq)
 ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "local_network_setup"
 
 # Cloudflared tunnel setup only
 ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "cloudflared_setup"
 
+# Skip storage setup (if no additional drives)
+ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --skip-tags "mergerfs_setup"
+
 # Skip reboot (for testing/development)
 ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --skip-tags "reboot"
+
+## 📈 Expanding Storage Pool
+
+When you add new drives to your server, use the expansion playbook:
+
+```bash
+# Option 1: Use helper script (recommended)
+./scripts/expand-storage.sh
+
+# Option 2: Run playbook directly
+ansible-playbook -i inventory/hosts.yml playbooks/expand-storage.yml
+```
+
+**Features:**
+- **🚀 Zero downtime** - Pool remains accessible during expansion
+- **🔒 Data protection** - No risk to existing data
+- **🎯 Interactive** - Select only new drives to add
+- **⚡ Instant capacity** - New space available immediately
+- **🔄 Automatic integration** - New drives included in pool seamlessly
 ```
 
 ## Deploying Applications
 
-After setup, deploy any web application with both local and external access:
+After setup, deploy any web application with both local and external access, plus integrated storage:
 
 ```yaml
 # docker-compose.yml for any app
@@ -166,6 +197,10 @@ services:
       # Local access via nginx-proxy
       - VIRTUAL_HOST=myapp.home
       - VIRTUAL_PORT=80
+    volumes:
+      # Direct access to unified storage pool
+      - /srv/storage/media:/app/media
+      - /srv/storage/downloads:/app/downloads
     labels:
       # Optional: External access via Cloudflare tunnel
       - "cloudflare.zero_trust.access.tunnel.public_hostname=myapp.gooffy.in"
@@ -177,8 +212,25 @@ networks:
 ```
 
 **Access Methods:**
-- **Local**: `http://myapp.home` (no SSL needed, resolved by local DNS)
-- **External**: `https://myapp.gooffy.in` (automatic SSL + security via Cloudflare)
+- **Local Web**: `http://myapp.home` (no SSL needed, resolved by local DNS)
+- **External Web**: `https://myapp.gooffy.in` (automatic SSL + security via Cloudflare)
+- **File Access**: `\\YOUR_SERVER_IP\storage` (Windows) - same files your Docker apps use!
+
+**Popular Service Examples:**
+```yaml
+# Sonarr - TV show management
+volumes:
+  - /srv/storage/media/tv:/tv
+  - /srv/storage/downloads:/downloads
+
+# Immich - Photo management  
+volumes:
+  - /srv/storage/media/photos:/usr/src/app/upload
+
+# qBittorrent - Download client
+volumes:
+  - /srv/storage/downloads:/downloads
+```
 
 ## DNS Configuration
 
@@ -268,26 +320,62 @@ If you prefer not to use Tailscale MagicDNS, you have these options:
 ├── group_vars/
 │   ├── all.yml                   # Global variables
 │   ├── docker.yml               # Docker configuration
+│   ├── mergerfs.yml             # MergerFS storage pool configuration
 │   ├── nginx_proxy.yml          # Nginx-proxy configuration
 │   ├── dnsmasq.yml              # DNSmasq configuration  
 │   ├── cloudflared.yml          # Cloudflared tunnel configuration
 │   └── vault.yml.example       # Secrets template
 ├── playbooks/
-│   └── setup.yml                # Complete server setup
+│   ├── setup.yml                # Complete server setup
+│   └── expand-storage.yml       # Storage pool expansion
 ├── roles/                       # Ansible roles including nginx-proxy, dnsmasq, cloudflared
-├── docs/                        # Documentation guides
-│   └── mergerfs/               # MergerFS setup guide  
+├── scripts/
+│   └── expand-storage.sh        # Helper script for storage expansion
+├── docs/                        # Additional documentation guides  
+│   ├── service-deployment-guide.md  # Service deployment reference
+│   └── ssh-agent-wsl-setup.md   # SSH agent setup for WSL
 └── service-templates/           # Example application templates
 ```
 
-## Documentation
+## Storage & File Sharing
 
-### Storage Setup
+The automated setup includes both **MergerFS storage pooling** and **Samba file sharing** with interactive configuration:
 
-**[MergerFS Guide](docs/mergerfs/)** - Pool multiple drives into a single mount point
-- Perfect for home servers with mixed drive sizes (1TB + 2TB drives)  
-- No RAID overhead, easy expansion, individual drive failure isolation
-- Optimized configuration for media servers and Docker services
+### 💾 **MergerFS Storage Pool**
+- **Interactive drive selection** during setup - choose which drives to pool
+- **Zero-downtime expansion** - add more drives anytime with `./scripts/expand-storage.sh`
+- **Mixed drive sizes** - combine 1TB, 2TB, 4TB drives seamlessly
+- **No RAID overhead** - full capacity available, individual drive failure isolation
+- **Optimized for media servers** - automatic file distribution and Docker integration
+
+### 🗂️ **Samba Network File Sharing**
+- **Interactive password setup** during deployment - secure SMB/CIFS access
+- **Windows network drive** - Access your entire storage pool as `\\SERVER_IP\storage`
+- **Cross-platform compatibility** - Works with Windows, macOS, Linux, mobile devices
+- **Docker container integration** - Direct volume mounting to unified storage pool
+- **Automatic subdirectory creation** - Pre-organized folders for media, downloads, backups
+
+### 🔧 **How It Works Together**
+1. **MergerFS** combines your drives into `/srv/storage` (unified pool)
+2. **Samba** shares this entire pool as a network drive
+3. **Result**: Windows sees one big drive, files automatically distribute across all physical drives
+
+### 📁 **Access Your Files**
+- **Network Share**: `\\YOUR_SERVER_IP\storage` (Windows) or `smb://YOUR_SERVER_IP/storage` (Mac/Linux)
+- **Docker Volumes**: Mount `/srv/storage/media/movies`, `/srv/storage/downloads`, etc.
+- **Direct Access**: SSH into server and access `/srv/storage/`
+
+### ⚡ **Expansion Process**
+When you add new drives:
+```bash
+# Zero-downtime expansion
+./scripts/expand-storage.sh
+# 1. Detects new drives automatically
+# 2. Interactive selection of drives to add
+# 3. Formats and integrates new drives
+# 4. Increases pool capacity instantly
+# 5. Samba share automatically includes new space
+```
 
 ### Service Deployment
 
@@ -315,6 +403,8 @@ Your server will have:
 - Hardened system with admin user
 - Tailscale VPN for secure access
 - Production-ready Docker installation
+- **MergerFS unified storage pool at `/srv/storage`**
+- **Samba file sharing with network drive access**
 - **Nginx-proxy for local .home domain access**
 - **DNSmasq for local DNS resolution**
 - **Cloudflared tunnel for secure external access**
@@ -323,10 +413,17 @@ Your server will have:
 
 **Access points:**
 - SSH: `ssh admin@your-tailscale-ip`
+- **File Share**: `\\YOUR_SERVER_IP\storage` (Windows) or `smb://YOUR_SERVER_IP/storage` (Mac/Linux)
+- **Web Services**: `http://service.home` (local) or `https://service.yourdomain.com` (external)
 
 **Management commands:**
 - Docker status: `/usr/local/bin/docker-status`
 - Docker cleanup: `/usr/local/bin/docker-cleanup`
+- Storage pool status: `df -h /srv/storage`
+- Balance storage pool: `mergerfs.balance /srv/storage`
+- **Expand storage pool: `./scripts/expand-storage.sh`**
+- **Samba status: `systemctl status smbd`**
+- **Samba connections: `smbstatus`**
 - Default directory: `/opt/docker`
 
-**Deploy anything with dual access** - local .home domains + secure external access via Cloudflare! 🚀
+**Deploy anything with triple access** - local .home domains + secure external access via Cloudflare + network file sharing! 🚀

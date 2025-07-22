@@ -11,6 +11,8 @@
     - ../group_vars/vault.yml
     - ../group_vars/all.yml
     - ../group_vars/docker.yml
+    - ../group_vars/mergerfs.yml
+    - ../group_vars/samba.yml
     - ../group_vars/nginx_proxy.yml
     - ../group_vars/dnsmasq.yml
     - ../group_vars/cloudflared.yml
@@ -144,10 +146,12 @@
           - "1. System hardening and preparation"
           - "2. Reboot server"
           - "3. Docker installation and configuration"
-          - "4. Nginx-proxy for local .home domains"
-          - "5. DNSmasq for local DNS resolution"
-          - "6. Cloudflared for secure external access"
-          - "7. Netdata monitoring system"
+          - "4. MergerFS storage pool setup (interactive)"
+          - "5. Samba file sharing setup (interactive password)"
+          - "6. Nginx-proxy for local .home domains"
+          - "7. DNSmasq for local DNS resolution"
+          - "8. Cloudflared for secure external access"
+          - "9. Netdata monitoring system"
           - ""
           - "⚠️  Server will reboot during this process"
           - "🔒 SSH access will be restricted to admin user"
@@ -289,13 +293,42 @@
           - "🐳 DOCKER SETUP COMPLETED"
           - "================================================================"
           - ""
-          - "Docker installation complete. Setting up local networking..."
+          - "Docker installation complete. Setting up storage pool..."
           - ""
       tags:
         - docker_setup
         - phase3
 
-    # Phase 4: Local Network Setup (Nginx-proxy + DNSmasq)
+    # Phase 4: MergerFS Storage Pool Setup
+    - name: Run MergerFS storage pool setup
+      ansible.builtin.include_role:
+        name: mergerfs
+      tags:
+        - mergerfs_setup
+        - phase4
+
+    # Phase 5: Samba File Sharing Setup
+    - name: Run Samba file sharing setup
+      ansible.builtin.include_role:
+        name: samba
+      tags:
+        - samba_setup
+        - phase5
+
+    - name: Display MergerFS setup completion
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "💽 MERGERFS STORAGE POOL SETUP COMPLETED"
+          - "================================================================"
+          - ""
+          - "Storage pool configured. Setting up local networking..."
+          - ""
+      tags:
+        - mergerfs_setup
+        - phase4
+
+    # Phase 6: Local Network Setup (Nginx-proxy + DNSmasq)
     - name: Run local network services setup
       ansible.builtin.include_role:
         name: "{{ item }}"
@@ -304,7 +337,7 @@
         - dnsmasq
       tags:
         - local_network_setup
-        - phase4
+        - phase6
 
     - name: Display local network setup completion
       ansible.builtin.debug:
@@ -320,15 +353,15 @@
           - ""
       tags:
         - local_network_setup
-        - phase4
+        - phase5
 
-    # Phase 5: Cloudflared Setup
+    # Phase 7: Cloudflared Setup
     - name: Run Cloudflared tunnel setup
       ansible.builtin.include_role:
         name: cloudflared
       tags:
         - cloudflared_setup
-        - phase5
+        - phase7
 
     - name: Display Cloudflared setup completion
       ansible.builtin.debug:
@@ -341,15 +374,15 @@
           - ""
       tags:
         - cloudflared_setup
-        - phase5
+        - phase6
 
-    # Phase 6: Monitoring Setup
+    # Phase 8: Monitoring Setup
     - name: Run monitoring system setup
       ansible.builtin.include_role:
         name: netdata
       tags:
         - monitoring_setup
-        - phase6
+        - phase8
 
   post_tasks:
     - name: Complete setup finished
@@ -362,12 +395,13 @@
           - "✅ System hardening applied"
           - "✅ Server rebooted with latest changes"
           - "✅ Docker installed and configured"
+          - "✅ MergerFS storage pool configured"
+          - "✅ Samba file sharing configured"
           - "✅ Nginx-proxy for local .{{ domain_suffix }} domains"
           - "✅ DNSmasq for local DNS resolution"
           - "✅ Cloudflared tunnel for external access"
           - "✅ Netdata monitoring installed"
           - "✅ Production settings applied"
-          - "✅ All validations passed"
           - ""
           - "🔒 SSH Access (via Tailscale):"
           - "   ssh {{ admin_username | default('admin') }}@{{ tailscale_ip | default('TAILSCALE_IP') }}"
@@ -376,8 +410,15 @@
           - "   Docker Status: /usr/local/bin/docker-status"
           - "   Docker Cleanup: /usr/local/bin/docker-cleanup"
           - "   Stack Directory: {{ docker_stack_root }}"
+          - "   Storage Pool: {{ mergerfs_pool_path | default('/srv/storage') }}"
           - "   Nginx-proxy Directory: {{ nginx_proxy_root_dir }}"
           - "   Cloudflared Directory: {{ cloudflared_root_dir }}"
+          - ""
+          - "💽 Storage Pool:"
+          - "   MergerFS Pool: {{ mergerfs_pool_path | default('/srv/storage') }}"
+          - "   Network Share: \\\\{{ ansible_default_ipv4.address }}\\storage"
+          - "   Check Status: df -h {{ mergerfs_pool_path | default('/srv/storage') }}"
+          - "   Balance Pool: mergerfs.balance {{ mergerfs_pool_path | default('/srv/storage') }}"
           - ""
           - "🌐 Network Services:"
           - "   Local DNS: {{ ansible_default_ipv4.address }}:{{ dnsmasq_port }}"
@@ -387,6 +428,7 @@
           - "   Netdata: http://{{ tailscale_ip | default('TAILSCALE_IP') }}:{{ netdata_port }}"
           - ""
           - "🚀 Your home server is ready!"
+          - "   Storage: {{ mergerfs_pool_path | default('/srv/storage') }} unified pool available"
           - "   Local Access: Add VIRTUAL_HOST=service.{{ domain_suffix }} to containers"
           - "   External Access: Add cloudflare labels for automatic tunnel routing"
           - "   No ports 80/443 exposed - all external traffic via Cloudflare tunnel"
