@@ -425,7 +425,7 @@ Your server will have:
 - Automated cleanup and log rotation
 
 **Access points:**
-- SSH: `ssh admin@homeserver` (via Tailscale MagicDNS)
+- SSH: `ssh your-user@homeserver` (via Tailscale MagicDNS)
 - **File Share**: `\\SERVER_IP\storage` (Windows) or `smb://SERVER_IP/storage` (Mac/Linux)
 - **Web Services**: `http://service.home` (local) or `https://service.yourdomain.com` (external)
 
