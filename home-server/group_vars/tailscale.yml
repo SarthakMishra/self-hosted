@@ -12,7 +12,7 @@ tailscale_ssh_enabled: true
 
 # Authentication
 tailscale_auth_key: "{{ vault_tailscale_auth_key | default('') }}"
-tailscale_hostname: "{{ inventory_hostname }}"
+tailscale_hostname: "{{ vault_ansible_host }}"
 
 # MagicDNS Configuration
 tailscale_magic_dns_enabled: true

@@ -26,43 +26,47 @@ Complete infrastructure-as-code solution using Ansible for automated deployment 
 ### Prerequisites
 
 - Ansible installed (`pip install ansible`)
-- SSH access to target server
-- Ubuntu 20.04+ or Debian 11+ server
+- Ubuntu 22.04+ Server installed on your home lab machine
+- Network access to the server from your Ansible control machine  
 - Cloudflare account with domain managed by Cloudflare
+
+> **⚠️ Important**: During Ubuntu Server installation, **DO NOT** set up SSH keys. The playbook will handle SSH configuration automatically. Simply set a password for the default user (usually `ubuntu`) - this will be used for initial bootstrap only.
 
 ### Cloudflare Setup
 
 1. **Enable Zero Trust** (free): Go to your Cloudflare dashboard → Zero Trust
 2. **Create Tunnel**: Networks → Tunnels → Create a tunnel → Cloudflared
 3. **Get Tunnel ID**: Copy the tunnel ID from the tunnel overview page
-4. **Get API Token**: My Profile → API Tokens → Create Token (needs Tunnel:Edit and DNS:Edit permissions)
+4. **Get API Token**: My Profile → API Tokens → Create Token
+   - **Account permissions**: Cloudflare Tunnel → Edit
+   - **Zone permissions**: DNS → Edit
 5. **Get Account ID**: Found in the right sidebar of your Cloudflare dashboard
 
 ### Setup
 
 ```bash
-# 1. Configure inventory
-cp inventory/hosts.yml.example inventory/hosts.yml
-nano inventory/hosts.yml  # Edit YOUR_SERVER_IP
-
-# 2. Configure secrets
+# 1. Configure vault with all settings
 cp group_vars/vault.yml.example group_vars/vault.yml
-nano group_vars/vault.yml  # Add your Tailscale auth key, email, etc.
+nano group_vars/vault.yml  # Configure initial bootstrap credentials and final setup
 
-# 3. Deploy everything
+# 2. Deploy everything  
 ansible-playbook -i inventory/hosts.yml playbooks/setup.yml
 ```
 
 The playbook will:
-1. Harden the system and create admin user
-2. Reboot the server automatically
-3. Install and configure Docker
-4. **Set up MergerFS storage pool (interactive drive selection)**
-5. **Set up nginx-proxy for local .home domains**
-6. **Configure DNSmasq for local DNS resolution**
-7. **Deploy Cloudflared tunnel for secure external access**
-8. Install Netdata monitoring
-9. Validate everything is working
+1. **Connect using initial Ubuntu credentials (password-based)**
+2. **Set up SSH keys and disable password authentication**
+3. **Create admin user with passwordless sudo**
+4. **Set up Tailscale VPN and transition to secure access**
+5. Harden the system and reboot automatically
+6. Install and configure Docker
+7. **Set up MergerFS storage pool (interactive drive selection)**
+8. **Set up Samba file sharing (interactive password configuration)**
+9. **Configure nginx-proxy for local .home domains**
+10. **Set up DNSmasq for local DNS resolution**
+11. **Deploy Cloudflared tunnel for secure external access**
+12. Install Netdata monitoring
+13. Validate everything is working
 
 ## Configuration
 
@@ -83,12 +87,20 @@ all:
 
 ### group_vars/vault.yml
 ```yaml
-# SSH Configuration (Option 1: Private key file)
-vault_ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
+# INITIAL BOOTSTRAP AUTHENTICATION (Fresh Ubuntu Install)
+vault_ansible_init_host: "192.168.1.100"      # Server IP during initial setup
+vault_ansible_init_user: "ubuntu"             # Default Ubuntu user  
+vault_ansible_init_password: "your-password"  # Initial SSH password
+
+# FINAL AUTHENTICATION (After Tailscale Setup)
+vault_ansible_host: "homeserver"              # Tailscale hostname (MagicDNS enabled)
+vault_ansible_user: "admin"                   # Final admin user (created during setup)
+
+# SSH Configuration
 vault_admin_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI..."
 
-# SSH Configuration (Option 2: SSH agent - comment out private key line above)
-# vault_admin_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI..."
+# Optional: SSH private key file (can use SSH agent instead)
+vault_ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
 
 # Tailscale Configuration
 vault_tailscale_auth_key: "tskey-auth-xxxxx"
@@ -316,7 +328,7 @@ If you prefer not to use Tailscale MagicDNS, you have these options:
 ## Project Structure
 
 ```
-├── inventory/hosts.yml.example   # Inventory template
+├── inventory/hosts.yml           # Inventory (references vault.yml variables)
 ├── group_vars/
 │   ├── all.yml                   # Global variables
 │   ├── docker.yml               # Docker configuration
@@ -384,6 +396,7 @@ Ready-to-deploy Docker services are available in `service-templates/`:
 - **immich** - Photo management and AI tagging
 - **frigate** - NVR with AI object detection  
 - **adguard** - DNS-based ad blocking
+- **portainer** - Docker container management interface
 
 ## Security
 
@@ -412,8 +425,8 @@ Your server will have:
 - Automated cleanup and log rotation
 
 **Access points:**
-- SSH: `ssh admin@your-tailscale-ip`
-- **File Share**: `\\YOUR_SERVER_IP\storage` (Windows) or `smb://YOUR_SERVER_IP/storage` (Mac/Linux)
+- SSH: `ssh admin@homeserver` (via Tailscale MagicDNS)
+- **File Share**: `\\SERVER_IP\storage` (Windows) or `smb://SERVER_IP/storage` (Mac/Linux)
 - **Web Services**: `http://service.home` (local) or `https://service.yourdomain.com` (external)
 
 **Management commands:**

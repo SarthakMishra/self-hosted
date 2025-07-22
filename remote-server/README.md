@@ -29,15 +29,11 @@ Complete infrastructure-as-code solution using Ansible for automated deployment 
 ### Setup
 
 ```bash
-# 1. Configure inventory
-cp inventory/hosts.yml.example inventory/hosts.yml
-nano inventory/hosts.yml  # Edit YOUR_SERVER_IP
-
-# 2. Configure secrets
+# 1. Configure vault with all settings
 cp group_vars/vault.yml.example group_vars/vault.yml
-nano group_vars/vault.yml  # Add your Tailscale auth key, email, etc.
+nano group_vars/vault.yml  # Add your server IP, SSH user, Tailscale auth key, Traefik settings, etc.
 
-# 3. Deploy everything (including Traefik!)
+# 2. Deploy everything (including Traefik!)
 ansible-playbook -i inventory/hosts.yml playbooks/setup.yml
 ```
 
@@ -51,26 +47,20 @@ The playbook will:
 
 ## Configuration
 
-### inventory/hosts.yml
-```yaml
-all:
-  children:
-    docker_servers:
-      hosts:
-        server:
-          ansible_host: YOUR_SERVER_IP
-          node_type: server
-  vars:
-    ansible_user: ubuntu
-    ansible_ssh_private_key_file: ~/.ssh/id_rsa
-    ansible_become: true
-```
-
 ### group_vars/vault.yml
 ```yaml
+# Ansible Connection Configuration
+vault_ansible_host: "203.0.113.1"        # Your server's IP address
+vault_ansible_user: "admin"              # SSH user (ubuntu, debian, admin, etc.)
+vault_ansible_ssh_private_key_file: "~/.ssh/id_ed25519"  # Path to your SSH key
+
+# SSH Configuration
+vault_admin_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI..."
+
+# Tailscale Configuration
 vault_tailscale_auth_key: "tskey-auth-xxxxx"
-vault_admin_ssh_public_key: "ssh-rsa AAAAB3..."
-# Traefik configuration:
+
+# Traefik Configuration
 vault_traefik_acme_email: "your@email.com"
 ```
 
@@ -127,7 +117,7 @@ networks:
 ## Project Structure
 
 ```
-├── inventory/hosts.yml.example   # Inventory template
+├── inventory/hosts.yml           # Inventory (references vault.yml variables)
 ├── group_vars/
 │   ├── all.yml                   # Global variables
 │   ├── docker.yml               # Docker configuration

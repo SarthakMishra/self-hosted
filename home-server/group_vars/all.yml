@@ -19,7 +19,7 @@ tailscale_accept_routes: true
 tailscale_accept_dns: true
 tailscale_ssh_enabled: true
 tailscale_auth_key: "{{ vault_tailscale_auth_key | default('') }}"
-tailscale_hostname: "{{ inventory_hostname }}"
+tailscale_hostname: "{{ vault_tailscale_hostname | default(inventory_hostname) }}"
 
 # Firewall Configuration
 firewall_enabled: true

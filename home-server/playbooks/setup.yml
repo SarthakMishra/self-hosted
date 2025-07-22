@@ -19,103 +19,42 @@
     - ../group_vars/netdata.yml
     
   pre_tasks:
-    # Dynamic Connection Detection and Setup
-    - name: Detect optimal connection method
+    # Bootstrap Connection Verification
+    - name: Verify bootstrap connection to fresh Ubuntu server
       block:
-        - name: Try connecting with current inventory settings first
+        - name: Test initial connection with bootstrap credentials
           ansible.builtin.setup:
-          register: connection_test
-          ignore_errors: true
+          register: bootstrap_connection_test
           
-        - name: Connection successful with current settings
+        - name: Bootstrap connection successful
           ansible.builtin.debug:
-            msg: "✅ Connected successfully with {{ ansible_user }}@{{ ansible_host }}"
-          when: connection_test is not failed
-          
-        - name: Try alternative connection methods if current failed
-          block:
-            # Try admin user with Tailscale hostname
-            - name: Test admin user with Tailscale connection
-              ansible.builtin.setup:
-              vars:
-                ansible_user: admin
-                ansible_host: "{{ inventory_hostname }}.{{ tailscale_magic_dns_suffix | default('tail6d423d.ts.net') }}"
-              register: admin_tailscale_test
-              ignore_errors: true
+            msg: 
+              - "✅ Connected successfully to fresh Ubuntu server"
+              - "Host: {{ ansible_host }}"
+              - "User: {{ ansible_user }}"
+              - "Method: Password-based authentication (bootstrap)"
+              - ""
+              - "This connection will be secured during setup process"
               
-            - name: Switch to admin user with Tailscale if successful
-              ansible.builtin.set_fact:
-                ansible_user: admin
-                ansible_host: "{{ inventory_hostname }}.{{ tailscale_magic_dns_suffix | default('tail6d423d.ts.net') }}"
-                connection_method: "admin_tailscale"
-              when: admin_tailscale_test is not failed
+      rescue:
+        - name: Bootstrap connection failed
+          ansible.builtin.fail:
+            msg: |
+              ❌ Cannot connect to Ubuntu server with bootstrap credentials:
               
-            # Try ubuntu user with public IP if admin+Tailscale failed
-            - name: Test ubuntu user with public IP connection
-              ansible.builtin.setup:
-              vars:
-                ansible_user: ubuntu
-                ansible_host: "{{ server_public_ip }}"
-              register: ubuntu_public_test
-              ignore_errors: true
-              when: admin_tailscale_test is failed
+              Host: {{ ansible_host }}
+              User: {{ ansible_user }}
               
-            - name: Switch to ubuntu user with public IP if successful
-              ansible.builtin.set_fact:
-                ansible_user: ubuntu
-                ansible_host: "{{ server_public_ip }}"
-                connection_method: "ubuntu_public"
-              when: 
-                - admin_tailscale_test is failed
-                - ubuntu_public_test is not failed
-                
-            # Final fallback: admin user with public IP
-            - name: Test admin user with public IP connection
-              ansible.builtin.setup:
-              vars:
-                ansible_user: admin
-                ansible_host: "{{ server_public_ip }}"
-              register: admin_public_test
-              ignore_errors: true
-              when: 
-                - admin_tailscale_test is failed
-                - ubuntu_public_test is failed
-                
-            - name: Switch to admin user with public IP if successful
-              ansible.builtin.set_fact:
-                ansible_user: admin
-                ansible_host: "{{ server_public_ip }}"
-                connection_method: "admin_public"
-              when: 
-                - admin_tailscale_test is failed
-                - ubuntu_public_test is failed
-                - admin_public_test is not failed
-                
-            - name: All connection methods failed
-              ansible.builtin.fail:
-                msg: |
-                  ❌ Cannot establish SSH connection with any method:
-                  - admin@{{ inventory_hostname }}.{{ tailscale_magic_dns_suffix | default('tail6d423d.ts.net') }}
-                  - ubuntu@{{ server_public_ip }}
-                  - admin@{{ server_public_ip }}
-                  
-                  Please check:
-                  1. Server is running and accessible
-                  2. SSH keys are correctly configured
-                  3. Tailscale is configured if using magic DNS
-                  4. Firewall allows SSH access from your IP
-              when: 
-                - admin_tailscale_test is failed
-                - ubuntu_public_test is failed  
-                - admin_public_test is failed
-                
-          when: connection_test is failed
-          
-        # Set connection facts based on successful method
-        - name: Set connection method fact for current settings
-          ansible.builtin.set_fact:
-            connection_method: "current_inventory"
-          when: connection_test is not failed
+              Please check:
+              1. Server is powered on and network accessible
+              2. IP address in vault.yml is correct (vault_ansible_init_host)
+              3. Username is correct (vault_ansible_init_user) 
+              4. Password is correct (vault_ansible_init_password)
+              5. SSH service is running on server
+              6. No firewall blocking SSH access from this machine
+              
+              💡 Remember: Do NOT set up SSH keys during Ubuntu installation!
+                 The playbook will configure secure SSH access automatically.
           
       tags: always
       
@@ -128,11 +67,108 @@
       ansible.builtin.debug:
         msg:
           - "🔗 Connection established:"
-          - "   Method: {{ connection_method | default('current_inventory') }}"
+          - "   Method: Password-based bootstrap"
           - "   User: {{ ansible_user }}"
           - "   Host: {{ ansible_host }}"
           - "   Target: {{ inventory_hostname }} ({{ ansible_default_ipv4.address }})"
       tags: always
+
+    # Phase 0: SSH Security Bootstrap (Immediate)
+    - name: Run SSH security bootstrap
+      block:
+        - name: Enable passwordless sudo for bootstrap user
+          ansible.builtin.lineinfile:
+            path: /etc/sudoers.d/bootstrap-user
+            line: "{{ ansible_user }} ALL=(ALL) NOPASSWD:ALL"
+            create: true
+            mode: '0440'
+            validate: 'visudo -cf %s'
+          tags:
+            - ssh_bootstrap
+            - sudo_setup
+
+        - name: Create admin user for final access
+          ansible.builtin.user:
+            name: "{{ vault_ansible_user }}"
+            shell: /bin/bash
+            home: "/home/{{ vault_ansible_user }}"
+            create_home: true
+            groups: sudo
+            append: true
+            state: present
+          tags:
+            - ssh_bootstrap
+            - admin_user
+
+        - name: Configure passwordless sudo for admin user
+          ansible.builtin.lineinfile:
+            path: /etc/sudoers.d/admin-user
+            line: "{{ vault_ansible_user }} ALL=(ALL) NOPASSWD:ALL"
+            create: true
+            mode: '0440'
+            validate: 'visudo -cf %s'
+          tags:
+            - ssh_bootstrap
+            - admin_user
+
+        - name: Create admin user .ssh directory
+          ansible.builtin.file:
+            path: "/home/{{ vault_ansible_user }}/.ssh"
+            state: directory
+            owner: "{{ vault_ansible_user }}"
+            group: "{{ vault_ansible_user }}"
+            mode: '0700'
+          tags:
+            - ssh_bootstrap
+            - admin_user
+
+        - name: Install SSH public key for admin user
+          ansible.builtin.authorized_key:
+            user: "{{ vault_ansible_user }}"
+            key: "{{ vault_admin_ssh_public_key }}"
+            state: present
+          when: vault_admin_ssh_public_key is defined
+          tags:
+            - ssh_bootstrap
+            - ssh_keys
+
+        - name: Disable SSH password authentication
+          ansible.builtin.lineinfile:
+            path: /etc/ssh/sshd_config
+            regexp: "{{ item.regexp }}"
+            line: "{{ item.line }}"
+            state: present
+          loop:
+            - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+            - { regexp: '^#?ChallengeResponseAuthentication', line: 'ChallengeResponseAuthentication no' }
+            - { regexp: '^#?PubkeyAuthentication', line: 'PubkeyAuthentication yes' }
+          register: ssh_config_updated
+          tags:
+            - ssh_bootstrap
+            - ssh_hardening
+
+        - name: Restart SSH service to apply security settings
+          ansible.builtin.systemd:
+            name: ssh
+            state: restarted
+          when: ssh_config_updated is changed
+          tags:
+            - ssh_bootstrap
+            - ssh_hardening
+
+        - name: Display SSH security status
+          ansible.builtin.debug:
+            msg:
+              - "✅ SSH Security Bootstrap Completed"
+              - "   Password authentication: DISABLED"
+              - "   SSH keys installed for admin user: {{ vault_ansible_user }}"
+              - "   Passwordless sudo enabled for setup"
+          tags:
+            - ssh_bootstrap
+
+      tags:
+        - ssh_bootstrap
+        - phase0
 
     - name: Display complete setup banner
       ansible.builtin.debug:
@@ -188,32 +224,24 @@
         - system_preparation
         - phase1
 
-    - name: Switch to secure connection method before reboot
+    - name: Switch to secure admin user connection via Tailscale
       block:
-        - name: Get Tailscale IP and Magic DNS info
+        - name: Update connection to use final admin credentials
           ansible.builtin.set_fact:
-            tailscale_magic_dns: "{{ inventory_hostname }}.{{ tailscale_magic_dns_suffix | default('tail6d423d.ts.net') }}"
-          when: tailscale_ip is defined
+            ansible_user: "{{ vault_ansible_user }}"
+            ansible_host: "{{ vault_ansible_host }}"
+            ansible_ssh_pass: "{{ omit }}"  # Remove password, use SSH keys only
+            connection_method: "secure_admin_tailscale"
           
-        - name: Update connection to use admin user and Tailscale after hardening
-          ansible.builtin.set_fact:
-            ansible_user: admin
-            ansible_host: "{{ tailscale_magic_dns }}"
-            connection_method: "secure_tailscale"
-          when: 
-            - tailscale_ip is defined
-            - connection_method in ['ubuntu_public', 'admin_public']
-            
-        - name: Display connection switch notice
+        - name: Display connection transition
           ansible.builtin.debug:
             msg:
-              - "🔄 Switching to secure connection method:"
-              - "   From: {{ ansible_user }}@{{ ansible_host }}"
-              - "   To: admin@{{ tailscale_magic_dns }}"
-              - "   Reason: SSH hardening applied, using Tailscale for security"
-          when: 
-            - tailscale_ip is defined
-            - connection_method in ['ubuntu_public', 'admin_public']
+              - "🔄 Transitioning to secure connection:"
+              - "   From: {{ vault_ansible_init_user }}@{{ vault_ansible_init_host }} (password-based)"
+              - "   To: {{ vault_ansible_user }}@{{ vault_ansible_host }} (SSH keys via Tailscale MagicDNS)"
+              - "   ✅ SSH hardening applied"
+              - "   ✅ Tailscale VPN active"
+              - "   ✅ MagicDNS enabled"
             
       tags:
         - system_preparation
@@ -228,7 +256,7 @@
           - ""
           - "System hardening complete. Rebooting server to apply changes..."
           - "Server will restart and Docker setup will continue automatically."
-          - "Post-reboot connection: admin@{{ tailscale_magic_dns | default(inventory_hostname) }}"
+          - "Post-reboot connection: {{ vault_ansible_user }}@{{ vault_ansible_host }}"
           - ""
       tags:
         - system_preparation
@@ -403,8 +431,8 @@
           - "✅ Netdata monitoring installed"
           - "✅ Production settings applied"
           - ""
-          - "🔒 SSH Access (via Tailscale):"
-          - "   ssh {{ admin_username | default('admin') }}@{{ tailscale_ip | default('TAILSCALE_IP') }}"
+          - "🔒 SSH Access (via Tailscale MagicDNS):"
+          - "   ssh {{ vault_ansible_user }}@{{ vault_ansible_host }}"
           - ""
           - "🔧 Management Commands:"
           - "   Docker Status: /usr/local/bin/docker-status"
@@ -425,7 +453,7 @@
           - "   External Domain: {{ cloudflared_external_domain }}"
           - ""
           - "📊 Monitoring:"
-          - "   Netdata: http://{{ tailscale_ip | default('TAILSCALE_IP') }}:{{ netdata_port }}"
+          - "   Netdata: http://{{ vault_ansible_host }}:{{ netdata_port }}"
           - ""
           - "🚀 Your home server is ready!"
           - "   Storage: {{ mergerfs_pool_path | default('/srv/storage') }} unified pool available"

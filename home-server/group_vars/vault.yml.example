@@ -4,16 +4,27 @@
 # Then encrypt it with: ansible-vault encrypt group_vars/vault.yml
 # WARNING: vault.yml contains sensitive data and is gitignored
 
+# INITIAL BOOTSTRAP AUTHENTICATION (Fresh Ubuntu Install)
+# These credentials are used for the first connection to a fresh Ubuntu server
+vault_ansible_init_host: "192.168.1.100"      # Server IP address during initial setup
+vault_ansible_init_user: "ubuntu"             # Default Ubuntu user (or 'root' if enabled)
+vault_ansible_init_password: "your-password"  # Initial SSH password
+
+# FINAL AUTHENTICATION (After Tailscale Setup)
+# These will be the permanent credentials after setup completes  
+vault_ansible_host: "homeserver"              # Tailscale hostname (MagicDNS enabled)
+vault_ansible_user: "admin"                   # Final admin user (created during setup)
+
 # SSH CONFIGURATION
-# SSH public key for admin user (optional - using Tailscale SSH by default)
+# SSH public key for the admin user (will be installed during setup)
 vault_admin_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... your-key-here"
 
-# SSH private key file path for Ansible connections
+# SSH private key file path for Ansible connections (optional - can use SSH agent)
 # Option 1: Use SSH private key file
 vault_ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
-# Option 2: Use SSH agent (Bitwarden, ssh-agent, etc.) - comment out or remove the line above
+# Option 2: Use SSH agent (Bitwarden, ssh-agent, etc.) - comment out the line above
 
-# TAILSCALE CONFIGURATION
+# TAILSCALE CONFIGURATION  
 # Get auth key from: https://login.tailscale.com/admin/settings/keys
 vault_tailscale_auth_key: "tskey-auth-xxxxxxxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 

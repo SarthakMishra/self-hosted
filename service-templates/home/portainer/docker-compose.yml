@@ -1,0 +1,28 @@
+---
+services:
+
+  portainer:
+    image: portainer/portainer-ce:lts
+    container_name: portainer
+    environment:
+      - TZ=UTC
+      - VIRTUAL_HOST=portainer.home
+      - VIRTUAL_PORT=9000
+      # Disable Portainer analytics and enable HTTP
+      - PORTAINER_FLAGS=--no-analytics --http-enabled
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/docker/config/portainer-config:/data
+    networks:
+      - home-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/system/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  home-network:
+    external: true 

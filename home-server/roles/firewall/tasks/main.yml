@@ -21,22 +21,24 @@
     - firewall
     - ufw
 
-- name: Allow HTTP access from anywhere
+- name: Allow HTTP access from anywhere (only if explicitly enabled)
   community.general.ufw:
     rule: allow
     to_port: "80"
     proto: tcp
     comment: "HTTP access"
+  when: expose_web_ports | default(false)
   tags:
     - firewall
     - web
 
-- name: Allow HTTPS access from anywhere
+- name: Allow HTTPS access from anywhere (only if explicitly enabled)
   community.general.ufw:
     rule: allow
     to_port: "443"
     proto: tcp
     comment: "HTTPS access"
+  when: expose_web_ports | default(false)
   tags:
     - firewall
     - web
@@ -118,17 +120,20 @@
   ansible.builtin.debug:
     msg:
       - "Firewall configuration completed"
-      - "HTTP (80): Open to all"
-      - "HTTPS (443): Open to all"
+      - "HTTP (80): {{ 'Open to all' if expose_web_ports | default(false) else 'BLOCKED (Cloudflared only)' }}"
+      - "HTTPS (443): {{ 'Open to all' if expose_web_ports | default(false) else 'BLOCKED (Cloudflared only)' }}"
       - "Docker Security: UFW-Docker rules applied"
       - ""
-      - "🔒 SECURITY: SSH port 22 blocked from public internet"
-      - "🌐 ACCESS: Use Tailscale SSH for secure admin access"
-      - "🐳 DOCKER: Containers blocked by default, use 'ufw route allow' to expose"
+      - "🔒 SECURITY: All public ports blocked - external access via Cloudflared tunnel only"
+      - "🌐 LOCAL ACCESS: Services accessible via .home domains"
+      - "🚀 EXTERNAL ACCESS: Services accessible via Cloudflare tunnel"
+      - "🔑 ADMIN ACCESS: SSH via Tailscale only"
+      - "🐳 DOCKER: All containers blocked by default"
       - ""
-      - "📋 To expose a Docker service:"
-      - "   ufw route allow proto tcp from any to any port 80"
-      - "   ufw route allow proto tcp from any to 172.17.0.2 port 3000"
+      - "📋 To allow local network access to a service:"
+      - "   Add VIRTUAL_HOST=service.home to container"
+      - "📋 To allow external access to a service:"
+      - "   Add Cloudflare tunnel labels to container"
   tags:
     - firewall
     - status 

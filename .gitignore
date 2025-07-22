@@ -1,5 +1,4 @@
 # Ansible inventory with real server IPs and hostnames
-**/inventory/hosts.yml
 **/inventory/production/
 **/inventory/staging/
 **/inventory/development/
@@ -158,10 +157,6 @@ logs/
 # =============================================================================
 # EXAMPLE CONFIGURATIONS (Keep these as templates)
 # =============================================================================
-
-# Example inventory (template file)
-!inventory/hosts.yml.example
-!inventory/hosts.example.yml
 
 # Example group vars (template files)
 !group_vars/all.yml.example

@@ -135,15 +135,6 @@
     - docker_installation
     - verification
 
-- name: Test Docker functionality with hello-world
-  ansible.builtin.command: docker run --rm hello-world
-  register: docker_hello_world_test
-  changed_when: false
-  become_user: docker
-  tags:
-    - docker_installation
-    - testing
-
 - name: Display Docker installation summary
   ansible.builtin.debug:
     msg:
@@ -151,7 +142,7 @@
       - "Docker version: {{ docker_version_check.stdout }}"
       - "Docker Compose version: {{ docker_compose_version_check.stdout }}"
       - "Users in docker group: docker{{ ', ' + admin_username if admin_username is defined else '' }}"
-      - "Hello-world test: {{ 'PASSED' if docker_hello_world_test.rc == 0 else 'FAILED' }}"
+      - "Note: Docker service will be started in configuration phase"
   tags:
     - docker_installation
     - summary 
