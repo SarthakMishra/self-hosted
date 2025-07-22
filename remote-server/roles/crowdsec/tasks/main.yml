@@ -9,20 +9,43 @@
 
 - name: CrowdSec installation and configuration
   block:
-    - name: Add CrowdSec repository key
-      ansible.builtin.get_url:
-        url: "{{ crowdsec_gpg_key_url }}"
-        dest: "{{ crowdsec_gpg_key_file }}"
-        mode: '0644'
+    - name: Clean up any existing broken CrowdSec repository configuration
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/apt/sources.list.d/crowdsec.list
+        - /etc/apt/sources.list.d/crowdsec_crowdsec.list
+        - /etc/apt/sources.list.d/proget-crowdsec-ubuntu.list
+        - /usr/share/keyrings/crowdsec-archive-keyring.gpg
+      ignore_errors: true
+      tags:
+        - crowdsec
+        - cleanup
+
+    - name: Install prerequisites for CrowdSec repository
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+        update_cache: true
       tags:
         - crowdsec
         - installation
 
-    - name: Add CrowdSec repository
-      ansible.builtin.apt_repository:
-        repo: "{{ crowdsec_apt_repository }}"
-        filename: crowdsec
-        state: present
+    - name: Add CrowdSec repository using official script
+      ansible.builtin.shell: |
+        curl -s https://install.crowdsec.net | sudo sh
+      args:
+        creates: /etc/apt/sources.list.d/crowdsec_crowdsec.list
+      tags:
+        - crowdsec
+        - installation
+
+    - name: Update apt cache after adding repository
+      ansible.builtin.apt:
         update_cache: true
       tags:
         - crowdsec
@@ -67,7 +90,7 @@
         - crowdsec
         - configuration
 
-    - name: Read existing bouncer configuration to get API key
+    - name: Read existing bouncer configuration
       ansible.builtin.slurp:
         src: /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml
       register: existing_bouncer_config
@@ -133,25 +156,42 @@
         - crowdsec
         - services
 
-    - name: Reload CrowdSec configuration
-      ansible.builtin.systemd:
-        name: crowdsec
-        state: reloaded
-      tags:
-        - crowdsec
-        - configuration
-
-    - name: Get CrowdSec status information
+    - name: Get CrowdSec collections status
       ansible.builtin.command:
-        cmd: "{{ item.cmd }}"
-      register: "{{ item.var }}"
+        cmd: "cscli collections list"
+      register: crowdsec_collections_status
       changed_when: false
       failed_when: false
-      loop:
-        - { cmd: "cscli collections list", var: "crowdsec_collections_status" }
-        - { cmd: "cscli bouncers list", var: "crowdsec_bouncers_status" }
-        - { cmd: "ipset list crowdsec-blacklists-0 | head -10", var: "crowdsec_blocked_ips" }
-        - { cmd: "iptables -L | grep -i crowdsec", var: "crowdsec_iptables_rules" }
+      tags:
+        - crowdsec
+        - validation
+
+    - name: Get CrowdSec bouncers status
+      ansible.builtin.command:
+        cmd: "cscli bouncers list"
+      register: crowdsec_bouncers_status
+      changed_when: false
+      failed_when: false
+      tags:
+        - crowdsec
+        - validation
+
+    - name: Get blocked IPs count
+      ansible.builtin.shell:
+        cmd: "ipset list crowdsec-blacklists-0 2>/dev/null | head -10 || echo 'No blocked IPs yet'"
+      register: crowdsec_blocked_ips
+      changed_when: false
+      failed_when: false
+      tags:
+        - crowdsec
+        - validation
+
+    - name: Get CrowdSec iptables rules
+      ansible.builtin.shell:
+        cmd: "iptables -L 2>/dev/null | grep -i crowdsec || echo 'No CrowdSec rules in iptables'"
+      register: crowdsec_iptables_rules
+      changed_when: false
+      failed_when: false
       tags:
         - crowdsec
         - validation
@@ -177,7 +217,7 @@
           - "   └── Firewall/UFW Integration"
           - ""
           - "📊 Security Status:"
-          - "   Active Collections: {{ (crowdsec_collections_status.stdout_lines | select('match', '.*enabled.*') | list) | length }}"
+          - "   Active Collections: {{ (crowdsec_collections_status.stdout_lines | select('match', '.*enabled.*') | list) | length if crowdsec_collections_status.rc == 0 else 'N/A' }}"
           - "   Registered Bouncers: {{ (crowdsec_bouncers_status.stdout_lines | length - 3) if crowdsec_bouncers_status.rc == 0 else 0 }}"
           - "   Blocked IPs: {{ crowdsec_blocked_ips.stdout_lines | length if crowdsec_blocked_ips.rc == 0 else 'N/A' }}"
           - ""

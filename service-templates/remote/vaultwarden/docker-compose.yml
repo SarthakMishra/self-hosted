@@ -13,7 +13,7 @@ services:
       - WEBSOCKET_ENABLED=true
       
       # Security
-      - SIGNUPS_ALLOWED=${VAULTWARDEN_SIGNUPS_ALLOWED:-false}
+      - SIGNUPS_ALLOWED=false
       
       # SMTP (Optional)
       - SMTP_HOST=${VAULTWARDEN_SMTP_HOST:-}
@@ -28,10 +28,6 @@ services:
     labels:
       # Enable Traefik
       - "traefik.enable=true"
-      
-      # HTTP to HTTPS redirect
-      - "traefik.http.routers.vaultwarden-http.rule=Host(`${VAULTWARDEN_DOMAIN}`)"
-      - "traefik.http.routers.vaultwarden-http.entrypoints=web"
       
       # HTTPS configuration
       - "traefik.http.routers.vaultwarden-https.rule=Host(`${VAULTWARDEN_DOMAIN}`)"

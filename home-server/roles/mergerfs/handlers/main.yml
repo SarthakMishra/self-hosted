@@ -10,16 +10,15 @@
   ansible.builtin.command: mount -a
   listen: "remount drives"
 
-- name: remount mergerfs pool
-  block:
-    - name: unmount mergerfs pool
-      ansible.builtin.mount:
-        path: "{{ mergerfs_pool_path }}"
-        state: unmounted
-      ignore_errors: true
-      
-    - name: mount mergerfs pool
-      ansible.builtin.mount:
-        path: "{{ mergerfs_pool_path }}"
-        state: mounted
+- name: unmount mergerfs pool
+  ansible.builtin.mount:
+    path: "{{ mergerfs_pool_path }}"
+    state: unmounted
+  ignore_errors: true
+  listen: "remount mergerfs pool"
+  
+- name: mount mergerfs pool
+  ansible.builtin.mount:
+    path: "{{ mergerfs_pool_path }}"
+    state: mounted
   listen: "remount mergerfs pool" 

@@ -1,25 +1,35 @@
 ---
-# Ansible Vault Template
+# Ansible Vault Template - Staged Deployment Configuration
 # Copy this file to vault.yml and customize with your sensitive data
 # Then encrypt it with: ansible-vault encrypt group_vars/vault.yml
 # WARNING: vault.yml contains sensitive data and is gitignored
 
-# ANSIBLE CONNECTION CONFIGURATION
-vault_ansible_host: "203.0.113.1"  # Your server's IP address
-vault_ansible_user: "admin"        # SSH user (ubuntu, debian, admin, etc.)
-vault_ansible_ssh_private_key_file: "~/.ssh/id_ed25519"  # Path to your SSH key
+# STAGE 1: BOOTSTRAP CREDENTIALS (SSH Key Access)
+# Used with: inventory/stage1-bootstrap.yml
+vault_bootstrap_host: "203.0.113.1"           # Server public IP address
+vault_bootstrap_user: "ubuntu"                # Default Ubuntu user (or 'root' if enabled)
 
-# SSH PUBLIC KEYS
-# Add your SSH public keys for secure access
+# STAGE 2: PRODUCTION CREDENTIALS (After System Setup)
+# Used with: inventory/stage2-production.yml  
+vault_production_host: "remoteserver"         # Tailscale hostname or public IP for production access
+vault_production_user: "admin"                # Final admin user (created during bootstrap)
+
+# SSH CONFIGURATION
+# SSH public key for the admin user (will be installed during setup)
 vault_admin_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... your-key-here"
 
-# TAILSCALE CONFIGURATION
+# SSH private key file path for Ansible connections (optional - can use SSH agent)
+# Option 1: Use SSH private key file
+vault_ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
+# Option 2: Use SSH agent (Bitwarden, ssh-agent, etc.) - comment out the line above
+
+# TAILSCALE CONFIGURATION  
 # Get auth key from: https://login.tailscale.com/admin/settings/keys
 vault_tailscale_auth_key: "tskey-auth-xxxxxxxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 # SERVER CONNECTION CONFIGURATION
-# Your server's public IP address
-vault_server_public_ip: "203.0.113.1"  # Replace with your actual server public IP
+# Your server's public IP address (for reference)
+vault_server_public_ip: "203.0.113.1"         # Replace with your actual server public IP
 # Your Tailscale Magic DNS suffix (found in Tailscale admin console)
 vault_tailscale_magic_dns_suffix: "tail1a2b3c.ts.net"  # Replace with your actual Tailscale suffix
 

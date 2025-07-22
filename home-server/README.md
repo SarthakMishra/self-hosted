@@ -7,11 +7,12 @@ Complete infrastructure-as-code solution using Ansible for automated deployment 
 
 ## Features
 
+- **Smart connection detection with automatic fallback**
+- **Fully idempotent and resumable deployment**
 - System hardening with security best practices
 - Admin user creation with SSH configuration
 - Tailscale mesh VPN integration
 - UFW firewall configuration with Docker security fix
-
 - Docker installation with production configuration
 - **MergerFS storage pool setup (interactive drive selection)**
 - **Samba file sharing setup (interactive password configuration)**
@@ -42,75 +43,141 @@ Complete infrastructure-as-code solution using Ansible for automated deployment 
    - **Zone permissions**: DNS → Edit
 5. **Get Account ID**: Found in the right sidebar of your Cloudflare dashboard
 
-### Setup
+### Setup - Staged Deployment
 
 ```bash
 # 1. Configure vault with all settings
 cp group_vars/vault.yml.example group_vars/vault.yml
-nano group_vars/vault.yml  # Configure initial bootstrap credentials and final setup
+nano group_vars/vault.yml  # Configure bootstrap and production credentials
 
-# 2. Deploy everything  
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml
+# 2. Stage 1: Bootstrap fresh Ubuntu server
+ansible-playbook -i inventory/stage1-bootstrap.yml playbooks/bootstrap.yml
+
+# 3. Stage 2: System setup (hardening, Tailscale, firewall)
+ansible-playbook -i inventory/stage2-hardened.yml playbooks/system-setup.yml
+
+# 4. Manual reboot required
+ssh <user>@<ip> "sudo reboot"  # Reboot to apply system changes remotely
+
+# 5. Stage 3: Storage infrastructure (MergerFS + Samba) - OPTIONAL
+ansible-playbook -i inventory/stage3-tailscale.yml playbooks/storage.yml
+# OR: Set up storage manually - see docs/manual-storage.md
+
+# 6. Stage 4: Docker and services (Docker + networking + monitoring)
+ansible-playbook -i inventory/stage3-tailscale.yml playbooks/services.yml
 ```
 
-The playbook will:
-1. **Connect using initial Ubuntu credentials (password-based)**
-2. **Set up SSH keys and disable password authentication**
-3. **Create admin user with passwordless sudo**
-4. **Set up Tailscale VPN and transition to secure access**
-5. Harden the system and reboot automatically
-6. Install and configure Docker
-7. **Set up MergerFS storage pool (interactive drive selection)**
-8. **Set up Samba file sharing (interactive password configuration)**
-9. **Configure nginx-proxy for local .home domains**
-10. **Set up DNSmasq for local DNS resolution**
-11. **Deploy Cloudflared tunnel for secure external access**
-12. Install Netdata monitoring
-13. Validate everything is working
+The deployment uses **staged approach** for clean separation and easy troubleshooting:
+
+### 🔄 Four-Stage Deployment Process
+
+#### 🔐 Stage 1: Bootstrap (Fresh Ubuntu)
+- **Inventory**: `stage1-bootstrap.yml` (password authentication)
+- **Playbook**: `bootstrap.yml`
+- **Purpose**: Create admin user, install SSH keys, disable password auth
+- **Connection**: `ubuntu@IP` with password → SSH keys only
+
+#### 🔧 Stage 2: System Setup (SSH Hardened)  
+- **Inventory**: `stage2-hardened.yml` (SSH key authentication)
+- **Playbook**: `system-setup.yml`
+- **Purpose**: System hardening, Tailscale, firewall configuration
+- **Connection**: `ubuntu@IP` with SSH keys → `admin@tailscale`
+- **⚠️ Manual reboot required** after this stage
+
+#### 💽 Stage 3: Storage Infrastructure (Storage Foundation) - **OPTIONAL**
+- **Inventory**: `stage3-tailscale.yml` (admin via Tailscale)
+- **Playbook**: `storage.yml`  
+- **Purpose**: MergerFS storage pool + Samba file sharing
+- **Connection**: `admin@tailscale` (production access)
+- **Alternative**: Manual setup with full control - see [`docs/manual-storage.md`](docs/manual-storage.md)
+
+#### 🐳 Stage 4: Docker and Services (Applications)
+- **Inventory**: `stage3-tailscale.yml` (admin via Tailscale)
+- **Playbook**: `services.yml`
+- **Purpose**: Docker installation + Nginx-proxy, DNSmasq, Cloudflared, Netdata
+- **Connection**: `admin@tailscale` (production access)
+
+### ✅ Benefits of Staged Approach
+- **Clear separation**: Each stage has distinct purpose and credentials
+- **Manual reboot control**: Reboot when convenient between stages
+- **Optional storage**: Use automated or manual storage setup as preferred
+- **Storage foundation first**: Build storage before services that depend on it
+- **Easy troubleshooting**: Issues isolated to specific stages
+- **Flexible resumption**: Resume from any stage if needed
+- **No complex state detection**: Simple, predictable progression
 
 ## Configuration
 
-### inventory/hosts.yml
+### Staged Inventory Files
+Each stage uses a specific inventory file with appropriate connection settings:
+
+#### Stage 1: Bootstrap (`inventory/stage1-bootstrap.yml`)
 ```yaml
 all:
   children:
-    docker_servers:
+    bootstrap_servers:
       hosts:
         server:
-          ansible_host: YOUR_SERVER_IP
-          node_type: server
+          ansible_host: "{{ vault_bootstrap_host }}"  # Direct IP
   vars:
-    ansible_user: ubuntu
+    ansible_user: "{{ vault_bootstrap_user }}"        # ubuntu
+    ansible_ssh_pass: "{{ vault_bootstrap_password }}" # Password auth
+```
+
+#### Stage 2: Hardened (`inventory/stage2-hardened.yml`)  
+```yaml
+all:
+  children:
+    hardened_servers:
+      hosts:
+        server:
+          ansible_host: "{{ vault_bootstrap_host }}"  # Still direct IP
+  vars:
+    ansible_user: "{{ vault_bootstrap_user }}"        # ubuntu (SSH keys)
     ansible_ssh_private_key_file: "{{ vault_ansible_ssh_private_key_file }}"
-    ansible_become: true
+```
+
+#### Stage 3: Production (`inventory/stage3-tailscale.yml`)
+```yaml
+all:
+  children:
+    production_servers:
+      hosts:
+        server:
+          ansible_host: "{{ vault_production_host }}"  # Tailscale hostname
+  vars:
+    ansible_user: "{{ vault_production_user }}"       # admin user
+    ansible_ssh_private_key_file: "{{ vault_ansible_ssh_private_key_file }}"
 ```
 
 ### group_vars/vault.yml
+**Staged credentials configuration**:
 ```yaml
-# INITIAL BOOTSTRAP AUTHENTICATION (Fresh Ubuntu Install)
-vault_ansible_init_host: "192.168.1.100"      # Server IP during initial setup
-vault_ansible_init_user: "ubuntu"             # Default Ubuntu user  
-vault_ansible_init_password: "your-password"  # Initial SSH password
+# STAGE 1: BOOTSTRAP CREDENTIALS (Fresh Ubuntu Install)
+vault_bootstrap_host: "192.168.1.100"         # Server IP during initial setup
+vault_bootstrap_user: "ubuntu"                # Default Ubuntu user  
+vault_bootstrap_password: "your-password"     # Initial SSH password
 
-# FINAL AUTHENTICATION (After Tailscale Setup)
-vault_ansible_host: "homeserver"              # Tailscale hostname (MagicDNS enabled)
-vault_ansible_user: "admin"                   # Final admin user (created during setup)
+# STAGE 3: PRODUCTION CREDENTIALS (After Complete Setup)
+vault_production_host: "homeserver"           # Tailscale hostname (MagicDNS)
+vault_production_user: "admin"                # Final admin user
 
 # SSH Configuration
 vault_admin_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI..."
-
-# Optional: SSH private key file (can use SSH agent instead)
 vault_ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
 
-# Tailscale Configuration
+# Tailscale & Cloudflare Configuration
 vault_tailscale_auth_key: "tskey-auth-xxxxx"
-
-# Cloudflare tunnel configuration:
 vault_cloudflared_tunnel_id: "12345678-1234-5678-9abc-123456789abc"
 vault_cloudflared_api_token: "your-cloudflare-api-token"
 vault_cloudflared_account_id: "your-cloudflare-account-id"
 vault_cloudflared_external_domain: "yourdomain.com"
 ```
+
+**🎯 Clean stage separation:**
+- **Stage 1**: Bootstrap credentials for fresh Ubuntu
+- **Stage 2**: Same user but with SSH keys (transition stage)
+- **Stage 3**: Admin user via Tailscale (production access)
 
 ### SSH Agent Authentication (Recommended)
 
@@ -139,40 +206,84 @@ See `examples/vault-ssh-agent.yml` for a complete vault.yml template configured 
 
 ## Deployment Options
 
-### Complete Setup (Recommended)
+### Complete Staged Setup (Recommended)
 ```bash
-# Full server setup with automatic reboot + nginx-proxy + cloudflared
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml
+# Stage 1: Bootstrap fresh Ubuntu server (password → SSH keys)
+ansible-playbook -i inventory/stage1-bootstrap.yml playbooks/bootstrap.yml
+
+# Stage 2: System setup (hardening, Tailscale, Docker)
+ansible-playbook -i inventory/stage2-hardened.yml playbooks/system-setup.yml
+
+# Stage 3: Services (storage, networking, monitoring)
+ansible-playbook -i inventory/stage3-tailscale.yml playbooks/services.yml
 ```
+
+### Resume from Any Stage
+
+Each stage is **idempotent** and can be safely re-run:
+
+#### 🔐 Stage 1: Bootstrap (Fresh Ubuntu only)
+```bash
+ansible-playbook -i inventory/stage1-bootstrap.yml playbooks/bootstrap.yml
+```
+**Required for:**
+- Fresh Ubuntu installation with password access
+- Creates admin user and installs SSH keys
+- Disables password authentication
+
+#### 🔧 Stage 2: System Setup (After bootstrap or to update system)
+```bash
+ansible-playbook -i inventory/stage2-hardened.yml playbooks/system-setup.yml
+```
+**Use for:**
+- System updates and hardening
+- Tailscale configuration changes
+- Docker reinstallation or updates
+
+#### 🚀 Stage 3: Services (Production updates)
+```bash
+ansible-playbook -i inventory/stage3-tailscale.yml playbooks/services.yml
+```
+**Use for:**
+- Adding/updating services
+- Storage configuration changes
+- Monitoring updates
+
+### Connection Troubleshooting
+
+Each stage has specific connection requirements:
+
+- **Stage 1**: Requires password access to fresh Ubuntu
+- **Stage 2**: Requires SSH key access to ubuntu user
+- **Stage 3**: Requires SSH key access to admin user via Tailscale
+
+If connection fails, check the appropriate credentials and network access for that stage.
 
 ### Partial Deployment (Using Tags)
 ```bash
-# System preparation only
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "system_preparation"
+# Stage 2: System preparation only
+ansible-playbook -i inventory/stage2-hardened.yml playbooks/system-setup.yml --tags "system_preparation"
 
-# Reboot only (after system prep)
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "reboot"
+# Stage 2: Reboot only (after system prep)
+ansible-playbook -i inventory/stage2-hardened.yml playbooks/system-setup.yml --tags "reboot"
 
-# Docker setup only (after system prep + reboot)
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "docker_setup"
+# Stage 2: Docker setup only
+ansible-playbook -i inventory/stage2-hardened.yml playbooks/system-setup.yml --tags "docker_setup"
 
-# MergerFS storage pool setup only
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "mergerfs_setup"
+# Stage 3: Storage setup only (MergerFS + Samba)
+ansible-playbook -i inventory/stage3-tailscale.yml playbooks/services.yml --tags "storage_setup"
 
-# Samba file sharing setup only
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "samba_setup"
+# Stage 3: Networking setup only (nginx-proxy + dnsmasq)
+ansible-playbook -i inventory/stage3-tailscale.yml playbooks/services.yml --tags "networking_setup"
 
-# Local network setup only (nginx-proxy + dnsmasq)
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "local_network_setup"
+# Stage 3: External access setup only (Cloudflared)
+ansible-playbook -i inventory/stage3-tailscale.yml playbooks/services.yml --tags "external_access_setup"
 
-# Cloudflared tunnel setup only
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "cloudflared_setup"
+# Stage 3: Monitoring setup only (Netdata)
+ansible-playbook -i inventory/stage3-tailscale.yml playbooks/services.yml --tags "monitoring_setup"
 
-# Skip storage setup (if no additional drives)
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --skip-tags "mergerfs_setup"
-
-# Skip reboot (for testing/development)
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --skip-tags "reboot"
+# Skip specific components
+ansible-playbook -i inventory/stage3-tailscale.yml playbooks/services.yml --skip-tags "storage_setup"
 
 ## 📈 Expanding Storage Pool
 
@@ -427,7 +538,7 @@ Your server will have:
 **Access points:**
 - SSH: `ssh your-user@homeserver` (via Tailscale MagicDNS)
 - **File Share**: `\\SERVER_IP\storage` (Windows) or `smb://SERVER_IP/storage` (Mac/Linux)
-- **Web Services**: `http://service.home` (local) or `https://service.yourdomain.com` (external)
+- **Web Services**: `http://service.home` (local) or `https://service.domain.com` (external)
 
 **Management commands:**
 - Docker status: `/usr/local/bin/docker-status`
@@ -438,5 +549,48 @@ Your server will have:
 - **Samba status: `systemctl status smbd`**
 - **Samba connections: `smbstatus`**
 - Default directory: `/opt/docker`
+
+## 🚀 Quick Reference
+
+### Common Deployment Scenarios
+
+```bash
+# Fresh Ubuntu installation (complete 4-stage setup with automated storage)
+ansible-playbook -i inventory/stage1-bootstrap.yml playbooks/bootstrap.yml
+ansible-playbook -i inventory/stage2-hardened.yml playbooks/system-setup.yml
+ssh <user>@<ip> "sudo reboot"  # Manual reboot
+ansible-playbook -i inventory/stage3-tailscale.yml playbooks/storage.yml
+ansible-playbook -i inventory/stage3-tailscale.yml playbooks/services.yml
+
+# Fresh Ubuntu installation (manual storage setup)
+ansible-playbook -i inventory/stage1-bootstrap.yml playbooks/bootstrap.yml
+ansible-playbook -i inventory/stage2-hardened.yml playbooks/system-setup.yml
+ssh <user>@<ip> "sudo reboot"  # Manual reboot
+# Follow docs/manual-storage.md for custom storage setup
+ansible-playbook -i inventory/stage3-tailscale.yml playbooks/services.yml
+
+# Update system configuration (stage 2)
+ansible-playbook -i inventory/stage2-hardened.yml playbooks/system-setup.yml
+
+# Update storage (stage 3) 
+ansible-playbook -i inventory/stage3-tailscale.yml playbooks/storage.yml
+
+# Update services (stage 4)
+ansible-playbook -i inventory/stage3-tailscale.yml playbooks/services.yml
+
+# Add new drives to storage pool (if using automated storage)
+./scripts/expand-storage.sh
+```
+
+### Staged Connection Methods
+- **🔐 Stage 1**: `ubuntu@server-ip` with password (bootstrap)
+- **🔧 Stage 2**: `ubuntu@server-ip` with SSH keys (hardened)
+- **💽 Stage 3**: `admin@tailscale-hostname` with SSH keys (storage - optional)
+- **🐳 Stage 4**: `admin@tailscale-hostname` with SSH keys (services)
+
+### Access Your Server
+- **SSH**: `ssh admin@homeserver` (Tailscale MagicDNS)
+- **File Share**: `\\SERVER_IP\storage` (network drive)
+- **Web Services**: `http://service.home` (local) or `https://service.domain.com` (external)
 
 **Deploy anything with triple access** - local .home domains + secure external access via Cloudflare + network file sharing! 🚀

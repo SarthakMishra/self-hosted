@@ -12,7 +12,7 @@ tailscale_ssh_enabled: true
 
 # Authentication
 tailscale_auth_key: "{{ vault_tailscale_auth_key | default('') }}"
-tailscale_hostname: "{{ vault_ansible_host }}"
+tailscale_hostname: "{{ vault_production_host }}"
 
 # MagicDNS Configuration
 tailscale_magic_dns_enabled: true
@@ -23,14 +23,14 @@ tailscale_dns_suffix: "{{ vault_tailscale_magic_dns_suffix | default('') }}"
 tailscale_custom_dns_enabled: true
 tailscale_dns_server: "{{ ansible_default_ipv4.address }}"
 tailscale_dns_domains:
-  - "{{ domain_suffix }}"  # .home domains
+  - "{{ domain_suffix | default('home') }}"  # .home domains
 
 # Split DNS Configuration
 # Tailscale handles .ts.net domains, server handles .home domains
 tailscale_split_dns:
   enabled: true
   local_domains:
-    - "{{ domain_suffix }}"
+    - "{{ domain_suffix | default('home') }}"
   local_dns_server: "{{ ansible_default_ipv4.address }}"
 
 # Security Configuration

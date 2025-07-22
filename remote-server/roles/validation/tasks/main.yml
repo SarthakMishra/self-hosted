@@ -210,42 +210,36 @@
       - "   sudo passwd -l ubuntu"
       - ""
   when: 
-    - disable_ubuntu_user | default(true)
+    - disable_ubuntu_user | default(true) | bool
     - not (admin_sudo_check.stdout == "root" and tailscale_connection_check.rc == 0)
   tags:
     - validation
     - security
     - final_hardening
 
-- name: Reboot system to apply all changes
-  ansible.builtin.reboot:
-    reboot_timeout: "{{ reboot_timeout | default(600) }}"
-    connect_timeout: 30
-    test_command: uptime
-    msg: "Rebooting to apply system preparation changes (kernel updates, security settings)"
-  when: 
-    - system_reboot_required | default(false) or kernel_reboot_recommended | default(false)
-    - reboot_after_preparation | default(true)
-  tags:
-    - validation
-    - reboot
-    - final_step
-
-- name: Post-reboot validation
+- name: System validation completed successfully
   ansible.builtin.debug:
     msg:
       - "================================================================"
-      - "🎉 SYSTEM REBOOT COMPLETED SUCCESSFULLY"
+      - "✅ SYSTEM VALIDATION COMPLETED SUCCESSFULLY"
       - "================================================================"
       - ""
-      - "✅ System rebooted and reconnected"
-      - "✅ All changes applied and active"
-      - "✅ Ready for Docker Swarm deployment"
+      - "🎯 All checks passed - system is ready for services deployment"
+      - "📋 Summary:"
+      - "   ✅ Firewall configured and active"
+      - "   ✅ Admin user created and verified"
+      - "   ✅ Tailscale VPN connected"
+      - "   ✅ SSH hardening applied"
+      - "   ✅ Kernel security hardening applied"
+      - "   ✅ System validation passed"
       - ""
-      - "🚀 Next Step: Run Docker deployment playbook"
-  when: 
-    - system_reboot_required | default(false) or kernel_reboot_recommended | default(false)
-    - reboot_after_preparation | default(true)
+      - "🔄 NEXT STEPS:"
+      - "1. Manually reboot the server:"
+      - "   ssh {{ admin_username | default('admin') }}@{{ tailscale_ip | default('TAILSCALE_IP') }} 'sudo reboot'"
+      - ""
+      - "2. Wait for server to come back online, then continue with services:"
+      - "   ansible-playbook -i inventory/stage2-production.yml playbooks/services.yml"
+      - ""
   tags:
     - validation
-    - reboot 
+    - summary 

@@ -1,0 +1,210 @@
+---
+# Stage 2: Services Playbook
+# CrowdSec security, Docker installation, Traefik reverse proxy and monitoring services setup
+# Run with: ansible-playbook -i inventory/stage2-production.yml playbooks/services.yml
+
+- name: Deploy CrowdSec, Docker, Traefik and Monitoring Services
+  hosts: production_servers
+  become: true
+  gather_facts: true
+  
+  vars_files:
+    - ../group_vars/vault.yml
+    - ../group_vars/all.yml
+    - ../group_vars/crowdsec.yml
+    - ../group_vars/docker.yml
+    - ../group_vars/traefik.yml
+    - ../group_vars/netdata.yml
+    
+  pre_tasks:
+    - name: Display services setup banner
+      ansible.builtin.debug:
+        msg:
+          - "=================================================="
+          - "🚀 STAGE 2: SECURITY & SERVICES DEPLOYMENT"
+          - "=================================================="
+          - ""
+          - "Target: {{ inventory_hostname }} ({{ ansible_default_ipv4.address }})"
+          - "User: {{ ansible_user }} (via Tailscale or public IP)"
+          - ""
+          - "This will deploy:"
+          - "1. CrowdSec security engine"
+          - "2. Docker installation and configuration"
+          - "3. Traefik reverse proxy with automatic SSL"
+          - "4. Netdata monitoring system"
+          - ""
+          - "🎯 Result: Production-ready server with security and containerized services"
+          - ""
+      tags: always
+
+  tasks:
+    # Phase 1: CrowdSec Security
+    - name: Display CrowdSec setup phase
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🛡️ PHASE 1: CROWDSEC SECURITY ENGINE"
+          - "================================================================"
+      tags:
+        - crowdsec_setup
+
+    - name: Run CrowdSec security engine setup
+      ansible.builtin.include_role:
+        name: crowdsec
+      tags:
+        - crowdsec_setup
+
+    - name: Display CrowdSec setup completion
+      ansible.builtin.debug:
+        msg:
+          - "✅ CrowdSec security engine completed"
+          - "   Collections: sudo cscli collections list"
+          - "   Status: sudo cscli metrics"
+          - ""
+      tags:
+        - crowdsec_setup
+
+    # Phase 2: Docker Setup
+    - name: Display Docker setup phase
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🐳 PHASE 2: DOCKER INSTALLATION"
+          - "================================================================"
+      tags:
+        - docker_setup
+
+    - name: Run Docker installation roles
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+      loop:
+        - docker_installation
+        - docker_configuration
+        - docker_production
+        - docker_validation
+      tags:
+        - docker_setup
+
+    - name: Display Docker setup completion
+      ansible.builtin.debug:
+        msg:
+          - "✅ Docker installation completed"
+          - "   Management: /usr/local/bin/docker-status"
+          - "   Directory: {{ docker_stack_root }}"
+          - ""
+      tags:
+        - docker_setup
+
+    # Phase 3: Traefik Setup
+    - name: Display Traefik setup phase
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🌐 PHASE 3: TRAEFIK REVERSE PROXY SETUP"
+          - "================================================================"
+      tags:
+        - traefik_setup
+
+    - name: Run Traefik reverse proxy setup
+      ansible.builtin.include_role:
+        name: traefik
+      tags:
+        - traefik_setup
+
+    - name: Display Traefik setup completion
+      ansible.builtin.debug:
+        msg:
+          - "✅ Traefik reverse proxy setup completed"
+          - "   HTTP/HTTPS endpoints: Port 80/443 configured"
+          - "   Automatic SSL: Let's Encrypt HTTP challenge"
+          - ""
+      tags:
+        - traefik_setup
+
+    # Phase 4: Monitoring Setup
+    - name: Display monitoring setup phase
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "📊 PHASE 4: MONITORING SETUP"
+          - "================================================================"
+      tags:
+        - monitoring_setup
+
+    - name: Run monitoring system setup
+      ansible.builtin.include_role:
+        name: netdata
+      tags:
+        - monitoring_setup
+        - netdata_setup
+
+    - name: Display monitoring setup completion
+      ansible.builtin.debug:
+        msg:
+          - "✅ Monitoring setup completed"
+          - "   Netdata: http://{{ vault_production_host }}:{{ netdata_port }}"
+          - ""
+      tags:
+        - monitoring_setup
+
+  post_tasks:
+    - name: Complete deployment finished
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🎉 COMPLETE REMOTE SERVER DEPLOYMENT FINISHED!"
+          - "================================================================"
+          - ""
+          - "✅ ALL STAGES COMPLETED SUCCESSFULLY:"
+          - ""
+          - "🔧 Stage 1: System Setup"  
+          - "   ✅ System hardening applied"
+          - "   ✅ Tailscale VPN configured"
+          - "   ✅ UFW firewall configured"
+          - ""
+          - "🚀 Stage 2: Services"
+          - "   ✅ CrowdSec security engine installed"
+          - "   ✅ Docker installed and configured"
+          - "   ✅ Traefik reverse proxy configured"
+          - "   ✅ Netdata monitoring installed"
+          - ""
+          - "================================================================"
+          - "🔗 ACCESS YOUR SERVER:"
+          - "================================================================"
+          - ""
+          - "🔒 SSH Access:"
+          - "   ssh {{ vault_production_user }}@{{ vault_production_host }} (Tailscale/Public)"
+          - ""
+          - "🌐 Web Services:"
+          - "   Traefik: HTTP/HTTPS reverse proxy ready"
+          - "   Add services with Traefik labels for automatic SSL"
+          - ""
+          - "📊 Monitoring:"
+          - "   Netdata: http://{{ vault_production_host }}:{{ netdata_port }}"
+          - ""
+          - "================================================================"
+          - "🔧 MANAGEMENT COMMANDS:"
+          - "================================================================"
+          - ""
+          - "🐳 Docker:"
+          - "   Status: /usr/local/bin/docker-status"
+          - "   Cleanup: /usr/local/bin/docker-cleanup"
+          - "   Directory: {{ docker_stack_root }}"
+          - ""
+          - "🛡️ Security:"
+          - "   CrowdSec Status: sudo cscli collections list"
+          - "   Security Alerts: sudo cscli alerts list"
+          - "   Blocked IPs: sudo cscli decisions list"
+          - "   Bouncer Status: sudo cscli bouncers list"
+          - ""
+          - "🌐 Reverse Proxy:"
+          - "   Traefik Config: {{ traefik_root_dir }}"
+          - "   SSL Certificates: Automatic via Let's Encrypt"
+          - ""
+          - "================================================================"
+          - "🚀 YOUR REMOTE SERVER IS READY!"
+          - ""
+          - "Deploy any web service with Traefik labels for automatic"
+          - "SSL certificates and public access via your domain!"
+          - ""
+      tags: always 

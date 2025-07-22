@@ -25,7 +25,7 @@ mergerfs_mount_options:
   - "fsname=mergerfs"
 
 # Drive Configuration
-mergerfs_filesystem: "ext4"
+mergerfs_filesystem: "xfs"
 mergerfs_mount_opts: "defaults,noatime"
 
 # Interactive Configuration

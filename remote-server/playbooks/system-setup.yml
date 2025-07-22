@@ -1,0 +1,169 @@
+---
+# Stage 1: System Setup Playbook  
+# System hardening, user creation, and Tailscale VPN
+# Run with: ansible-playbook -i inventory/stage1-system-setup.yml playbooks/system-setup.yml
+
+- name: System Hardening and Security Setup
+  hosts: system_servers
+  become: true
+  gather_facts: true
+  
+  vars_files:
+    - ../group_vars/vault.yml
+    - ../group_vars/all.yml
+    - ../group_vars/tailscale.yml
+    
+  pre_tasks:
+    - name: Display system setup banner
+      ansible.builtin.debug:
+        msg:
+          - "=================================================="
+          - "🔧 STAGE 1: SYSTEM HARDENING & SECURITY"
+          - "=================================================="
+          - ""
+          - "Target: {{ inventory_hostname }} ({{ ansible_default_ipv4.address }})"
+          - "User: {{ ansible_user }} (SSH key authentication)"
+          - ""
+          - "This will:"
+          - "1. Create admin user and configure SSH keys"
+          - "2. System updates and hardening"
+          - "3. Tailscale VPN installation and configuration"
+          - "4. Firewall setup (UFW)"
+          - ""
+          - "⚠️  After this stage, manually reboot then use stage2-production.yml"
+          - ""
+      tags: always
+
+    - name: Check system requirements
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "Ubuntu"
+          - ansible_distribution_major_version | int >= 20
+          - ansible_memtotal_mb >= 1024
+          - ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='size_available') | first > 5000000000
+        fail_msg: "Requirements: Ubuntu 20.04+, 1GB RAM, 5GB disk space"
+        success_msg: "System requirements met"
+      tags: always
+
+  tasks:
+    # Phase 0: User Management
+    - name: Display user setup phase
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "👤 PHASE 0: USER MANAGEMENT SETUP"
+          - "================================================================"
+      tags:
+        - user_management
+
+    - name: Ensure passwordless sudo for bootstrap user
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/bootstrap-user
+        line: "{{ ansible_user }} ALL=(ALL) NOPASSWD:ALL"
+        create: true
+        mode: '0440'
+        validate: 'visudo -cf %s'
+      tags:
+        - user_management
+
+    - name: Create admin user for production access
+      ansible.builtin.user:
+        name: "{{ vault_production_user }}"
+        shell: /bin/bash
+        home: "/home/{{ vault_production_user }}"
+        create_home: true
+        groups: sudo
+        append: true
+        state: present
+      tags:
+        - user_management
+
+    - name: Configure passwordless sudo for admin user
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/admin-user
+        line: "{{ vault_production_user }} ALL=(ALL) NOPASSWD:ALL"
+        create: true
+        mode: '0440'
+        validate: 'visudo -cf %s'
+      tags:
+        - user_management
+
+    - name: Create admin user .ssh directory
+      ansible.builtin.file:
+        path: "/home/{{ vault_production_user }}/.ssh"
+        state: directory
+        owner: "{{ vault_production_user }}"
+        group: "{{ vault_production_user }}"
+        mode: '0700'
+      tags:
+        - user_management
+
+    - name: Install SSH public key for admin user
+      ansible.builtin.authorized_key:
+        user: "{{ vault_production_user }}"
+        key: "{{ vault_admin_ssh_public_key }}"
+        state: present
+      when: vault_admin_ssh_public_key is defined
+      tags:
+        - user_management
+
+    - name: Install SSH public key for bootstrap user (backup access)
+      ansible.builtin.authorized_key:
+        user: "{{ ansible_user }}"
+        key: "{{ vault_admin_ssh_public_key }}"
+        state: present
+      when: vault_admin_ssh_public_key is defined
+      tags:
+        - user_management
+
+    # Phase 1: System Preparation
+    - name: Display system preparation phase
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🔧 PHASE 1: SYSTEM PREPARATION"
+          - "================================================================"
+      tags:
+        - system_preparation
+
+    - name: Run system preparation roles
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+      loop:
+        - system_update
+        - user_management
+        - kernel_hardening
+        - logging
+        - tailscale
+        - ssh_hardening
+        - firewall
+        - validation
+      tags:
+        - system_preparation
+
+  post_tasks:
+    - name: System setup completed successfully
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "✅ SYSTEM HARDENING & SECURITY COMPLETED"
+          - "================================================================"
+          - ""
+          - "✅ Admin user created: {{ vault_production_user }}"
+          - "✅ SSH keys installed and configured"
+          - "✅ System hardening applied"
+          - "✅ Tailscale VPN active ({{ vault_production_host }})"
+          - "✅ UFW firewall configured"
+          - ""
+          - "🔄 NEXT STEPS:"
+          - "1. Reboot the server manually:"
+          - "   ssh {{ ansible_user }}@{{ ansible_default_ipv4.address }} 'sudo reboot'"
+          - ""
+          - "2. Wait for server to come back online, then continue:"
+          - "   ansible-playbook -i inventory/stage2-production.yml playbooks/services.yml"
+          - ""
+          - "📊 Access Methods After Services:"
+          - "   Tailscale: {{ vault_production_user }}@{{ vault_production_host }}"
+          - "   Direct IP: {{ vault_production_user }}@{{ ansible_default_ipv4.address }}"
+          - ""
+      tags: always 

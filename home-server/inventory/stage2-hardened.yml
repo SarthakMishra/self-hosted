@@ -1,0 +1,26 @@
+---
+# Stage 2: Hardened Inventory - SSH Security Applied
+# Use this after SSH hardening but before Tailscale setup
+# Uses SSH keys but still connects to original user
+
+all:
+  children:
+    hardened_servers:
+      hosts:
+        server:
+          ansible_host: "{{ vault_bootstrap_host }}"  # Still using direct IP
+          node_type: server
+
+  vars:
+    # Hardened connection settings (SSH keys, no password)
+    ansible_user: "{{ vault_bootstrap_user }}"  # Original user (ubuntu)
+    ansible_ssh_private_key_file: "{{ vault_ansible_ssh_private_key_file | default(omit) }}"
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o ConnectTimeout=10'
+    
+    # Passwordless sudo configured
+    ansible_become: true
+    ansible_become_method: sudo
+    ansible_become_user: root
+    # No become password needed
+    
+    ansible_python_interpreter: /usr/bin/python3 

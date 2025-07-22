@@ -1,0 +1,173 @@
+---
+# Storage Playbook
+# MergerFS storage pool and Samba file sharing setup
+# Run with: ansible-playbook -i inventory/stage3-tailscale.yml playbooks/storage.yml
+
+- name: Deploy Storage Infrastructure
+  hosts: production_servers
+  become: true
+  gather_facts: true
+  
+  vars_files:
+    - ../group_vars/vault.yml
+    - ../group_vars/all.yml
+    - ../group_vars/mergerfs.yml
+    - ../group_vars/samba.yml
+    
+  pre_tasks:
+    - name: Display storage setup banner
+      ansible.builtin.debug:
+        msg:
+          - "=================================================="
+          - "💽 STORAGE INFRASTRUCTURE DEPLOYMENT"
+          - "=================================================="
+          - ""
+          - "Target: {{ inventory_hostname }} ({{ ansible_default_ipv4.address }})"
+          - "User: {{ ansible_user }} (via Tailscale: {{ vault_production_host }})"
+          - ""
+          - "This will deploy:"
+          - "1. MergerFS storage pool (interactive drive selection)"
+          - "2. Samba file sharing (interactive password setup)"
+          - ""
+          - "🎯 Result: Unified storage pool with network file sharing"
+          - ""
+      tags: always
+
+  tasks:
+    # Phase 1: MergerFS Storage Pool Setup
+    - name: Display MergerFS setup phase
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "📦 PHASE 1: MERGERFS STORAGE POOL"
+          - "================================================================"
+          - ""
+          - "Setting up unified storage pool from multiple drives..."
+          - ""
+      tags:
+        - storage_setup
+        - mergerfs_setup
+
+    - name: Run MergerFS storage pool setup
+      ansible.builtin.include_role:
+        name: mergerfs
+      tags:
+        - storage_setup
+        - mergerfs_setup
+
+    - name: Display MergerFS completion
+      ansible.builtin.debug:
+        msg:
+          - "✅ MergerFS setup completed"
+          - "   Pool: {{ mergerfs_pool_path | default('/srv/storage') }}"
+          - "   Capacity: Combined capacity of selected drives"
+          - ""
+      when: not (mergerfs_skipped | default(false))
+      tags:
+        - storage_setup
+        - mergerfs_setup
+
+    - name: Display MergerFS skip notice
+      ansible.builtin.debug:
+        msg:
+          - "⏭️  MergerFS setup skipped (no additional drives found)"
+          - "   Samba will use local storage instead"
+          - ""
+      when: mergerfs_skipped | default(false)
+      tags:
+        - storage_setup
+        - mergerfs_setup
+
+    # Phase 2: Samba File Sharing Setup
+    - name: Display Samba setup phase
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🗂️  PHASE 2: SAMBA FILE SHARING"
+          - "================================================================"
+          - ""
+          - "Setting up secure SMB/CIFS file sharing..."
+          - ""
+      tags:
+        - storage_setup
+        - samba_setup
+
+    - name: Run Samba file sharing setup
+      ansible.builtin.include_role:
+        name: samba
+      tags:
+        - storage_setup
+        - samba_setup
+
+  post_tasks:
+    - name: Storage deployment completed
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🎉 STORAGE INFRASTRUCTURE DEPLOYMENT COMPLETED!"
+          - "================================================================"
+          - ""
+          - "✅ STORAGE COMPONENTS DEPLOYED:"
+          - ""
+          - "📦 MergerFS Storage Pool:"
+          - "{% if not (mergerfs_skipped | default(false)) %}"
+          - "   ✅ Unified storage pool configured"
+          - "   📁 Mount point: {{ mergerfs_pool_path | default('/srv/storage') }}"
+          - "   💾 Capacity: Combined drive capacity"
+          - "{% else %}"
+          - "   ⏭️  Skipped (no additional drives)"
+          - "   📁 Using local storage: {{ samba_fallback_path | default('/srv/share') }}"
+          - "{% endif %}"
+          - ""
+          - "🗂️  Samba File Sharing:"
+          - "   ✅ SMB/CIFS server configured"
+          - "   🔑 User: {{ samba_username | default('samba') }}"
+          - "   🌐 Network access enabled"
+          - ""
+          - "================================================================"
+          - "🔗 ACCESS YOUR STORAGE:"
+          - "================================================================"
+          - ""
+          - "💽 Network File Access:"
+          - "   Windows: \\\\{{ ansible_default_ipv4.address }}\\storage"
+          - "   macOS: smb://{{ ansible_default_ipv4.address }}/storage"
+          - "   Linux: smb://{{ ansible_default_ipv4.address }}/storage"
+          - ""
+          - "🔑 Credentials:"
+          - "   Username: {{ samba_username | default('samba') }}"
+          - "   Password: [Password you entered during setup]"
+          - ""
+          - "📁 Storage Path:"
+          - "{% if not (mergerfs_skipped | default(false)) %}"
+          - "   {{ mergerfs_pool_path | default('/srv/storage') }} (MergerFS Pool)"
+          - "{% else %}"
+          - "   {{ samba_fallback_path | default('/srv/share') }} (Local Storage)"
+          - "{% endif %}"
+          - ""
+          - "================================================================"
+          - "🔧 MANAGEMENT COMMANDS:"
+          - "================================================================"
+          - ""
+          - "📦 Storage Pool:"
+          - "{% if not (mergerfs_skipped | default(false)) %}"
+          - "   Status: df -h {{ mergerfs_pool_path | default('/srv/storage') }}"
+          - "   Balance: mergerfs.balance {{ mergerfs_pool_path | default('/srv/storage') }}"
+          - "   Expand: ./scripts/expand-storage.sh"
+          - "{% else %}"
+          - "   Status: df -h {{ samba_fallback_path | default('/srv/share') }}"
+          - "   Add drives: Re-run MergerFS setup when drives available"
+          - "{% endif %}"
+          - ""
+          - "🗂️  File Sharing:"
+          - "   Status: systemctl status smbd nmbd"
+          - "   Connections: smbstatus"
+          - "   Config test: testparm"
+          - "   Logs: tail -f /var/log/samba/log.smbd"
+          - ""
+          - "================================================================"
+          - "🚀 STORAGE INFRASTRUCTURE IS READY!"
+          - ""
+          - "Your storage foundation is now configured."
+          - "You can now deploy services that use this storage."
+          - ""
+      tags: always 

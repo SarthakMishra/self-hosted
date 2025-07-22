@@ -1,11 +1,6 @@
 ---
 # CrowdSec Role Default Variables
 
-# Repository Configuration
-crowdsec_gpg_key_url: "https://packagecloud.io/crowdsec/crowdsec/gpgkey"
-crowdsec_gpg_key_file: "/usr/share/keyrings/crowdsec-archive-keyring.gpg"
-crowdsec_apt_repository: "deb [signed-by=/usr/share/keyrings/crowdsec-archive-keyring.gpg] https://packagecloud.io/crowdsec/crowdsec/any any main"
-
 # Package Installation
 crowdsec_packages:
   - crowdsec

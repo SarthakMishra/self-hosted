@@ -1,0 +1,88 @@
+---
+# Stage 2: System Setup Playbook  
+# System hardening and Tailscale setup
+# Run with: ansible-playbook -i inventory/stage2-hardened.yml playbooks/system-setup.yml
+
+- name: System Setup and Hardening
+  hosts: hardened_servers
+  become: true
+  gather_facts: true
+  
+  vars_files:
+    - ../group_vars/vault.yml
+    - ../group_vars/all.yml
+    - ../group_vars/nginx_proxy.yml  # Required for domain_suffix variable
+    - ../group_vars/tailscale.yml    # Required for tailscale configuration
+    
+  pre_tasks:
+    - name: Display system setup banner
+      ansible.builtin.debug:
+        msg:
+          - "=================================================="
+          - "🔧 STAGE 2: SYSTEM SETUP AND HARDENING"
+          - "=================================================="
+          - ""
+          - "Target: {{ inventory_hostname }} ({{ ansible_default_ipv4.address }})"
+          - "User: {{ ansible_user }} (SSH key authentication)"
+          - ""
+          - "This will:"
+          - "1. System updates and hardening"
+          - "2. Tailscale VPN installation and configuration"
+          - "3. Firewall setup (UFW)"
+          - "4. SSH and kernel hardening"
+          - ""
+          - "⚠️  Manual reboot required after this stage"
+          - "⚠️  After reboot, use stage3-tailscale.yml inventory"
+          - ""
+      tags: always
+
+  tasks:
+    # System Preparation
+    - name: Run system preparation roles
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+      loop:
+        - system_update
+        - user_management
+        - tailscale
+        - firewall
+        - ssh_hardening
+        - kernel_hardening
+        - logging
+        - validation
+      tags:
+        - system_preparation
+
+  post_tasks:
+    - name: System setup completed successfully
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "✅ SYSTEM SETUP STAGE COMPLETED SUCCESSFULLY"
+          - "================================================================"
+          - ""
+          - "✅ System hardening applied"
+          - "✅ Tailscale VPN configured (Tailscale hostname: {{ vault_production_host }})"
+          - "✅ Firewall configured (UFW)"
+          - "✅ SSH and kernel hardening applied"
+          - ""
+          - "🔄 NEXT STEPS:"
+          - "1. Manually reboot the server:"
+          - "   sudo reboot"
+          - ""
+          - "2. Wait for server to come back online"
+          - ""
+          - "3. Test Tailscale connection:"
+          - "   ssh {{ vault_production_user }}@{{ vault_production_host }}"
+          - ""
+          - "4. Continue with storage setup:"
+          - "   ansible-playbook -i inventory/stage3-tailscale.yml playbooks/storage.yml"
+          - ""
+          - "5. Deploy services:"
+          - "   ansible-playbook -i inventory/stage3-tailscale.yml playbooks/services.yml"
+          - ""
+          - "📊 Connection Methods Available After Reboot:"
+          - "   Direct IP: {{ vault_production_user }}@{{ ansible_default_ipv4.address }}"
+          - "   Tailscale: {{ vault_production_user }}@{{ vault_production_host }}"
+          - ""
+      tags: always 

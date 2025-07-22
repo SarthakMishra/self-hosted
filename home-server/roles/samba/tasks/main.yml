@@ -30,7 +30,40 @@
     - samba
     - validation
 
-- name: Warn if MergerFS pool not found
+- name: Check if MergerFS was skipped
+  ansible.builtin.set_fact:
+    mergerfs_was_skipped: "{{ hostvars[inventory_hostname].mergerfs_skipped | default(false) }}"
+  tags:
+    - samba
+    - validation
+
+- name: Display MergerFS skip notice for Samba
+  ansible.builtin.debug:
+    msg:
+      - "================================================================"
+      - "🗂️  SAMBA SETUP WITH LOCAL STORAGE"
+      - "================================================================"
+      - ""
+      - "MergerFS was skipped (no additional drives found)."
+      - "Samba will be configured to share local storage instead:"
+      - ""
+      - "📁 Share path: {{ samba_fallback_path | default('/srv/share') }}"
+      - "💾 Storage: Local filesystem on system drive"
+      - "⚠️  Limited by system drive capacity"
+      - ""
+      - "To use MergerFS storage pool in the future:"
+      - "• Add additional drives to the system"
+      - "• Re-run the MergerFS setup playbook"
+      - "• Update Samba configuration to use MergerFS pool"
+      - ""
+  when: 
+    - samba_depends_on_mergerfs | default(true)
+    - mergerfs_was_skipped | default(false)
+  tags:
+    - samba
+    - validation
+
+- name: Warn if MergerFS pool not found (standard case)
   ansible.builtin.debug:
     msg:
       - "⚠️  WARNING: MergerFS pool not found at {{ mergerfs_pool_path | default('/srv/storage') }}"
@@ -39,6 +72,14 @@
   when: 
     - samba_depends_on_mergerfs | default(true)
     - not mergerfs_pool_stat.stat.exists
+    - not (mergerfs_was_skipped | default(false))
+  tags:
+    - samba
+    - validation
+
+- name: Set storage path based on MergerFS availability
+  ansible.builtin.set_fact:
+    samba_storage_path: "{{ samba_fallback_path | default('/srv/share') if mergerfs_was_skipped else mergerfs_pool_path | default('/srv/storage') }}"
   tags:
     - samba
     - validation
@@ -53,7 +94,7 @@
 
 - name: Install Samba packages
   ansible.builtin.apt:
-    name: "{{ samba_packages }}"
+    name: "{{ samba_packages + ['expect'] }}"
     state: present
   tags:
     - samba
@@ -161,11 +202,29 @@
     - user
 
 - name: Configure Samba password for user
-  ansible.builtin.shell: |
-    echo -e "{{ samba_user_password }}\n{{ samba_user_password }}" | smbpasswd -a -s {{ samba_username }}
+  ansible.builtin.expect:
+    command: "smbpasswd -a {{ samba_username }}"
+    responses:
+      'New SMB password:': "{{ samba_user_password }}"
+      'Retype new SMB password:': "{{ samba_user_password }}"
+    timeout: 30
   when: samba_user_password is defined
   no_log: true
   register: samba_password_result
+  changed_when: true
+  failed_when: false
+  tags:
+    - samba
+    - user
+
+- name: Configure Samba password for user (fallback method)
+  ansible.builtin.shell: |
+    printf '%s\n%s\n' "{{ samba_user_password }}" "{{ samba_user_password }}" | smbpasswd -a -s {{ samba_username }}
+  when: 
+    - samba_user_password is defined
+    - samba_password_result.failed | default(false)
+  no_log: true
+  register: samba_password_fallback
   changed_when: true
   tags:
     - samba
@@ -203,7 +262,7 @@
 
 - name: Create MergerFS pool directory if needed
   ansible.builtin.file:
-    path: "{{ mergerfs_pool_path | default('/srv/storage') }}"
+    path: "{{ samba_storage_path }}"
     state: directory
     owner: "{{ samba_username }}"
     group: "{{ samba_username }}"
@@ -213,9 +272,9 @@
     - samba
     - directories
 
-- name: Create media subdirectories in MergerFS pool
+- name: Create media subdirectories in storage path
   ansible.builtin.file:
-    path: "{{ mergerfs_pool_path | default('/srv/storage') }}/{{ item }}"
+    path: "{{ samba_storage_path }}/{{ item }}"
     state: directory
     owner: "{{ samba_username }}"
     group: "{{ samba_username }}"
@@ -226,14 +285,16 @@
     - samba
     - directories
 
-- name: Set ownership of MergerFS pool to Samba user
+- name: Set ownership of storage path to Samba user
   ansible.builtin.file:
-    path: "{{ mergerfs_pool_path | default('/srv/storage') }}"
+    path: "{{ samba_storage_path }}"
     owner: "{{ samba_username }}"
     group: "{{ samba_username }}"
     mode: '0775'
     recurse: false
-  when: mergerfs_pool_stat.stat.exists | default(false)
+  when: 
+    - samba_storage_path is defined
+    - mergerfs_pool_stat.stat.exists | default(false) or mergerfs_was_skipped | default(false)
   tags:
     - samba
     - permissions
@@ -346,46 +407,57 @@
 
 - name: Display Samba setup completion
   ansible.builtin.debug:
-    msg:
-      - "================================================================"
-      - "🎉 SAMBA FILE SHARING SETUP COMPLETED!"
-      - "================================================================"
-      - ""
-      - "✅ Samba installed and configured"
-      - "✅ User '{{ samba_username }}' created with secure password"
-      - "✅ MergerFS pool shared as 'storage'"
-      - "✅ Firewall configured for local network access"
-      - "✅ Services started and enabled"
-      - ""
-      - "🔗 NETWORK ACCESS:"
-      - "   Windows: \\\\{{ ansible_default_ipv4.address }}\\storage"
-      - "   macOS: smb://{{ ansible_default_ipv4.address }}/storage"
-      - "   Linux: smb://{{ ansible_default_ipv4.address }}/storage"
-      - ""
-      - "🔑 CREDENTIALS:"
-      - "   Username: {{ samba_username }}"
-      - "   Password: [Password you entered]"
-      - ""
-      - "📁 SHARED CONTENT:"
-      - "   Share Name: storage"
-      - "   Path: {{ mergerfs_pool_path | default('/srv/storage') }}"
-      - "   Available subdirectories:"
-      - "{% for dir in samba_media_subdirs | default([]) %}"
-      - "   • {{ dir }}"
-      - "{% endfor %}"
-      - ""
-      - "🐳 DOCKER INTEGRATION:"
-      - "   Use: {{ mergerfs_pool_path | default('/srv/storage') }}/[subfolder]"
-      - "   Example: {{ mergerfs_pool_path | default('/srv/storage') }}/media/movies"
-      - ""
-      - "🔧 MANAGEMENT COMMANDS:"
-      - "   Check status: systemctl status smbd"
-      - "   View connections: smbstatus"
-      - "   Test config: testparm"
-      - "   View logs: tail -f /var/log/samba/log.smbd"
-      - ""
-      - "🚀 Your network file sharing is ready!"
-      - ""
+    msg: |
+      ================================================================
+      🎉 SAMBA FILE SHARING SETUP COMPLETED!
+      ================================================================
+      
+      ✅ Samba installed and configured
+      ✅ User '{{ samba_username }}' created with secure password
+      {% if mergerfs_was_skipped | default(false) %}
+      ✅ Local storage shared as 'storage' ({{ samba_storage_path }})
+      ⚠️  Using system drive storage (limited capacity)
+      {% else %}
+      ✅ MergerFS pool shared as 'storage'
+      {% endif %}
+      ✅ Firewall configured for local network access
+      ✅ Services started and enabled
+      
+      🔗 NETWORK ACCESS:
+         Windows: \\{{ ansible_default_ipv4.address }}\storage
+         macOS: smb://{{ ansible_default_ipv4.address }}/storage
+         Linux: smb://{{ ansible_default_ipv4.address }}/storage
+      
+      🔑 CREDENTIALS:
+         Username: {{ samba_username }}
+         Password: [Password you entered]
+      
+      📁 SHARED CONTENT:
+         Share Name: storage
+         Path: {{ samba_storage_path }}
+         Available subdirectories:
+      {% for dir in samba_media_subdirs | default([]) %}
+         • {{ dir }}
+      {% endfor %}
+      
+      🐳 DOCKER INTEGRATION:
+         Use: {{ samba_storage_path }}/[subfolder]
+         Example: {{ samba_storage_path }}/media/movies
+      
+      {% if mergerfs_was_skipped | default(false) %}
+      💡 FUTURE STORAGE EXPANSION:
+         • Add additional drives to expand beyond system storage
+         • Run MergerFS setup to create unified storage pool
+         • Update Samba to use MergerFS pool for larger capacity
+      
+      {% endif %}
+      🔧 MANAGEMENT COMMANDS:
+         Check status: systemctl status smbd
+         View connections: smbstatus
+         Test config: testparm
+         View logs: tail -f /var/log/samba/log.smbd
+      
+      🚀 Your network file sharing is ready!
   tags:
     - samba
     - summary 

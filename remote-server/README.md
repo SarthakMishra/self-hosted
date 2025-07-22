@@ -1,165 +1,89 @@
-# Self-Hosted Infrastructure Automation
+# Remote Server Ansible Setup
 
-> [!WARNING] 
-> ⚠️ **This entire project is AI-generated. Use with caution!**
+2-stage deployment for Ubuntu servers with SSH key authentication.
 
-Complete infrastructure-as-code solution using Ansible for automated deployment of production-ready, self-hosted server environments with reverse proxy and automatic SSL.
+## Prerequisites
 
-## Features
+- Ubuntu 20.04+ server with SSH key access
+- Sudo-enabled user (ubuntu/admin)
+- SSH private key configured
 
-- System hardening with security best practices
-- Admin user creation with SSH configuration
-- Tailscale mesh VPN integration
-- UFW firewall configuration with Docker security fix
-- **CrowdSec security engine with community threat intelligence**
-- Docker installation with production configuration
-- Traefik reverse proxy with Let's Encrypt SSL
-- Log rotation and cleanup automation
-- System validation and verification
+## Setup
 
-## Quick Start
-
-### Prerequisites
-
-- Ansible installed (`pip install ansible`)
-- SSH access to target server
-- Ubuntu 20.04+ or Debian 11+ server
-- Domain name pointing to your server (for SSL)
-
-### Setup
+### 1. Configure Vault
 
 ```bash
-# 1. Configure vault with all settings
 cp group_vars/vault.yml.example group_vars/vault.yml
-nano group_vars/vault.yml  # Add your server IP, SSH user, Tailscale auth key, Traefik settings, etc.
-
-# 2. Deploy everything (including Traefik!)
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml
+nano group_vars/vault.yml  # Add server details and SSH keys
+ansible-vault encrypt group_vars/vault.yml  # Optional
 ```
 
-The playbook will:
-1. Harden the system and create admin user
-2. Install CrowdSec security engine with firewall integration
-3. Reboot the server automatically
-4. Install and configure Docker
-5. **Set up Traefik reverse proxy with automatic SSL**
-6. Validate everything is working
+### 2. Stage 1: System Hardening
+
+System hardening, user creation, and Tailscale:
+
+```bash
+ansible-playbook -i inventory/stage1-system-setup.yml playbooks/system-setup.yml
+```
+
+**Manual reboot required:**
+```bash
+ssh <admin_user>@<tailscale_machine_name> 'sudo reboot'
+```
+
+### 3. Stage 2: Services
+
+CrowdSec security, Docker, Traefik reverse proxy, and monitoring:
+
+```bash
+ansible-playbook -i inventory/stage2-production.yml playbooks/services.yml
+```
 
 ## Configuration
 
-### group_vars/vault.yml
+Key variables in `group_vars/vault.yml`:
+
 ```yaml
-# Ansible Connection Configuration
-vault_ansible_host: "203.0.113.1"        # Your server's IP address
-vault_ansible_user: "admin"              # SSH user (ubuntu, debian, admin, etc.)
-vault_ansible_ssh_private_key_file: "~/.ssh/id_ed25519"  # Path to your SSH key
-
-# SSH Configuration
-vault_admin_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI..."
-
-# Tailscale Configuration
-vault_tailscale_auth_key: "tskey-auth-xxxxx"
-
-# Traefik Configuration
+vault_bootstrap_host: "203.0.113.1"           # Server IP
+vault_bootstrap_user: "ubuntu"                # Base user
+vault_production_host: "myserver"             # Tailscale hostname
+vault_production_user: "admin"                # Admin user to create
+vault_admin_ssh_public_key: "ssh-ed25519 ..."
+vault_ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
+vault_tailscale_auth_key: "tskey-auth-xxxxx..."
 vault_traefik_acme_email: "your@email.com"
 ```
 
-## Deployment Options
+## Deploy Applications
 
-### Complete Setup (Recommended)
-```bash
-# Full server setup with automatic reboot + Traefik
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml
-```
-
-### Partial Deployment (Using Tags)
-```bash
-# System preparation only
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "system_preparation"
-
-# Reboot only (after system prep)
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "reboot"
-
-# Docker setup only (after system prep + reboot)
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "docker_setup"
-
-# Traefik setup only (after Docker)
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --tags "traefik_setup"
-
-# Skip reboot (for testing/development)
-ansible-playbook -i inventory/hosts.yml playbooks/setup.yml --skip-tags "reboot"
-```
-
-## Deploying Applications
-
-After setup, deploy any web application with automatic SSL:
+Add Traefik labels for automatic SSL:
 
 ```yaml
-# docker-compose.yml for any app
 services:
   myapp:
-    image: nginx:alpine
-    networks:
-      - app-network
+    image: myapp:latest
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.myapp.rule=Host('myapp.yourdomain.com')"
-      - "traefik.http.routers.myapp.entrypoints=websecure"
-      - "traefik.http.routers.myapp.tls.certresolver=letsencrypt"
-
-networks:
-  app-network:
-    external: true
+      - traefik.enable=true
+      - traefik.http.routers.myapp.rule=Host(`myapp.yourdomain.com`)
+      - traefik.http.routers.myapp.entrypoints=websecure
+      - traefik.http.routers.myapp.tls.certresolver=letsencrypt
 ```
 
-**That's it!** Automatic HTTPS at `https://myapp.yourdomain.com`
+## Access
 
-## Project Structure
+- SSH: `ssh admin@myserver` (Tailscale) or `ssh admin@server-ip`
+- Traefik: `https://traefik.yourdomain.com`
+- Netdata: `http://myserver:19999`
 
-```
-├── inventory/hosts.yml           # Inventory (references vault.yml variables)
-├── group_vars/
-│   ├── all.yml                   # Global variables
-│   ├── docker.yml               # Docker configuration
-│   ├── traefik.yml              # Traefik configuration
-│   ├── crowdsec.yml             # CrowdSec security configuration
-│   └── vault.yml.example       # Secrets template
-├── playbooks/
-│   └── setup.yml                # Complete server setup
-├── roles/                       # Ansible roles including Traefik
-└── service-templates/           # Example application templates
-```
+## Management
 
-## Security
-
-Files are automatically gitignored:
-- `inventory/hosts.yml` - Server IPs
-- `group_vars/vault.yml` - Secrets
-
-For CI/CD pipelines, encrypt vault file:
 ```bash
-ansible-vault encrypt group_vars/vault.yml
-ansible-playbook playbook.yml --vault-password-file .vault_pass
+# Docker
+/usr/local/bin/docker-status
+/usr/local/bin/docker-cleanup
+
+# Security (CrowdSec)
+sudo cscli collections list
+sudo cscli alerts list
+sudo cscli decisions list
 ```
-
-## After Deployment
-
-Your server will have:
-- Hardened system with admin user
-- Tailscale VPN for secure access
-- **CrowdSec security engine protecting against attacks**
-- Production-ready Docker installation
-- **Traefik reverse proxy with automatic SSL**
-- UFW firewall with Docker security fix
-- Automated cleanup and log rotation
-
-**Access points:**
-- SSH: `ssh admin@your-tailscale-ip`
-
-**Management commands:**
-- Docker status: `/usr/local/bin/docker-status`
-- Docker cleanup: `/usr/local/bin/docker-cleanup`
-- CrowdSec status: `sudo cscli collections list`
-- Default directory: `/opt/docker`
-
-**Deploy anything with automatic HTTPS** - just add Traefik labels! 🚀

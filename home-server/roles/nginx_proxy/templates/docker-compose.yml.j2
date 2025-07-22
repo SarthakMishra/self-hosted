@@ -14,8 +14,8 @@ services:
       # Docker socket for service discovery
       - /var/run/docker.sock:/tmp/docker.sock:ro
       
-      # Custom nginx configuration
-      - {{ nginx_proxy_config_dir }}:/etc/nginx/conf.d:ro
+      # Custom nginx configuration (needs write access for docker-gen)
+      - {{ nginx_proxy_config_dir }}:/etc/nginx/conf.d
       
       # SSL certificates (if needed for local development)
       - {{ nginx_proxy_ssl_dir }}:/etc/nginx/certs:ro

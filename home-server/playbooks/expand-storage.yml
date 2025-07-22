@@ -341,7 +341,7 @@
       tags:
         - partitioning
 
-    - name: Format new drives with ext4 filesystem
+    - name: Format new drives with XFS filesystem
       ansible.builtin.filesystem:
         fstype: "{{ mergerfs_filesystem }}"
         dev: "/dev/{{ item[0] }}1"

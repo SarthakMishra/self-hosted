@@ -127,6 +127,25 @@
     - tailscale
     - configuration
 
+- name: Set Tailscale hostname explicitly (force update)
+  ansible.builtin.command: tailscale set --hostname={{ tailscale_hostname | default(inventory_hostname) }}
+  register: hostname_result
+  changed_when: hostname_result.rc == 0
+  failed_when: hostname_result.rc != 0
+  when: tailscale_hostname is defined
+  tags:
+    - tailscale
+    - configuration
+    
+- name: Restart Tailscale service after hostname change
+  ansible.builtin.systemd:
+    name: tailscaled
+    state: restarted
+  when: tailscale_hostname is defined and hostname_result is changed
+  tags:
+    - tailscale
+    - configuration
+
 - name: Wait for Tailscale to establish connection
   ansible.builtin.wait_for:
     timeout: 30
@@ -185,8 +204,8 @@
       - ""
       - "🌐 DNS Configuration:"
       - "   Configure Tailscale MagicDNS to use: {{ tailscale_ip | default('TAILSCALE_IP') }}:53"
-      - "   Search domains: {{ domain_suffix }}"
-      - "   This enables .{{ domain_suffix }} domains on all Tailscale devices"
+      - "   Search domains: {{ domain_suffix | default('home') }}"
+      - "   This enables .{{ domain_suffix | default('home') }} domains on all Tailscale devices"
       - ""
       - "📊 Full Status:"
       - "{{ tailscale_final_status.stdout.split('\n') if tailscale_final_status.stdout else ['Status not available'] }}"

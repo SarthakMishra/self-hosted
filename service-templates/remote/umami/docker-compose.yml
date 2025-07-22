@@ -42,11 +42,6 @@ services:
       # Enable Traefik
       - "traefik.enable=true"
       
-      # HTTP to HTTPS redirect
-      - "traefik.http.routers.umami-http.rule=Host(`${UMAMI_DOMAIN}`)"
-      - "traefik.http.routers.umami-http.entrypoints=web"
-      - "traefik.http.routers.umami-http.middlewares=redirect-to-https"
-      
       # HTTPS configuration
       - "traefik.http.routers.umami-https.rule=Host(`${UMAMI_DOMAIN}`)"
       - "traefik.http.routers.umami-https.entrypoints=websecure"

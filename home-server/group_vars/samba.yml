@@ -26,7 +26,7 @@ samba_server_min_protocol: "SMB2"
 samba_client_min_protocol: "SMB2"
 samba_smb_encrypt: "desired"  # desired|required|off
 samba_server_signing: "mandatory"
-samba_ntlm_auth: "disabled"
+samba_ntlm_auth: "yes"
 samba_lanman_auth: "no"
 
 # User Configuration
@@ -38,8 +38,8 @@ samba_user_system: true
 # Share Configuration
 samba_shares:
   - name: "storage"
-    comment: "MergerFS Pooled Storage"
-    path: "{{ mergerfs_pool_path | default('/srv/storage') }}"
+    comment: "Shared Storage"
+    path: "{{ samba_storage_path | default(mergerfs_pool_path | default('/srv/storage')) }}"
     valid_users: "{{ samba_username }}"
     read_only: false
     browseable: true
@@ -47,6 +47,9 @@ samba_shares:
     directory_mask: "0775"
     force_user: "{{ samba_username }}"
     force_group: "{{ samba_username }}"
+
+# Fallback storage configuration
+samba_fallback_path: "/srv/share"
 
 # Firewall Configuration
 samba_firewall_enabled: true

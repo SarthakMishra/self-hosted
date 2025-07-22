@@ -1,19 +1,19 @@
 ---
-# Ansible Vault Template
+# Ansible Vault Template - Staged Deployment Configuration
 # Copy this file to vault.yml and customize with your sensitive data
 # Then encrypt it with: ansible-vault encrypt group_vars/vault.yml
 # WARNING: vault.yml contains sensitive data and is gitignored
 
-# INITIAL BOOTSTRAP AUTHENTICATION (Fresh Ubuntu Install)
-# These credentials are used for the first connection to a fresh Ubuntu server
-vault_ansible_init_host: "192.168.1.100"      # Server IP address during initial setup
-vault_ansible_init_user: "ubuntu"             # Default Ubuntu user (or 'root' if enabled)
-vault_ansible_init_password: "your-password"  # Initial SSH password
+# STAGE 1: BOOTSTRAP CREDENTIALS (Fresh Ubuntu Install)
+# Used with: inventory/stage1-bootstrap.yml
+vault_bootstrap_host: "192.168.1.100"         # Server IP address during initial setup
+vault_bootstrap_user: "ubuntu"                # Default Ubuntu user (or 'root' if enabled)
+vault_bootstrap_password: "your-password"     # Initial SSH password for first connection
 
-# FINAL AUTHENTICATION (After Tailscale Setup)
-# These will be the permanent credentials after setup completes  
-vault_ansible_host: "homeserver"              # Tailscale hostname (MagicDNS enabled)
-vault_ansible_user: "admin"                   # Final admin user (created during setup)
+# STAGE 3: PRODUCTION CREDENTIALS (After Complete Setup)
+# Used with: inventory/stage3-tailscale.yml  
+vault_production_host: "homeserver"           # Tailscale hostname (MagicDNS enabled)
+vault_production_user: "admin"                # Final admin user (created during bootstrap)
 
 # SSH CONFIGURATION
 # SSH public key for the admin user (will be installed during setup)
@@ -29,7 +29,7 @@ vault_ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
 vault_tailscale_auth_key: "tskey-auth-xxxxxxxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 # SERVER CONNECTION CONFIGURATION
-# Your server's public IP address
+# Your server's public IP address (for reference)
 vault_server_public_ip: "203.0.113.1"  # Replace with your actual server public IP
 # Your Tailscale Magic DNS suffix (found in Tailscale admin console)
 vault_tailscale_magic_dns_suffix: "tail1a2b3c.ts.net"  # Replace with your actual Tailscale suffix

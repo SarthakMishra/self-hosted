@@ -1,0 +1,237 @@
+---
+# Services Playbook
+# Docker installation and services setup
+# Run with: ansible-playbook -i inventory/stage3-tailscale.yml playbooks/services.yml
+
+- name: Deploy Docker and Services
+  hosts: production_servers
+  become: true
+  gather_facts: true
+  
+  vars_files:
+    - ../group_vars/vault.yml
+    - ../group_vars/all.yml
+    - ../group_vars/docker.yml
+    - ../group_vars/nginx_proxy.yml
+    - ../group_vars/dnsmasq.yml
+    - ../group_vars/cloudflared.yml
+    - ../group_vars/netdata.yml
+    
+  pre_tasks:
+    - name: Display services setup banner
+      ansible.builtin.debug:
+        msg:
+          - "=================================================="
+          - "🐳 DOCKER AND SERVICES DEPLOYMENT"
+          - "=================================================="
+          - ""
+          - "Target: {{ inventory_hostname }} ({{ ansible_default_ipv4.address }})"
+          - "User: {{ ansible_user }} (via Tailscale: {{ vault_production_host }})"
+          - ""
+          - "This will deploy:"
+          - "1. Docker installation and configuration"
+          - "2. Nginx-proxy for local .{{ domain_suffix }} domains"
+          - "3. DNSmasq for local DNS resolution"
+          - "4. Cloudflared tunnel for secure external access"
+          - "5. Netdata monitoring system"
+          - ""
+          - "🎯 Result: Complete Docker infrastructure and services"
+          - ""
+          - "⚠️  Prerequisites: System must be rebooted after Stage 2"
+          - "   Ensure system-setup.yml completed and server rebooted"
+          - ""
+      tags: always
+
+  tasks:
+    # Phase 1: Docker Installation
+    - name: Display Docker setup phase
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🐳 PHASE 1: DOCKER INSTALLATION"
+          - "================================================================"
+          - ""
+          - "Installing and configuring Docker for containerized services..."
+          - ""
+      tags:
+        - docker_setup
+
+    - name: Run Docker installation roles
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+      loop:
+        - docker_installation
+        - docker_configuration
+        - docker_production
+        - docker_validation
+      tags:
+        - docker_setup
+
+    - name: Display Docker setup completion
+      ansible.builtin.debug:
+        msg:
+          - "✅ Docker installation completed"
+          - "   Docker daemon running and configured"
+          - "   Production settings applied"
+          - ""
+      tags:
+        - docker_setup
+
+    # Phase 2: Local Network Setup
+    - name: Display networking setup phase
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🌐 PHASE 2: LOCAL NETWORKING SETUP"
+          - "================================================================"
+          - ""
+          - "Setting up nginx-proxy and DNSmasq for local .{{ domain_suffix }} domains..."
+          - ""
+      tags:
+        - networking_setup
+
+    - name: Run local network services setup
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+      loop:
+        - nginx_proxy
+        - dnsmasq
+      tags:
+        - networking_setup
+        - local_network_setup
+
+    - name: Display networking setup completion
+      ansible.builtin.debug:
+        msg:
+          - "✅ Local networking setup completed"
+          - "   Nginx-proxy: Running for .{{ domain_suffix }} domains"
+          - "   DNSmasq: Local DNS resolution on port {{ dnsmasq_port }}"
+          - ""
+      tags:
+        - networking_setup
+
+    # Phase 3: External Access Setup
+    - name: Display external access setup phase
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "☁️  PHASE 3: EXTERNAL ACCESS SETUP"
+          - "================================================================"
+          - ""
+          - "Setting up Cloudflared tunnel for secure external access..."
+          - ""
+      tags:
+        - external_access_setup
+
+    - name: Run Cloudflared tunnel setup
+      ansible.builtin.include_role:
+        name: cloudflared
+      tags:
+        - external_access_setup
+        - cloudflared_setup
+
+    - name: Display external access setup completion
+      ansible.builtin.debug:
+        msg:
+          - "✅ External access setup completed"
+          - "   Cloudflared tunnel: {{ cloudflared_external_domain }}"
+          - "   Secure external access configured"
+          - ""
+      tags:
+        - external_access_setup
+
+    # Phase 4: Monitoring Setup
+    - name: Display monitoring setup phase
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "📊 PHASE 4: MONITORING SETUP"
+          - "================================================================"
+          - ""
+          - "Installing Netdata monitoring system..."
+          - ""
+      tags:
+        - monitoring_setup
+
+    - name: Run monitoring system setup
+      ansible.builtin.include_role:
+        name: netdata
+      tags:
+        - monitoring_setup
+        - netdata_setup
+
+    - name: Display monitoring setup completion
+      ansible.builtin.debug:
+        msg:
+          - "✅ Monitoring setup completed"
+          - "   Netdata: http://{{ vault_production_host }}:{{ netdata_port }}"
+          - ""
+      tags:
+        - monitoring_setup
+
+  post_tasks:
+    - name: Services deployment completed
+      ansible.builtin.debug:
+        msg:
+          - "================================================================"
+          - "🎉 DOCKER AND SERVICES DEPLOYMENT COMPLETED!"
+          - "================================================================"
+          - ""
+          - "✅ ALL COMPONENTS DEPLOYED:"
+          - ""
+          - "🐳 Docker Infrastructure:"
+          - "   ✅ Docker daemon installed and configured"
+          - "   ✅ Production settings applied"
+          - ""
+          - "🌐 Local Networking:"
+          - "   ✅ Nginx-proxy for local .{{ domain_suffix }} domains"
+          - "   ✅ DNSmasq for local DNS resolution"
+          - ""
+          - "☁️  External Access:"
+          - "   ✅ Cloudflared tunnel for external access"
+          - ""
+          - "📊 Monitoring:"
+          - "   ✅ Netdata monitoring system"
+          - ""
+          - "================================================================"
+          - "🔗 ACCESS YOUR SERVICES:"
+          - "================================================================"
+          - ""
+          - "🌐 Web Services:"
+          - "   Local: http://service.{{ domain_suffix }}"
+          - "   External: https://service.{{ cloudflared_external_domain }}"
+          - ""
+          - "📊 Monitoring:"
+          - "   Netdata: http://{{ vault_production_host }}:{{ netdata_port }}"
+          - ""
+          - "🔧 DNS Configuration:"
+          - "   Set your router/device DNS to: {{ ansible_default_ipv4.address }}"
+          - "   DNSmasq port: {{ dnsmasq_port }}"
+          - ""
+          - "================================================================"
+          - "🔧 MANAGEMENT COMMANDS:"
+          - "================================================================"
+          - ""
+          - "🐳 Docker Services:"
+          - "   Status: /usr/local/bin/docker-status"
+          - "   Cleanup: /usr/local/bin/docker-cleanup"
+          - "   Directory: {{ docker_stack_root | default('/opt/docker') }}"
+          - ""
+          - "🌐 Network Services:"
+          - "   Nginx-proxy: docker logs nginx-proxy"
+          - "   DNSmasq: systemctl status dnsmasq"
+          - "   Cloudflared: systemctl status cloudflared"
+          - ""
+          - "📊 Monitoring:"
+          - "   Netdata: systemctl status netdata"
+          - "   Web UI: http://{{ vault_production_host }}:{{ netdata_port }}"
+          - ""
+          - "================================================================"
+          - "🚀 YOUR DOCKER SERVICES ARE READY!"
+          - ""
+          - "Deploy any containerized service with automatic:"
+          - "• Local .{{ domain_suffix }} domain access"
+          - "• Secure external access via Cloudflare tunnel"
+          - "• Real-time monitoring and alerting"
+          - ""
+      tags: always 
