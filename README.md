@@ -1,7 +1,7 @@
 # Self-Hosted Infrastructure
 
 > [!WARNING] 
-> ⚠️ **This entire project is AI-generated. Use with caution!**
+> ⚠️ **This project has AI-generated code. Use with caution!**
 
 Complete automation for self-hosted server deployment.
 
