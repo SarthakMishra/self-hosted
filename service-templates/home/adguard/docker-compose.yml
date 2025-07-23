@@ -11,7 +11,8 @@ services:
       - "53:53/udp"    # DNS
       - "784:784/udp"  # DNS-over-QUIC
       - "853:853/tcp"  # DNS-over-TLS
-      - "3000:3000/tcp"  # Initial setup
+      - "3030:3000/tcp"  # Initial setup
+      - "3080:80/tcp"   # Web dashboard (direct access)
     volumes:
       - ./workdir:/opt/adguardhome/work
       - ./confdir:/opt/adguardhome/conf

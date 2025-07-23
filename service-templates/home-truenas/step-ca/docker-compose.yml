@@ -1,0 +1,78 @@
+---
+services:
+
+  step-ca:
+    image: smallstep/step-ca:latest
+    container_name: step-ca
+    hostname: step-ca
+    environment:
+      - TZ=UTC
+      - VIRTUAL_HOST=ca.home
+      - VIRTUAL_PORT=9000
+      # Step CA initialization configuration
+      - DOCKER_STEPCA_INIT_NAME=${STEP_CA_NAME}
+      - DOCKER_STEPCA_INIT_DNS_NAMES=${STEP_CA_DNS_NAMES}
+      - DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT=true
+      - DOCKER_STEPCA_INIT_SSH=true
+      - DOCKER_STEPCA_INIT_ACME=true
+      - DOCKER_STEPCA_INIT_PASSWORD_FILE=/run/secrets/ca_password
+      - DOCKER_STEPCA_INIT_PROVISIONER_NAME=${STEP_CA_PROVISIONER_NAME}
+    volumes:
+      - step-ca-data:/home/step
+      - ./secrets/ca_password.txt:/run/secrets/ca_password:ro
+      - ./config/ca.json:/home/step/config/ca.json:ro
+    ports:
+      - "9000:9000"  # Keep direct access for ACME clients
+    networks:
+      - home-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "https://localhost:9000/health", "--cacert", "/home/step/certs/root_ca.crt"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ACME Certificate Manager - Automatically requests certificates for nginx-proxy
+  step-ca-acme-manager:
+    image: certbot/certbot:latest
+    container_name: step-ca-acme-manager
+    environment:
+      - TZ=UTC
+    volumes:
+      - step-ca-data:/step-ca:ro
+      - nginx-proxy-certs:/etc/letsencrypt
+      - ./scripts:/scripts:ro
+    networks:
+      - home-network
+    restart: "no"  # Run manually or via cron
+    depends_on:
+      - step-ca
+    command: /scripts/request-certificates.sh
+
+  # Certificate renewal service
+  step-ca-renewer:
+    image: certbot/certbot:latest
+    container_name: step-ca-renewer
+    environment:
+      - TZ=UTC
+    volumes:
+      - step-ca-data:/step-ca:ro
+      - nginx-proxy-certs:/etc/letsencrypt
+      - ./scripts:/scripts:ro
+    networks:
+      - home-network
+    restart: "no"  # Run via cron
+    depends_on:
+      - step-ca
+    command: /scripts/renew-certificates.sh
+
+networks:
+  home-network:
+    external: true
+
+volumes:
+  step-ca-data:
+    external: true
+  nginx-proxy-certs:
+    external: true 
