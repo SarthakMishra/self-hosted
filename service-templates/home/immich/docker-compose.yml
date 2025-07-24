@@ -4,20 +4,46 @@ services:
   immich:
     container_name: immich
     image: ghcr.io/immich-app/immich-server:release
+    
+    # Environment configuration
+    env_file:
+      - .env
+    
     volumes:
       - /opt/docker/data/media/photos:/usr/src/app/upload
       - /etc/localtime:/etc/localtime:ro
-    environment:
-      - VIRTUAL_HOST=immich.home
-      - VIRTUAL_PORT=2283
-      # nginx-proxy configurations for large uploads and timeouts
-      - NGINX_PROXY_PASS_HEADER=upgrade
-      - NGINX_PROXY_PASS_HEADER=connection
-      - NGINX_PROXY_SET_HEADER=Connection upgrade
-      - NGINX_PROXY_SET_HEADER=Upgrade $$http_upgrade
-      - NGINX_CLIENT_MAX_BODY_SIZE=50000M
-      - NGINX_PROXY_READ_TIMEOUT=600s
-      - NGINX_PROXY_SEND_TIMEOUT=600s
+    
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+      
+      # Web interface routing - HTTP
+      - "traefik.http.routers.immich-http.rule=Host(`${IMMICH_DOMAIN}`)"
+      - "traefik.http.routers.immich-http.entrypoints=web"
+      - "traefik.http.routers.immich-http.service=immich"
+      
+      # Web interface routing - HTTPS  
+      - "traefik.http.routers.immich-https.rule=Host(`${IMMICH_DOMAIN}`)"
+      - "traefik.http.routers.immich-https.entrypoints=websecure"
+      - "traefik.http.routers.immich-https.tls=true"
+      - "traefik.http.routers.immich-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.immich-https.service=immich"
+      
+      # Service configuration (Immich web interface on port 2283)
+      - "traefik.http.services.immich.loadbalancer.server.port=2283"
+      
+      # Middleware for large file uploads and timeouts
+      - "traefik.http.middlewares.immich-uploads.buffering.maxRequestBodyBytes=50000000000"  # 50GB
+      - "traefik.http.middlewares.immich-uploads.buffering.maxResponseBodyBytes=50000000000" # 50GB
+      - "traefik.http.middlewares.immich-uploads.buffering.memRequestBodyBytes=1048576"     # 1MB
+      - "traefik.http.middlewares.immich-uploads.buffering.memResponseBodyBytes=1048576"    # 1MB
+      - "traefik.http.middlewares.immich-timeouts.forwardingTimeouts.dialTimeout=300s"
+      - "traefik.http.middlewares.immich-timeouts.forwardingTimeouts.responseHeaderTimeout=300s"
+      - "traefik.http.middlewares.immich-timeouts.forwardingTimeouts.idleConnTimeout=300s"
+      
+      # Apply middlewares
+      - "traefik.http.routers.immich-https.middlewares=immich-uploads,immich-timeouts"
+    
     networks:
       - home-network
     depends_on:

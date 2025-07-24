@@ -6,12 +6,14 @@ services:
     restart: unless-stopped
     stop_grace_period: 30s
     image: ghcr.io/blakeblackshear/frigate:stable-tensorrt
+    # Environment configuration
+    env_file:
+      - .env
+    
     environment:
       - YOLO_MODELS=yolov7-320.trt
       - USE_FP16=true
       - TZ=UTC
-      - VIRTUAL_HOST=frigate.home
-      - VIRTUAL_PORT=5000
       # Camera credentials for config file substitution
       - CAMERA_USER_1=${CAMERA_USER_1}
       - CAMERA_PASS_1=${CAMERA_PASS_1}
@@ -34,6 +36,26 @@ services:
     ports:
       - "5000:5000"        # Keep for RTMP streams and API access
       - "8554:8554"  # Keep for RTSP restreaming
+    
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+      
+      # Web interface routing - HTTP
+      - "traefik.http.routers.frigate-http.rule=Host(`${FRIGATE_DOMAIN}`)"
+      - "traefik.http.routers.frigate-http.entrypoints=web"
+      - "traefik.http.routers.frigate-http.service=frigate"
+      
+      # Web interface routing - HTTPS  
+      - "traefik.http.routers.frigate-https.rule=Host(`${FRIGATE_DOMAIN}`)"
+      - "traefik.http.routers.frigate-https.entrypoints=websecure"
+      - "traefik.http.routers.frigate-https.tls=true"
+      - "traefik.http.routers.frigate-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.frigate-https.service=frigate"
+      
+      # Service configuration (Frigate web interface on port 5000)
+      - "traefik.http.services.frigate.loadbalancer.server.port=5000"
+    
     networks:
       - home-network
 

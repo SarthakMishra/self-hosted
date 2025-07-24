@@ -1,0 +1,101 @@
+services:
+  traefik:
+    image: traefik:v3.1
+    container_name: traefik
+    restart: unless-stopped
+    
+    # Environment configuration
+    env_file:
+      - .env
+    
+    environment:
+      # Cloudflare DNS API for Let's Encrypt DNS-01 challenge
+      - CF_API_EMAIL=${CLOUDFLARE_EMAIL}
+      - CF_API_KEY=${CLOUDFLARE_API_KEY}
+      # Alternative: CF_DNS_API_TOKEN (for API tokens instead of Global API Key)
+      # - CF_DNS_API_TOKEN=${CLOUDFLARE_DNS_API_TOKEN}
+    
+    command:
+      # API and Dashboard
+      - --api.dashboard=true
+      - --api.debug=${TRAEFIK_DEBUG:-false}
+      - --api.insecure=${TRAEFIK_API_INSECURE:-false}
+      
+      # Entry points
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      
+      # HTTP to HTTPS redirect (DISABLED for flexible home access)
+      # - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      # - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      # - --entrypoints.web.http.redirections.entrypoint.permanent=true
+      
+      # Docker provider
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=home-network
+      
+      # Let's Encrypt certificate resolver with DNS-01 challenge
+      - --certificatesresolvers.letsencrypt.acme.tlschallenge=false
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge=true
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge.delaybeforecheck=30
+      - --certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      
+      # Logging
+      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
+      - --accesslog=true
+
+    ports:
+      # Bind to specific local IP address
+      - "${TRAEFIK_LOCAL_IP}:80:80"
+      - "${TRAEFIK_LOCAL_IP}:443:443"
+      # Dashboard port (optional, can be accessed via domain instead)
+      - "${TRAEFIK_LOCAL_IP}:8080:8080"
+
+    volumes:
+      # Docker socket for service discovery
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      
+      # Let's Encrypt certificates storage
+      - traefik_letsencrypt:/letsencrypt
+      
+
+    labels:
+      # Enable Traefik for itself
+      - "traefik.enable=true"
+      
+      # Simplified security headers for home use
+      - "traefik.http.middlewares.security-headers.headers.browserxssfilter=true"
+      - "traefik.http.middlewares.security-headers.headers.contenttypenosniff=true"
+      - "traefik.http.middlewares.security-headers.headers.referrerpolicy=strict-origin-when-cross-origin"
+      
+      # HTTPS redirect middleware
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
+
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    # Network configuration
+    networks:
+      - home-network
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+
+# Networks
+networks:
+  home-network:
+    external: true
+
+volumes:
+  traefik_letsencrypt:
+    external: true 

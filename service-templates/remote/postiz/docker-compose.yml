@@ -1,0 +1,234 @@
+services:
+  postiz:
+    image: ghcr.io/gitroomhq/postiz-app:latest
+    container_name: postiz
+    restart: unless-stopped
+    
+    # Environment configuration
+    env_file:
+      - .env
+    
+    environment:
+      # Core Postiz configuration
+      - MAIN_URL=https://${POSTIZ_DOMAIN}
+      - FRONTEND_URL=https://${POSTIZ_DOMAIN}
+      - NEXT_PUBLIC_BACKEND_URL=https://${POSTIZ_DOMAIN}/api
+      - JWT_SECRET=${POSTIZ_JWT_SECRET}
+      
+      # Database configuration
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postiz-postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://postiz-redis:6379
+      
+      # Backend configuration
+      - BACKEND_INTERNAL_URL=http://localhost:3000
+      - IS_GENERAL=true
+      
+      # Registration control
+      - DISABLE_REGISTRATION=${POSTIZ_DISABLE_REGISTRATION:-false}
+      
+      # Storage configuration
+      - STORAGE_PROVIDER=${POSTIZ_STORAGE_PROVIDER:-local}
+      - UPLOAD_DIRECTORY=${POSTIZ_UPLOAD_DIRECTORY:-/uploads}
+      - NEXT_PUBLIC_UPLOAD_DIRECTORY=${POSTIZ_UPLOAD_DIRECTORY:-/uploads}
+      
+      # Optional: Additional configuration
+      - NODE_ENV=${NODE_ENV:-production}
+
+    volumes:
+      # Persistent data storage
+      - postiz_config:/config/
+      - postiz_uploads:/uploads/
+      
+      # Optional: Custom configuration files
+      # - ./config:/custom-config:ro
+
+    depends_on:
+      postiz-postgres:
+        condition: service_healthy
+      postiz-redis:
+        condition: service_healthy
+
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+      
+      # HTTP to HTTPS redirect
+      - "traefik.http.routers.postiz-http.rule=Host(`${POSTIZ_DOMAIN}`)"
+      - "traefik.http.routers.postiz-http.entrypoints=web"
+      - "traefik.http.routers.postiz-http.middlewares=redirect-to-https"
+      
+      # HTTPS configuration
+      - "traefik.http.routers.postiz-https.rule=Host(`${POSTIZ_DOMAIN}`)"
+      - "traefik.http.routers.postiz-https.entrypoints=websecure"
+      - "traefik.http.routers.postiz-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.postiz-https.service=postiz"
+      
+      # Service configuration
+      - "traefik.http.services.postiz.loadbalancer.server.port=5000"
+      
+      # Security headers middleware
+      - "traefik.http.middlewares.postiz-headers.headers.sslredirect=true"
+      - "traefik.http.middlewares.postiz-headers.headers.stsSeconds=315360000"
+      - "traefik.http.middlewares.postiz-headers.headers.browserxssfilter=true"
+      - "traefik.http.middlewares.postiz-headers.headers.contenttypenosniff=true"
+      - "traefik.http.middlewares.postiz-headers.headers.forcestsheader=true"
+      - "traefik.http.middlewares.postiz-headers.headers.sslhost=${POSTIZ_DOMAIN}"
+      - "traefik.http.middlewares.postiz-headers.headers.stsincludesubdomains=true"
+      - "traefik.http.middlewares.postiz-headers.headers.stspreload=true"
+      - "traefik.http.middlewares.postiz-headers.headers.framedeny=true"
+      - "traefik.http.middlewares.postiz-headers.headers.referrerpolicy=strict-origin-when-cross-origin"
+      
+      # Apply middleware to HTTPS router
+      - "traefik.http.routers.postiz-https.middlewares=postiz-headers"
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+    # Network configuration
+    networks:
+      - app-network
+      - postiz-internal
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+
+  postiz-postgres:
+    image: postgres:17-alpine
+    container_name: postiz-postgres
+    restart: unless-stopped
+    
+    # Environment configuration
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_INITDB_ARGS=${POSTGRES_INITDB_ARGS:---encoding=UTF-8 --lc-collate=C --lc-ctype=C}
+    
+    volumes:
+      # Persistent database storage
+      - postiz_db_data:/var/lib/postgresql/data
+      
+      # Optional: Custom PostgreSQL configuration
+      # - ./postgres.conf:/etc/postgresql/postgresql.conf:ro
+      
+      # Optional: Database initialization scripts
+      # - ./init-scripts:/docker-entrypoint-initdb.d:ro
+
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+    # Network configuration (only internal network)
+    networks:
+      - postiz-internal
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+
+    # Labels for organization (not exposed to Traefik)
+    labels:
+      - "traefik.enable=false"
+
+  postiz-redis:
+    image: redis:7.2-alpine
+    container_name: postiz-redis
+    restart: unless-stopped
+    
+    # Optional: Redis configuration
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    
+    environment:
+      # Optional: Redis password
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    
+    volumes:
+      # Persistent Redis data
+      - postiz_redis_data:/data
+      
+      # Optional: Custom Redis configuration
+      # - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.1'
+        reservations:
+          memory: 64M
+          cpus: '0.05'
+
+    # Network configuration (only internal network)
+    networks:
+      - postiz-internal
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+
+    # Labels for organization (not exposed to Traefik)
+    labels:
+      - "traefik.enable=false"
+
+# Networks
+networks:
+  # External network for Traefik communication
+  app-network:
+    external: true
+    
+  # Internal network for database and Redis communication
+  postiz-internal:
+    driver: bridge
+    internal: true
+
+# Persistent volumes
+volumes:
+  postiz_config:
+    driver: local
+  
+  postiz_uploads:
+    driver: local
+  
+  postiz_db_data:
+    driver: local
+  
+  postiz_redis_data:
+    driver: local 

@@ -4,12 +4,36 @@ services:
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:latest
     container_name: flaresolverr
+    
+    # Environment configuration
+    env_file:
+      - .env
+    
     environment:
       - LOG_LEVEL=info
       - LOG_HTML=false
       - CAPTCHA_SOLVER=none
       - TZ=UTC
-      - VIRTUAL_HOST=flaresolverr.home
+    
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+      
+      # Web interface routing - HTTP
+      - "traefik.http.routers.flaresolverr-http.rule=Host(`${FLARESOLVERR_DOMAIN}`)"
+      - "traefik.http.routers.flaresolverr-http.entrypoints=web"
+      - "traefik.http.routers.flaresolverr-http.service=flaresolverr"
+      
+      # Web interface routing - HTTPS  
+      - "traefik.http.routers.flaresolverr-https.rule=Host(`${FLARESOLVERR_DOMAIN}`)"
+      - "traefik.http.routers.flaresolverr-https.entrypoints=websecure"
+      - "traefik.http.routers.flaresolverr-https.tls=true"
+      - "traefik.http.routers.flaresolverr-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.flaresolverr-https.service=flaresolverr"
+      
+      # Service configuration (Flaresolverr on port 8191)
+      - "traefik.http.services.flaresolverr.loadbalancer.server.port=8191"
+    
     networks:
       - home-network
     restart: unless-stopped
@@ -34,6 +58,41 @@ services:
       - "8080:8080"  # qBittorrent web UI
       - "6881:6881"  # qBittorrent torrenting
       - "6881:6881/udp"  # qBittorrent torrenting UDP
+    
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+      
+      # Prowlarr routing - HTTP
+      - "traefik.http.routers.prowlarr-http.rule=Host(`${PROWLARR_DOMAIN}`)"
+      - "traefik.http.routers.prowlarr-http.entrypoints=web"
+      - "traefik.http.routers.prowlarr-http.service=prowlarr"
+      
+      # Prowlarr routing - HTTPS  
+      - "traefik.http.routers.prowlarr-https.rule=Host(`${PROWLARR_DOMAIN}`)"
+      - "traefik.http.routers.prowlarr-https.entrypoints=websecure"
+      - "traefik.http.routers.prowlarr-https.tls=true"
+      - "traefik.http.routers.prowlarr-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.prowlarr-https.service=prowlarr"
+      
+      # Prowlarr service configuration
+      - "traefik.http.services.prowlarr.loadbalancer.server.port=9696"
+      
+      # qBittorrent routing - HTTP
+      - "traefik.http.routers.qbittorrent-http.rule=Host(`${QBITTORRENT_DOMAIN}`)"
+      - "traefik.http.routers.qbittorrent-http.entrypoints=web"
+      - "traefik.http.routers.qbittorrent-http.service=qbittorrent"
+      
+      # qBittorrent routing - HTTPS  
+      - "traefik.http.routers.qbittorrent-https.rule=Host(`${QBITTORRENT_DOMAIN}`)"
+      - "traefik.http.routers.qbittorrent-https.entrypoints=websecure"
+      - "traefik.http.routers.qbittorrent-https.tls=true"
+      - "traefik.http.routers.qbittorrent-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.qbittorrent-https.service=qbittorrent"
+      
+      # qBittorrent service configuration
+      - "traefik.http.services.qbittorrent.loadbalancer.server.port=8080"
+    
     networks:
       - home-network
     restart: unless-stopped
@@ -51,8 +110,7 @@ services:
       - PGID=1000
       - UMASK=002
       - TZ=UTC
-      - VIRTUAL_HOST=prowlarr.home
-      - VIRTUAL_PORT=9696
+      # Note: Using gluetun network, accessible via Traefik at PROWLARR_DOMAIN
     volumes:
       - /opt/docker/config/prowlarr-config:/config
     network_mode: "service:gluetun"
@@ -70,8 +128,7 @@ services:
       - TZ=UTC
       - WEBUI_PORT=8080
       - TORRENTING_PORT=6881
-      - VIRTUAL_HOST=qbittorrent.home
-      - VIRTUAL_PORT=8080
+      # Note: Using gluetun network, accessible via Traefik at QBITTORRENT_DOMAIN
     volumes:
       - /opt/docker/config/qbittorrent-config:/config
       - /opt/docker/data/downloads:/downloads
@@ -88,10 +145,29 @@ services:
       - PGID=1000
       - UMASK=002
       - TZ=UTC
-      - VIRTUAL_HOST=sonarr.home
     volumes:
       - /opt/docker/config/sonarr-config:/config
       - /opt/docker/data:/data
+    
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+      
+      # Web interface routing - HTTP
+      - "traefik.http.routers.sonarr-http.rule=Host(`${SONARR_DOMAIN}`)"
+      - "traefik.http.routers.sonarr-http.entrypoints=web"
+      - "traefik.http.routers.sonarr-http.service=sonarr"
+      
+      # Web interface routing - HTTPS  
+      - "traefik.http.routers.sonarr-https.rule=Host(`${SONARR_DOMAIN}`)"
+      - "traefik.http.routers.sonarr-https.entrypoints=websecure"
+      - "traefik.http.routers.sonarr-https.tls=true"
+      - "traefik.http.routers.sonarr-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.sonarr-https.service=sonarr"
+      
+      # Service configuration (Sonarr on port 8989)
+      - "traefik.http.services.sonarr.loadbalancer.server.port=8989"
+    
     restart: unless-stopped
     networks:
       - home-network
@@ -104,10 +180,29 @@ services:
       - PGID=1000
       - UMASK=002
       - TZ=UTC
-      - VIRTUAL_HOST=radarr.home
     volumes:
       - /opt/docker/config/radarr-config:/config
       - /opt/docker/data:/data
+    
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+      
+      # Web interface routing - HTTP
+      - "traefik.http.routers.radarr-http.rule=Host(`${RADARR_DOMAIN}`)"
+      - "traefik.http.routers.radarr-http.entrypoints=web"
+      - "traefik.http.routers.radarr-http.service=radarr"
+      
+      # Web interface routing - HTTPS  
+      - "traefik.http.routers.radarr-https.rule=Host(`${RADARR_DOMAIN}`)"
+      - "traefik.http.routers.radarr-https.entrypoints=websecure"
+      - "traefik.http.routers.radarr-https.tls=true"
+      - "traefik.http.routers.radarr-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.radarr-https.service=radarr"
+      
+      # Service configuration (Radarr on port 7878)
+      - "traefik.http.services.radarr.loadbalancer.server.port=7878"
+    
     restart: unless-stopped
     networks:
       - home-network
@@ -120,10 +215,29 @@ services:
       - PGID=1000
       - UMASK=002
       - TZ=UTC
-      - VIRTUAL_HOST=bazarr.home
     volumes:
       - /opt/docker/config/bazarr-config:/config
       - /opt/docker/data:/data
+    
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+      
+      # Web interface routing - HTTP
+      - "traefik.http.routers.bazarr-http.rule=Host(`${BAZARR_DOMAIN}`)"
+      - "traefik.http.routers.bazarr-http.entrypoints=web"
+      - "traefik.http.routers.bazarr-http.service=bazarr"
+      
+      # Web interface routing - HTTPS  
+      - "traefik.http.routers.bazarr-https.rule=Host(`${BAZARR_DOMAIN}`)"
+      - "traefik.http.routers.bazarr-https.entrypoints=websecure"
+      - "traefik.http.routers.bazarr-https.tls=true"
+      - "traefik.http.routers.bazarr-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.bazarr-https.service=bazarr"
+      
+      # Service configuration (Bazarr on port 6767)
+      - "traefik.http.services.bazarr.loadbalancer.server.port=6767"
+    
     restart: unless-stopped
     networks:
       - home-network
@@ -133,13 +247,31 @@ services:
     container_name: plex
     environment:
       - TZ=UTC
-      - VIRTUAL_HOST=plex.home
-      - VIRTUAL_PORT=32400
     volumes:
       - /opt/docker/config/plex-config:/config
       - /opt/docker/data/media:/data
     ports:
       - "32400:32400"  # Keep for direct access and client discovery
+    
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+      
+      # Web interface routing - HTTP
+      - "traefik.http.routers.plex-http.rule=Host(`${PLEX_DOMAIN}`)"
+      - "traefik.http.routers.plex-http.entrypoints=web"
+      - "traefik.http.routers.plex-http.service=plex"
+      
+      # Web interface routing - HTTPS  
+      - "traefik.http.routers.plex-https.rule=Host(`${PLEX_DOMAIN}`)"
+      - "traefik.http.routers.plex-https.entrypoints=websecure"
+      - "traefik.http.routers.plex-https.tls=true"
+      - "traefik.http.routers.plex-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.plex-https.service=plex"
+      
+      # Service configuration (Plex on port 32400)
+      - "traefik.http.services.plex.loadbalancer.server.port=32400"
+    
     networks:
       - home-network
     restart: unless-stopped
@@ -151,9 +283,28 @@ services:
       - LOG_LEVEL=debug
       - TZ=UTC
       - PORT=5055
-      - VIRTUAL_HOST=jellyseerr.home
     volumes:
       - /opt/docker/config/jellyseerr-config:/app/config
+    
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+      
+      # Web interface routing - HTTP
+      - "traefik.http.routers.jellyseerr-http.rule=Host(`${JELLYSEERR_DOMAIN}`)"
+      - "traefik.http.routers.jellyseerr-http.entrypoints=web"
+      - "traefik.http.routers.jellyseerr-http.service=jellyseerr"
+      
+      # Web interface routing - HTTPS  
+      - "traefik.http.routers.jellyseerr-https.rule=Host(`${JELLYSEERR_DOMAIN}`)"
+      - "traefik.http.routers.jellyseerr-https.entrypoints=websecure"
+      - "traefik.http.routers.jellyseerr-https.tls=true"
+      - "traefik.http.routers.jellyseerr-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.jellyseerr-https.service=jellyseerr"
+      
+      # Service configuration (Jellyseerr on port 5055)
+      - "traefik.http.services.jellyseerr.loadbalancer.server.port=5055"
+    
     restart: unless-stopped
     networks:
       - home-network

@@ -191,3 +191,5 @@ kube-config
 
 # Miscc
 wg0.conf
+cloudflare.ini
+*.secret.*
