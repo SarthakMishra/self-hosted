@@ -77,6 +77,9 @@ services:
       
       # Service
       - "traefik.http.services.directus.loadbalancer.server.port=8055"
+
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
     networks:
       - app-network
       - directus-internal

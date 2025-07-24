@@ -1,0 +1,107 @@
+services:
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: openwebui
+    restart: unless-stopped
+    
+    # Environment configuration
+    env_file:
+      - .env
+    
+    environment:
+      # Core Open WebUI configuration
+      - WEBUI_NAME=${WEBUI_NAME:-Open WebUI}
+      - WEBUI_URL=https://${OPENWEBUI_DOMAIN}
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
+      
+      # Open Router API configuration
+      - OPENAI_API_BASE_URL=${OPENROUTER_API_BASE_URL:-https://openrouter.ai/api/v1}
+      - OPENAI_API_KEY=${OPENROUTER_API_KEY}
+      
+      # Web search configuration (Tavily)
+      - ENABLE_RAG_WEB_SEARCH=${ENABLE_WEB_SEARCH:-true}
+      - RAG_WEB_SEARCH_ENGINE=${WEB_SEARCH_ENGINE:-tavily}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - RAG_WEB_SEARCH_RESULT_COUNT=${WEB_SEARCH_RESULT_COUNT:-5}
+      - RAG_WEB_SEARCH_CONCURRENT_REQUESTS=${WEB_SEARCH_CONCURRENT_REQUESTS:-10}
+      
+      # User authentication and registration
+      - ENABLE_SIGNUP=${ENABLE_SIGNUP:-true}
+      - DEFAULT_USER_ROLE=${DEFAULT_USER_ROLE:-pending}
+      - ENABLE_LOGIN_FORM=${ENABLE_LOGIN_FORM:-true}
+      
+      # File uploads and document processing
+      - ENABLE_IMAGE_GENERATION=${ENABLE_IMAGE_GENERATION:-true}
+      - ENABLE_COMMUNITY_SHARING=${ENABLE_COMMUNITY_SHARING:-false}
+      - PDF_EXTRACT_IMAGES=${PDF_EXTRACT_IMAGES:-true}
+      
+      # Model management
+      - MODEL_FILTER_ENABLED=${MODEL_FILTER_ENABLED:-false}
+      - MODEL_FILTER_LIST=${MODEL_FILTER_LIST}
+      
+      # Audio and speech
+      - AUDIO_STT_ENGINE=${AUDIO_STT_ENGINE:-}
+      - AUDIO_TTS_ENGINE=${AUDIO_TTS_ENGINE:-}
+      
+      # Advanced features
+      - ENABLE_ADMIN_EXPORT=${ENABLE_ADMIN_EXPORT:-true}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      
+    volumes:
+      # Persistent data storage
+      - openwebui_data:/app/backend/data
+
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+      
+      # HTTPS configuration
+      - "traefik.http.routers.openwebui.rule=Host(`${OPENWEBUI_DOMAIN}`)"
+      - "traefik.http.routers.openwebui.entrypoints=websecure"
+      - "traefik.http.routers.openwebui.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.openwebui.service=openwebui"
+      
+      # Service configuration
+      - "traefik.http.services.openwebui.loadbalancer.server.port=8080"
+      
+      # Security headers middleware
+      - "traefik.http.middlewares.openwebui-headers.headers.sslredirect=true"
+      - "traefik.http.middlewares.openwebui-headers.headers.stsSeconds=315360000"
+      - "traefik.http.middlewares.openwebui-headers.headers.browserxssfilter=true"
+      - "traefik.http.middlewares.openwebui-headers.headers.contenttypenosniff=true"
+      - "traefik.http.middlewares.openwebui-headers.headers.forcestsheader=true"
+      - "traefik.http.middlewares.openwebui-headers.headers.sslhost=${OPENWEBUI_DOMAIN}"
+      - "traefik.http.middlewares.openwebui-headers.headers.stsincludesubdomains=true"
+      - "traefik.http.middlewares.openwebui-headers.headers.stspreload=true"
+      - "traefik.http.middlewares.openwebui-headers.headers.framedeny=true"
+      
+      # Apply middleware to HTTPS router
+      - "traefik.http.routers.openwebui.middlewares=openwebui-headers"
+
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    # Network configuration
+    networks:
+      - app-network
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+
+# External network created by Traefik
+networks:
+  app-network:
+    external: true
+
+# Persistent volumes
+volumes:
+  openwebui_data:
+    driver: local

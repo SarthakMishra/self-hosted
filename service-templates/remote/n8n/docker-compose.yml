@@ -97,6 +97,9 @@ services:
       # Apply middleware to HTTPS router
       - "traefik.http.routers.n8n-https.middlewares=n8n-headers"
 
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5678/healthz || exit 1"]
       interval: 30s

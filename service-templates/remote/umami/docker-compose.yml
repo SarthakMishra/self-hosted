@@ -65,6 +65,9 @@ services:
       # Apply middleware to HTTPS router
       - "traefik.http.routers.umami-https.middlewares=umami-headers"
 
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+
     # Health check
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3000/api/heartbeat || exit 1"]

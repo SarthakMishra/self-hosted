@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_SCHEDULE=${WATCHTOWER_SCHEDULE}
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_LABEL_ENABLE=true
+      - TZ=${TZ:-UTC}
+    labels:
+      - "traefik.enable=false"
+      # Watchtower best practice: opt-in rather than opt-out
+      - "com.centurylinklabs.watchtower.enable=true" 

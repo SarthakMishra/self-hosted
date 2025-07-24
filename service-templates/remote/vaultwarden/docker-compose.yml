@@ -45,6 +45,9 @@ services:
       - "traefik.http.routers.vaultwarden-websocket.service=vaultwarden-websocket"
       - "traefik.http.services.vaultwarden-websocket.loadbalancer.server.port=3012"
 
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+
     networks:
       - app-network
 

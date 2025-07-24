@@ -52,22 +52,16 @@ services:
       # Enable Traefik
       - "traefik.enable=true"
       
-      # HTTP to HTTPS redirect
-      - "traefik.http.routers.postiz-http.rule=Host(`${POSTIZ_DOMAIN}`)"
-      - "traefik.http.routers.postiz-http.entrypoints=web"
-      - "traefik.http.routers.postiz-http.middlewares=redirect-to-https"
-      
       # HTTPS configuration
-      - "traefik.http.routers.postiz-https.rule=Host(`${POSTIZ_DOMAIN}`)"
-      - "traefik.http.routers.postiz-https.entrypoints=websecure"
-      - "traefik.http.routers.postiz-https.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.postiz-https.service=postiz"
+      - "traefik.http.routers.postiz.rule=Host(`${POSTIZ_DOMAIN}`)"
+      - "traefik.http.routers.postiz.entrypoints=websecure"
+      - "traefik.http.routers.postiz.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.postiz.service=postiz"
       
       # Service configuration
       - "traefik.http.services.postiz.loadbalancer.server.port=5000"
       
       # Security headers middleware
-      - "traefik.http.middlewares.postiz-headers.headers.sslredirect=true"
       - "traefik.http.middlewares.postiz-headers.headers.stsSeconds=315360000"
       - "traefik.http.middlewares.postiz-headers.headers.browserxssfilter=true"
       - "traefik.http.middlewares.postiz-headers.headers.contenttypenosniff=true"
@@ -79,24 +73,14 @@ services:
       - "traefik.http.middlewares.postiz-headers.headers.referrerpolicy=strict-origin-when-cross-origin"
       
       # Apply middleware to HTTPS router
-      - "traefik.http.routers.postiz-https.middlewares=postiz-headers"
+      - "traefik.http.routers.postiz.middlewares=postiz-headers"
 
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5000/api/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
-
-    # Resource limits (adjust based on your needs)
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '1.0'
-        reservations:
-          memory: 512M
-          cpus: '0.5'
 
     # Network configuration
     networks:
@@ -122,12 +106,6 @@ services:
     volumes:
       # Persistent database storage
       - postiz_db_data:/var/lib/postgresql/data
-      
-      # Optional: Custom PostgreSQL configuration
-      # - ./postgres.conf:/etc/postgresql/postgresql.conf:ro
-      
-      # Optional: Database initialization scripts
-      # - ./init-scripts:/docker-entrypoint-initdb.d:ro
 
     # Health check
     healthcheck:
@@ -136,16 +114,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.25'
-        reservations:
-          memory: 128M
-          cpus: '0.1'
 
     # Network configuration (only internal network)
     networks:
@@ -165,11 +133,7 @@ services:
     restart: unless-stopped
     
     # Optional: Redis configuration
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
-    
-    environment:
-      # Optional: Redis password
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    command: redis-server --appendonly yes
     
     volumes:
       # Persistent Redis data
@@ -185,16 +149,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-          cpus: '0.1'
-        reservations:
-          memory: 64M
-          cpus: '0.05'
 
     # Network configuration (only internal network)
     networks:
