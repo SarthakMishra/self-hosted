@@ -39,34 +39,13 @@ services:
         condition: service_healthy
 
     labels:
-      # Enable Traefik
       - "traefik.enable=true"
-      
-      # HTTPS configuration
       - "traefik.http.routers.umami-https.rule=Host(`${UMAMI_DOMAIN}`)"
       - "traefik.http.routers.umami-https.entrypoints=websecure"
       - "traefik.http.routers.umami-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.umami-https.service=umami"
-      
-      # Service configuration
       - "traefik.http.services.umami.loadbalancer.server.port=3000"
-      
-      # Security headers middleware
-      - "traefik.http.middlewares.umami-headers.headers.sslredirect=true"
-      - "traefik.http.middlewares.umami-headers.headers.stsSeconds=315360000"
-      - "traefik.http.middlewares.umami-headers.headers.browserxssfilter=true"
-      - "traefik.http.middlewares.umami-headers.headers.contenttypenosniff=true"
-      - "traefik.http.middlewares.umami-headers.headers.forcestsheader=true"
-      - "traefik.http.middlewares.umami-headers.headers.sslhost=${UMAMI_DOMAIN}"
-      - "traefik.http.middlewares.umami-headers.headers.stsincludesubdomains=true"
-      - "traefik.http.middlewares.umami-headers.headers.stspreload=true"
-      - "traefik.http.middlewares.umami-headers.headers.referrerpolicy=strict-origin-when-cross-origin"
-      
-      # Apply middleware to HTTPS router
-      - "traefik.http.routers.umami-https.middlewares=umami-headers"
-
-      # Watchtower
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "traefik.http.routers.umami-https.middlewares=security-headers@file,crowdsec@file"
 
     # Health check
     healthcheck:

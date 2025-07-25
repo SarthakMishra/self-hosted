@@ -26,34 +26,13 @@ services:
     security_opt:
       - no-new-privileges:true
     labels:
-      # Enable Traefik
       - "traefik.enable=true"
-
-      # HTTPS configuration
       - "traefik.http.routers.nocodb.rule=Host(`${NOCODB_DOMAIN}`)"
       - "traefik.http.routers.nocodb.entrypoints=websecure"
       - "traefik.http.routers.nocodb.tls.certresolver=letsencrypt"
       - "traefik.http.routers.nocodb.service=nocodb"
-
-      # Service configuration
       - "traefik.http.services.nocodb.loadbalancer.server.port=8080"
-
-      # Security headers middleware
-      - "traefik.http.middlewares.nocodb-headers.headers.sslredirect=true"
-      - "traefik.http.middlewares.nocodb-headers.headers.stsSeconds=315360000"
-      - "traefik.http.middlewares.nocodb-headers.headers.browserxssfilter=true"
-      - "traefik.http.middlewares.nocodb-headers.headers.contenttypenosniff=true"
-      - "traefik.http.middlewares.nocodb-headers.headers.forcestsheader=true"
-      - "traefik.http.middlewares.nocodb-headers.headers.sslhost=${NOCODB_DOMAIN}"
-      - "traefik.http.middlewares.nocodb-headers.headers.stsincludesubdomains=true"
-      - "traefik.http.middlewares.nocodb-headers.headers.stspreload=true"
-      - "traefik.http.middlewares.nocodb-headers.headers.referrerpolicy=strict-origin-when-cross-origin"
-
-      # Apply middleware to HTTPS router
-      - "traefik.http.routers.nocodb.middlewares=nocodb-headers"
-
-      # Watchtower
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "traefik.http.routers.nocodb.middlewares=security-headers@file,crowdsec@file"
 
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/api/v1/health || exit 1"]

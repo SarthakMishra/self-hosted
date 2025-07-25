@@ -66,39 +66,13 @@ services:
       # - ./certs:/home/node/certs:ro
 
     labels:
-      # Enable Traefik
       - "traefik.enable=true"
-      
-      # HTTP to HTTPS redirect
-      - "traefik.http.routers.n8n-http.rule=Host(`${N8N_DOMAIN}`)"
-      - "traefik.http.routers.n8n-http.entrypoints=web"
-      - "traefik.http.routers.n8n-http.middlewares=redirect-to-https"
-      
-      # HTTPS configuration
       - "traefik.http.routers.n8n-https.rule=Host(`${N8N_DOMAIN}`)"
       - "traefik.http.routers.n8n-https.entrypoints=websecure"
       - "traefik.http.routers.n8n-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.n8n-https.service=n8n"
-      
-      # Service configuration
       - "traefik.http.services.n8n.loadbalancer.server.port=5678"
-      
-      # Security headers middleware
-      - "traefik.http.middlewares.n8n-headers.headers.sslredirect=true"
-      - "traefik.http.middlewares.n8n-headers.headers.stsSeconds=315360000"
-      - "traefik.http.middlewares.n8n-headers.headers.browserxssfilter=true"
-      - "traefik.http.middlewares.n8n-headers.headers.contenttypenosniff=true"
-      - "traefik.http.middlewares.n8n-headers.headers.forcestsheader=true"
-      - "traefik.http.middlewares.n8n-headers.headers.sslhost=${N8N_DOMAIN}"
-      - "traefik.http.middlewares.n8n-headers.headers.stsincludesubdomains=true"
-      - "traefik.http.middlewares.n8n-headers.headers.stspreload=true"
-      - "traefik.http.middlewares.n8n-headers.headers.framedeny=true"
-      
-      # Apply middleware to HTTPS router
-      - "traefik.http.routers.n8n-https.middlewares=n8n-headers"
-
-      # Watchtower
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "traefik.http.routers.n8n-https.middlewares=security-headers@file,crowdsec@file"
 
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5678/healthz || exit 1"]

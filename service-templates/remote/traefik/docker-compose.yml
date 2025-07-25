@@ -1,0 +1,127 @@
+services:
+  traefik:
+    build:
+      context: .
+      dockerfile: Dockerfile.traefik
+    container_name: traefik
+    restart: unless-stopped
+    
+    # Environment configuration
+    env_file:
+      - .env
+    
+    environment:
+      # Cloudflare DNS API for Let's Encrypt DNS-01 challenge
+      - CF_API_EMAIL=${CLOUDFLARE_EMAIL}
+      - CF_API_KEY=${CLOUDFLARE_API_KEY}
+      # CrowdSec API key for plugin
+      - CROWDSEC_API_KEY=${CROWDSEC_API_KEY}
+    
+    command:
+      # API and Dashboard (disabled for production)
+      - --api.dashboard=false
+      - --api.debug=false
+      
+      # Entry points
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      
+      # HTTP to HTTPS redirect
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.web.http.redirections.entrypoint.permanent=true
+      
+      # Trust Cloudflare headers for real IP (if behind Cloudflare proxy)
+      - --entrypoints.websecure.forwardedheaders.insecure=false
+      - --entrypoints.websecure.forwardedheaders.trustedips=173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,2400:cb00::/32,2606:4700::/32,2803:f800::/32,2405:b500::/32,2405:8100::/32,2a06:98c0::/29,2c0f:f248::/32
+      
+      # Trust forwarded headers (if not behind Cloudflare proxy)
+      # --entrypoints.websecure.forwardedheaders.insecure=true
+
+      # Docker provider
+      - --providers.docker=true
+      - --providers.file.filename=/etc/traefik/middlewares.yml
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=app-network
+      
+      # Let's Encrypt certificate resolver with DNS-01 challenge
+      - --certificatesresolvers.letsencrypt.acme.tlschallenge=false
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge=true
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge.delaybeforecheck=30
+      - --certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}
+      
+      # CrowdSec plugin configuration
+      - --experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      - --experimental.plugins.bouncer.version=v1.4.4
+      
+      # Logging
+      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
+      - --accesslog=true
+      - --accesslog.format=json
+
+    ports:
+      # Standard HTTP/HTTPS ports
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - logs-traefik:/var/log/traefik
+
+    # Network configuration
+    networks:
+      - app-network
+
+    depends_on:
+      - crowdsec
+
+  # CrowdSec for threat detection
+  crowdsec:
+    build:
+      context: .
+      dockerfile: Dockerfile.crowdsec
+    container_name: crowdsec
+    restart: unless-stopped
+    
+    environment:
+      # CrowdSec configuration
+      - BOUNCER_KEY_TRAEFIK=${CROWDSEC_API_KEY}
+      - COLLECTIONS=crowdsecurity/traefik crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules
+      # Enable LAPI for Traefik plugin
+      - LAPI_HOST=0.0.0.0
+      - LAPI_PORT=8080
+    
+    volumes:
+      # CrowdSec configuration and data
+      - crowdsec_config:/etc/crowdsec
+      - crowdsec_data:/var/lib/crowdsec
+      
+      # Log files to monitor
+      - logs-traefik:/var/log/traefik
+
+    networks:
+      - app-network
+
+    labels:
+      - "traefik.enable=false"
+
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "cscli lapi status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+# Networks
+networks:
+  app-network:
+    external: true
+
+# Persistent volumes
+volumes:
+  logs-traefik:
+  crowdsec_config:
+  crowdsec_data:

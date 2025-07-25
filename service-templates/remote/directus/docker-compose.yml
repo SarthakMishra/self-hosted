@@ -59,27 +59,13 @@ services:
 
       PUBLIC_URL: "https://${DOMAIN}"
     labels:
-      # Enable Traefik
-      - "traefik.enable=true"
-      - "traefik.docker.network=app-network"
-      
-      # HTTP to HTTPS redirect
-      - "traefik.http.routers.directus-http.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.directus-http.entrypoints=web"
-      - "traefik.http.routers.directus-http.middlewares=directus-https-redirect"
-      - "traefik.http.middlewares.directus-https-redirect.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.directus-https-redirect.redirectscheme.permanent=true"
-      
-      # HTTPS router
+      - "traefik.enable=true" 
       - "traefik.http.routers.directus.rule=Host(`${DOMAIN}`)"
       - "traefik.http.routers.directus.entrypoints=websecure"
       - "traefik.http.routers.directus.tls.certresolver=letsencrypt"
-      
-      # Service
       - "traefik.http.services.directus.loadbalancer.server.port=8055"
+      - "traefik.http.routers.directus.middlewares=security-headers@file,crowdsec@file"
 
-      # Watchtower
-      - "com.centurylinklabs.watchtower.enable=true"
     networks:
       - app-network
       - directus-internal

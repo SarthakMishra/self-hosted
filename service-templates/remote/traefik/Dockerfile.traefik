@@ -1,0 +1,2 @@
+FROM traefik:latest
+COPY middlewares.yml /etc/traefik/middlewares.yml

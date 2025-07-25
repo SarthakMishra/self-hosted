@@ -1,0 +1,58 @@
+services:
+  serpbear:
+    image: towfiqi/serpbear:latest
+    container_name: serpbear
+    restart: unless-stopped
+    
+    # Environment configuration
+    env_file:
+      - .env
+    
+    environment:
+      # Core SerpBear configuration
+      - USER=${SERPBEAR_USER:-admin}
+      - PASSWORD=${SERPBEAR_PASSWORD}
+      - SECRET=${SERPBEAR_SECRET}
+      - APIKEY=${SERPBEAR_APIKEY}
+      - NEXT_PUBLIC_APP_URL=https://${SERPBEAR_DOMAIN}
+      
+      # Optional: Additional configuration
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3000
+
+    volumes:
+      # Persistent data storage
+      - serpbear_data:/app/data
+    
+    ports:
+      - "3344:3000"
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.serpbear.rule=Host(`${SERPBEAR_DOMAIN}`)"
+      - "traefik.http.routers.serpbear.entrypoints=websecure"
+      - "traefik.http.routers.serpbear.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.serpbear.service=serpbear"
+      - "traefik.http.services.serpbear.loadbalancer.server.port=3000"
+      - "traefik.http.routers.serpbear.middlewares=security-headers@file,crowdsec@file"
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    # Network configuration
+    networks:
+      - app-network
+
+# External network created by Traefik
+networks:
+  app-network:
+    external: true
+
+# Persistent volumes
+volumes:
+  serpbear_data:
+    driver: local

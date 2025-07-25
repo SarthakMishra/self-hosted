@@ -49,31 +49,13 @@ services:
         condition: service_healthy
 
     labels:
-      # Enable Traefik
       - "traefik.enable=true"
-      
-      # HTTPS configuration
       - "traefik.http.routers.postiz.rule=Host(`${POSTIZ_DOMAIN}`)"
       - "traefik.http.routers.postiz.entrypoints=websecure"
       - "traefik.http.routers.postiz.tls.certresolver=letsencrypt"
       - "traefik.http.routers.postiz.service=postiz"
-      
-      # Service configuration
       - "traefik.http.services.postiz.loadbalancer.server.port=5000"
-      
-      # Security headers middleware
-      - "traefik.http.middlewares.postiz-headers.headers.stsSeconds=315360000"
-      - "traefik.http.middlewares.postiz-headers.headers.browserxssfilter=true"
-      - "traefik.http.middlewares.postiz-headers.headers.contenttypenosniff=true"
-      - "traefik.http.middlewares.postiz-headers.headers.forcestsheader=true"
-      - "traefik.http.middlewares.postiz-headers.headers.sslhost=${POSTIZ_DOMAIN}"
-      - "traefik.http.middlewares.postiz-headers.headers.stsincludesubdomains=true"
-      - "traefik.http.middlewares.postiz-headers.headers.stspreload=true"
-      - "traefik.http.middlewares.postiz-headers.headers.framedeny=true"
-      - "traefik.http.middlewares.postiz-headers.headers.referrerpolicy=strict-origin-when-cross-origin"
-      
-      # Apply middleware to HTTPS router
-      - "traefik.http.routers.postiz.middlewares=postiz-headers"
+      - "traefik.http.routers.postiz.middlewares=security-headers@file,crowdsec@file"
 
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]

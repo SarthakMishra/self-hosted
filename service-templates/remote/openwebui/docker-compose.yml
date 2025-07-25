@@ -52,34 +52,13 @@ services:
       - openwebui_data:/app/backend/data
 
     labels:
-      # Enable Traefik
       - "traefik.enable=true"
-      
-      # HTTPS configuration
       - "traefik.http.routers.openwebui.rule=Host(`${OPENWEBUI_DOMAIN}`)"
       - "traefik.http.routers.openwebui.entrypoints=websecure"
       - "traefik.http.routers.openwebui.tls.certresolver=letsencrypt"
       - "traefik.http.routers.openwebui.service=openwebui"
-      
-      # Service configuration
       - "traefik.http.services.openwebui.loadbalancer.server.port=8080"
-      
-      # Security headers middleware
-      - "traefik.http.middlewares.openwebui-headers.headers.sslredirect=true"
-      - "traefik.http.middlewares.openwebui-headers.headers.stsSeconds=315360000"
-      - "traefik.http.middlewares.openwebui-headers.headers.browserxssfilter=true"
-      - "traefik.http.middlewares.openwebui-headers.headers.contenttypenosniff=true"
-      - "traefik.http.middlewares.openwebui-headers.headers.forcestsheader=true"
-      - "traefik.http.middlewares.openwebui-headers.headers.sslhost=${OPENWEBUI_DOMAIN}"
-      - "traefik.http.middlewares.openwebui-headers.headers.stsincludesubdomains=true"
-      - "traefik.http.middlewares.openwebui-headers.headers.stspreload=true"
-      - "traefik.http.middlewares.openwebui-headers.headers.framedeny=true"
-      
-      # Apply middleware to HTTPS router
-      - "traefik.http.routers.openwebui.middlewares=openwebui-headers"
-
-      # Watchtower
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "traefik.http.routers.openwebui.middlewares=security-headers@file,crowdsec@file"
 
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
