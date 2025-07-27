@@ -56,9 +56,23 @@ http:
             - "2a06:98c0::/29"
             - "2c0f:f248::/32"
 
-# Experimental plugins configuration
-experimental:
-  plugins:
-    bouncer:
-      moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
-      version: v1.4.4 
+    # API Key Authentication middleware
+    api-key-auth:
+      plugin:
+        traefik-api-key-auth:
+          enabled: true
+          authenticationHeaderEnabled: true
+          authenticationHeaderName: "X-API-KEY"
+          bearerHeader: true
+          bearerHeaderName: "Authorization"
+          queryParam: true
+          queryParamName: "token"
+          keys:
+            - "your-very-secret-api-key"  # Replace with your actual API key
+
+    # Basic Authentication middleware
+    basic-auth:
+      basicAuth:
+        users:
+          - "admin:$2y$10$your_hashed_password_here"  # Generate with: htpasswd -nbB admin your_password
+        removeHeader: true

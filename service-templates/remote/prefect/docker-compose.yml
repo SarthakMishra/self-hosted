@@ -1,0 +1,189 @@
+services:
+  prefect-server:
+    image: prefecthq/prefect:3-latest
+    container_name: prefect-server
+    restart: unless-stopped
+    
+    # Environment configuration
+    env_file:
+      - .env
+    
+    environment:
+      # Database configuration
+      - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@prefect-db:5432/${POSTGRES_DB}
+      
+      # Server configuration
+      - PREFECT_SERVER_API_HOST=0.0.0.0
+      - PREFECT_SERVER_API_PORT=4200
+      
+      # Messaging configuration
+      - PREFECT_MESSAGING_BROKER=prefect_redis.messaging
+      - PREFECT_MESSAGING_CACHE=prefect_redis.messaging
+      - PREFECT_REDIS_MESSAGING_HOST=prefect-redis
+      - PREFECT_REDIS_MESSAGING_PORT=6379
+      - PREFECT_REDIS_MESSAGING_DB=0
+      
+      # Optional: External API URL for webhooks
+      - PREFECT_API_URL=https://${PREFECT_DOMAIN}/api
+
+      # Optional: Basic authentication string
+      - PREFECT_SERVER_API_AUTH_STRING=${API_AUTH_STRING}
+      - PREFECT_API_AUTH_STRING=${API_AUTH_STRING}
+      
+      # Optional: Security settings
+      - PREFECT_SERVER_ANALYTICS_ENABLED=${PREFECT_ANALYTICS_ENABLED:-false}
+      - PREFECT_SERVER_TELEMETRY_ENABLED=${PREFECT_TELEMETRY_ENABLED:-false}
+
+    depends_on:
+      prefect-db:
+        condition: service_healthy
+      prefect-redis:
+        condition: service_healthy
+
+    command: prefect server start --no-services
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prefect-https.rule=Host(`${PREFECT_DOMAIN}`)"
+      - "traefik.http.routers.prefect-https.entrypoints=websecure"
+      - "traefik.http.routers.prefect-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.prefect-https.service=prefect-server"
+      - "traefik.http.services.prefect-server.loadbalancer.server.port=4200"
+      - "traefik.http.routers.prefect-https.middlewares=security-headers@file,crowdsec@file"
+
+    networks:
+      - app-network
+      - prefect-internal
+
+  prefect-services:
+    image: prefecthq/prefect:3-latest
+    container_name: prefect-services
+    restart: unless-stopped
+    
+    env_file:
+      - .env
+    
+    environment:
+      # Database configuration
+      - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@prefect-db:5432/${POSTGRES_DB}
+      
+      # Messaging configuration
+      - PREFECT_MESSAGING_BROKER=prefect_redis.messaging
+      - PREFECT_MESSAGING_CACHE=prefect_redis.messaging
+      - PREFECT_REDIS_MESSAGING_HOST=prefect-redis
+      - PREFECT_REDIS_MESSAGING_PORT=6379
+      - PREFECT_REDIS_MESSAGING_DB=0
+
+    depends_on:
+      prefect-db:
+        condition: service_healthy
+      prefect-redis:
+        condition: service_healthy
+      prefect-server:
+        condition: service_started
+
+    command: prefect server services start
+
+    networks:
+      - prefect-internal
+
+    labels:
+      - "traefik.enable=false"
+
+  prefect-worker:
+    image: prefecthq/prefect:3-latest
+    container_name: prefect-worker
+    restart: unless-stopped
+    
+    env_file:
+      - .env
+    
+    environment:
+      # API configuration
+      - PREFECT_API_URL=http://prefect-server:4200/api
+      - PREFECT_SERVER_API_AUTH_STRING=${API_AUTH_STRING}
+      - PREFECT_API_AUTH_STRING=${API_AUTH_STRING}
+
+      # Worker configuration
+      - PREFECT_WORKER_PREFETCH_SECONDS=${PREFECT_WORKER_PREFETCH_SECONDS:-10}
+      - PREFECT_WORKER_WORK_QUEUE_NAME=${PREFECT_WORKER_WORK_QUEUE_NAME:-default}
+
+    depends_on:
+      prefect-server:
+        condition: service_started
+
+    command: prefect worker start --pool ${PREFECT_WORKER_POOL:-local-pool}
+
+    networks:
+      - prefect-internal
+
+    labels:
+      - "traefik.enable=false"
+
+  prefect-db:
+    image: postgres:15-alpine
+    container_name: prefect-db
+    restart: unless-stopped
+    
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_INITDB_ARGS=${POSTGRES_INITDB_ARGS:---encoding=UTF-8 --lc-collate=C --lc-ctype=C}
+    
+    volumes:
+      - prefect_db_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+    networks:
+      - prefect-internal
+
+    labels:
+      - "traefik.enable=false"
+
+  prefect-redis:
+    image: redis:7-alpine
+    container_name: prefect-redis
+    restart: unless-stopped
+    
+    command: redis-server --appendonly yes --maxmemory ${REDIS_MAX_MEMORY:-256mb} --maxmemory-policy allkeys-lru
+    
+    volumes:
+      - prefect_redis_data:/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    networks:
+      - prefect-internal
+
+    labels:
+      - "traefik.enable=false"
+
+# Networks
+networks:
+  # External network for Traefik communication
+  app-network:
+    external: true
+    
+  # Internal network for service communication
+  prefect-internal:
+    driver: bridge
+    internal: true
+
+# Persistent volumes
+volumes:
+  prefect_db_data:
+    driver: local
+  prefect_redis_data:
+    driver: local 

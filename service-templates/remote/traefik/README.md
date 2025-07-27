@@ -76,6 +76,52 @@ labels:
 
 **Note**: The `crowdsec@file` middleware provides real-time threat protection. All services using this middleware will be protected by CrowdSec's threat detection.
 
+## API Key Authentication Middleware
+
+### Overview
+
+The API key authentication middleware (`traefik-api-key-auth`) allows you to protect specific routes or services with an API key. Requests must provide a valid API key via header, bearer token, query parameter, or path segment, or they will receive a 403 Forbidden response.
+
+This is useful for protecting internal APIs, admin endpoints, or any service that should require a secret key for access.
+
+### Configuration
+
+The middleware is defined in `middlewares.example.yml` and can be enabled for any service by adding the appropriate label. You can customize accepted keys and which methods are allowed (header, bearer, query param, path segment).
+
+#### Example middleware definition (see `middlewares.example.yml`):
+
+```yaml
+api-key-auth:
+  plugin:
+    traefik-api-key-auth:
+      enabled: true
+      authenticationHeaderEnabled: true
+      authenticationHeaderName: "X-API-KEY"
+      bearerHeader: true
+      bearerHeaderName: "Authorization"
+      queryParam: true
+      queryParamName: "token"
+      keys:
+        - "your-very-secret-api-key"
+```
+
+#### Example service labels:
+
+```yaml
+labels:
+  - "traefik.enable=true"
+  - "traefik.http.routers.myapi.rule=Host(`api.yourdomain.com`)"
+  - "traefik.http.routers.myapi.entrypoints=websecure"
+  - "traefik.http.routers.myapi.tls.certresolver=letsencrypt"
+  - "traefik.http.services.myapi.loadbalancer.server.port=8080"
+  - "traefik.http.routers.myapi.middlewares=security-headers@file,crowdsec@file,api-key-auth@file"
+```
+
+**Security Note:**
+- Use strong, unique API keys and rotate them regularly.
+- Do not expose sensitive endpoints without authentication.
+- This middleware can be combined with CrowdSec and security headers for layered protection.
+
 ## UFW Management
 
 ### Automatic Cloudflare IP Whitelisting

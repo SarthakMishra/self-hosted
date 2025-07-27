@@ -55,6 +55,10 @@ services:
       # CrowdSec plugin configuration
       - --experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
       - --experimental.plugins.bouncer.version=v1.4.4
+
+      # API Key Authentication
+      - --experimental.plugins.traefik-api-key-auth.modulename=github.com/Septima/traefik-api-key-auth
+      - --experimental.plugins.traefik-api-key-auth.version=v0.3.0
       
       # Logging
       - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
