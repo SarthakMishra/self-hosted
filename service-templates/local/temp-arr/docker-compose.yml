@@ -1,0 +1,359 @@
+---
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    volumes:
+      - ./cloudflared-config.yml:/cloudflared-config.yml
+      - ./cloudflared-credentials.json:/cloudflared-credentials.json
+    command: tunnel --no-autoupdate --config=/cloudflared-config.yml run
+    networks:
+      - local-network
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment:
+      - PUID=${PUID_SONARR}
+      - PGID=${PGID_SHARED}
+      - UMASK=002
+      - TZ=${TZ_MAIN}
+    volumes:
+      - ${BASE_CONFIG_PATH}/sonarr-config:/config
+      - ${BASE_DATA_PATH}:/data
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sonarr.rule=Host(`sonarr.local`)"
+      - "traefik.http.routers.sonarr.entrypoints=web"
+      - "traefik.http.services.sonarr.loadbalancer.server.port=8989"
+      - "traefik.docker.network=local-network"
+    networks:
+      - local-network
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment:
+      - PUID=${PUID_RADARR}
+      - PGID=${PGID_SHARED}
+      - UMASK=002
+      - TZ=${TZ_MAIN}
+    volumes:
+      - ${BASE_CONFIG_PATH}/radarr-config:/config
+      - ${BASE_DATA_PATH}:/data
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.radarr.rule=Host(`radarr.local`)"
+      - "traefik.http.routers.radarr.entrypoints=web"
+      - "traefik.http.services.radarr.loadbalancer.server.port=7878"
+      - "traefik.docker.network=local-network"
+    networks:
+      - local-network
+
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - VPN_SERVICE_PROVIDER=private internet access
+      - VPN_PORT_FORWARDING=true
+      - PORT_FORWARD_ONLY=true
+      - VPN_PORT_FORWARDING_STATUS_FILE=/shared/forwarded_port
+      - TZ=${TZ_MAIN}
+      - OPENVPN_USER=${OPENVPN_USER}
+      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
+      - UPDATER_PERIOD=24h
+      - DOT_PROVIDERS=cloudflare,google
+      - PUBLICIP_API=ip2location
+      - HTTPPROXY=on
+      - HTTPPROXY_LOG=true
+    volumes:
+      - gluetun-data:/gluetun
+      - qbt-gluetun-shared:/shared
+    networks:
+      - vpn-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/openvpn/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:develop
+    container_name: prowlarr
+    environment:
+      - PUID=${PUID_PROWLARR}
+      - PGID=${PGID_SHARED}
+      - UMASK=002
+      - TZ=${TZ_MAIN}
+      # Configure HTTP proxy for external requests
+      - HTTP_PROXY=http://gluetun:8888
+      - HTTPS_PROXY=http://gluetun:8888
+      - NO_PROXY=localhost,127.0.0.1,radarr,sonarr,qbittorrent,*.local
+    volumes:
+      - ${BASE_CONFIG_PATH}/prowlarr-config:/config
+    networks:
+      - local-network
+      - vpn-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prowlarr.rule=Host(`prowlarr.local`)"
+      - "traefik.http.routers.prowlarr.entrypoints=web"
+      - "traefik.http.services.prowlarr.loadbalancer.server.port=9696"
+      - "traefik.docker.network=local-network"
+    restart: unless-stopped
+    depends_on:
+      - gluetun
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      - PUID=${PUID_QBITTORRENT}
+      - PGID=${PGID_SHARED}
+      - TZ=${TZ_MAIN}
+      - WEBUI_PORT=${QBITTORRENT_WEBUI_PORT}
+      - WEBUI_ADDRESS=0.0.0.0
+      - TORRENTING_PORT=${QBITTORRENT_TORRENTING_PORT}
+    volumes:
+      - ${BASE_CONFIG_PATH}/qbittorrent-config:/config
+      - ${BASE_DATA_PATH}/torrents/downloads:/downloads
+      - qbt-gluetun-shared:/shared
+    networks:
+      - local-network
+      - vpn-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.qbittorrent.rule=Host(`torrent.local`)"
+      - "traefik.http.routers.qbittorrent.entrypoints=web"
+      - "traefik.http.services.qbittorrent.loadbalancer.server.port=${QBITTORRENT_WEBUI_PORT}"
+      - "traefik.docker.network=local-network"
+    restart: unless-stopped
+    depends_on:
+      - gluetun
+
+  qbittorrent-port-updater:
+    image: alpine:latest
+    container_name: qbittorrent-port-updater
+    environment:
+      - QBT_USERNAME=${QBT_USERNAME}
+      - QBT_PASSWORD=${QBT_PASSWORD}
+      - QBT_HOST=qbittorrent
+      - QBT_PORT=${QBITTORRENT_WEBUI_PORT}
+      - CHECK_INTERVAL=60
+      - PORT_FILE=/shared/forwarded_port
+    volumes:
+      - qbt-gluetun-shared:/shared
+      - ./qbt-port-updater.sh:/usr/local/bin/qbt-port-updater.sh:ro
+    networks:
+      - vpn-network
+    restart: unless-stopped
+    depends_on:
+      - qbittorrent
+    command: sh /usr/local/bin/qbt-port-updater.sh
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    environment:
+      - PUID=${PUID_BAZARR}
+      - PGID=${PGID_SHARED}
+      - UMASK=002
+      - TZ=${TZ_MAIN}
+    volumes:
+      - ${BASE_CONFIG_PATH}/bazarr-config:/config
+      - ${BASE_DATA_PATH}:/data
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bazarr.rule=Host(`bazarr.local`)"
+      - "traefik.http.routers.bazarr.entrypoints=web"
+      - "traefik.http.services.bazarr.loadbalancer.server.port=6767"
+      - "traefik.docker.network=local-network"
+    networks:
+      - local-network
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_HTML=${LOG_HTML:-false}
+      - CAPTCHA_SOLVER=${CAPTCHA_SOLVER:-none}
+      - TZ=${TZ_MAIN}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.flaresolverr.rule=Host(`flaresolverr.local`)"
+      - "traefik.http.routers.flaresolverr.entrypoints=web"
+      - "traefik.http.services.flaresolverr.loadbalancer.server.port=8191"
+      - "traefik.docker.network=local-network"
+    networks:
+      - local-network
+    restart: unless-stopped
+
+  plex:
+    image: plexinc/pms-docker
+    container_name: plex
+    environment:
+      - TZ=${TZ_MAIN}
+    volumes:
+      - ${BASE_CONFIG_PATH}/plex-config:/config
+      - ${BASE_DATA_PATH}/media:/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.plex.rule=Host(`plex.local`)"
+      - "traefik.http.routers.plex.entrypoints=web"
+      - "traefik.http.services.plex.loadbalancer.server.port=${PLEX_PORT}"
+      - "traefik.docker.network=local-network"
+    networks:
+      - local-network
+    restart: unless-stopped
+
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    environment:
+      - LOG_LEVEL=debug
+      - TZ=${TZ_MAIN}
+      - PORT=${JELLYSEERR_PORT}
+    volumes:
+      - ${BASE_CONFIG_PATH}/jellyseerr-config:/app/config
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jellyseerr.rule=Host(`jellyseerr.local`)"
+      - "traefik.http.routers.jellyseerr.entrypoints=web"
+      - "traefik.http.services.jellyseerr.loadbalancer.server.port=${JELLYSEERR_PORT}"
+      - "traefik.docker.network=local-network"
+    networks:
+      - local-network
+    restart: unless-stopped
+
+  immich:
+    container_name: immich
+    image: ghcr.io/immich-app/immich-server:release
+    volumes:
+      - ${BASE_DATA_PATH}/media/photos:/usr/src/app/upload
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      # Remove nginx-proxy configurations as they're not needed with Traefik
+      - DB_HOSTNAME=immich-database
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=postgres
+      - DB_DATABASE_NAME=immich
+      - REDIS_HOSTNAME=immich-redis
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.immich.rule=Host(`immich.local`)"
+      - "traefik.http.routers.immich.entrypoints=web"
+      - "traefik.http.services.immich.loadbalancer.server.port=${IMMICH_PORT}"
+      - "traefik.docker.network=local-network"
+      # Handle large uploads
+      - "traefik.http.routers.immich.middlewares=immich-headers"
+      - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-Proto=http"
+      - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-For=$$remote_addr"
+    networks:
+      - local-network
+    depends_on:
+      - immich-redis
+      - immich-database
+    restart: always
+    healthcheck:
+      disable: false
+
+  immich-machine-learning:
+    container_name: immich_machine_learning
+    image: ghcr.io/immich-app/immich-machine-learning:release-cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities:
+                - gpu
+    volumes:
+      - ${BASE_CONFIG_PATH}/immich-config/ml-cache:/cache
+    networks:
+      - local-network
+    restart: always
+    healthcheck:
+      disable: false
+
+  immich-redis:
+    container_name: immich_redis
+    image: docker.io/valkey/valkey:8-bookworm@sha256:fec42f399876eb6faf9e008570597741c87ff7662a54185593e74b09ce83d177
+    healthcheck:
+      test: redis-cli ping || exit 1
+    networks:
+      local-network:
+        aliases:
+          - redis
+    restart: always
+
+  immich-database:
+    container_name: immich_postgres
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: immich
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+    volumes:
+      - immich-postgres-data:/var/lib/postgresql/data
+    restart: always
+    networks:
+      local-network:
+        aliases:
+          - database
+
+  frigate:
+    container_name: frigate
+    restart: unless-stopped
+    stop_grace_period: 30s
+    image: ghcr.io/blakeblackshear/frigate:stable-tensorrt
+    environment:
+      - YOLO_MODELS=yolov7-320,yolov7x-640
+      - USE_FP16=false
+      - TZ=${TZ_MAIN}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities:
+                - gpu
+    volumes:
+      - ${BASE_CONFIG_PATH}/frigate-config:/config
+      - ${BASE_DATA_PATH}/media/cctv:/media/frigate
+      - ./frigate_config.yaml:/config/config.yaml:ro
+    ports:
+      - "${FRIGATE_RTSP_PORT}:${FRIGATE_RTSP_PORT}"  # Keep RTSP port for camera streams
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frigate.rule=Host(`frigate.local`)"
+      - "traefik.http.routers.frigate.entrypoints=web"
+      - "traefik.http.services.frigate.loadbalancer.server.port=${FRIGATE_PORT}"
+      - "traefik.docker.network=local-network"
+    networks:
+      - local-network
+
+# Networks
+networks:
+  local-network:
+    external: true
+  vpn-network:
+    driver: bridge
+    internal: false
+
+volumes:
+  immich-postgres-data:
+  gluetun-data:
+  qbt-gluetun-shared:

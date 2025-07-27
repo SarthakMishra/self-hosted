@@ -194,3 +194,4 @@ wg0.conf
 cloudflare.ini
 *.secret.*
 middlewares.yml
+**/cronicle/data/

@@ -1,0 +1,40 @@
+services:
+  cronicle:
+    image: soulteary/cronicle:0.9.80
+    restart: always
+    hostname: cronicle
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ./data/data:/opt/cronicle/data
+      - ./data/logs:/opt/cronicle/logs
+      - ./data/plugins:/opt/cronicle/plugins
+    extra_hosts:
+      - "cron.local:0.0.0.0"
+    environment:
+      - TZ=Asia/Shanghai
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider localhost:3012/api/app/ping || exit 1"]
+      interval: 5s
+      timeout: 1s
+      retries: 3
+    logging:
+        driver: "json-file"
+        options:
+            max-size: "10m"
+    
+    # Traefik configuration
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cronicle.rule=Host(`cron.local`)"
+      - "traefik.http.routers.cronicle.entrypoints=web"
+      - "traefik.http.services.cronicle.loadbalancer.server.port=3012"
+      - "traefik.docker.network=local-network"
+    
+    networks:
+      - local-network
+
+# Networks
+networks:
+  local-network:
+    external: true
