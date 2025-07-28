@@ -8,9 +8,15 @@ services:
     # Environment configuration
     env_file:
       - .env
+    environment:
+      - DB_HOSTNAME=immich-database
+      - DB_USERNAME=immich
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_DATABASE_NAME=immich
+      - REDIS_HOSTNAME=immich-redis
     
     volumes:
-      - /opt/docker/data/media/photos:/usr/src/app/upload
+      - /mnt/Data/Shared_Storage/Rishi/Selfhosted/data/photos:/usr/src/app/upload
       - /etc/localtime:/etc/localtime:ro
     
     labels:
@@ -32,17 +38,21 @@ services:
       # Service configuration (Immich web interface on port 2283)
       - "traefik.http.services.immich.loadbalancer.server.port=2283"
       
-      # Middleware for large file uploads and timeouts
+      # Middleware for large file uploads (50GB max)
       - "traefik.http.middlewares.immich-uploads.buffering.maxRequestBodyBytes=50000000000"  # 50GB
       - "traefik.http.middlewares.immich-uploads.buffering.maxResponseBodyBytes=50000000000" # 50GB
       - "traefik.http.middlewares.immich-uploads.buffering.memRequestBodyBytes=1048576"     # 1MB
       - "traefik.http.middlewares.immich-uploads.buffering.memResponseBodyBytes=1048576"    # 1MB
-      - "traefik.http.middlewares.immich-timeouts.forwardingTimeouts.dialTimeout=300s"
-      - "traefik.http.middlewares.immich-timeouts.forwardingTimeouts.responseHeaderTimeout=300s"
-      - "traefik.http.middlewares.immich-timeouts.forwardingTimeouts.idleConnTimeout=300s"
       
-      # Apply middlewares
-      - "traefik.http.routers.immich-https.middlewares=immich-uploads,immich-timeouts"
+      # HTTP to HTTPS redirect
+      - "traefik.http.middlewares.immich-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.immich-http.middlewares=immich-redirect"
+      
+      # Apply middleware to HTTPS router
+      - "traefik.http.routers.immich-https.middlewares=immich-uploads"
+      
+      # Network specification for Traefik
+      - "traefik.docker.network=home-network"
     
     networks:
       - home-network
@@ -55,17 +65,10 @@ services:
 
   immich-machine-learning:
     container_name: immich_machine_learning
-    image: ghcr.io/immich-app/immich-machine-learning:release-cuda
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities:
-                - gpu
+    image: ghcr.io/immich-app/immich-machine-learning:release
+    
     volumes:
-      - /opt/docker/config/immich-config/ml-cache:/cache
+      - /mnt/Data/Shared_Storage/Rishi/Selfhosted/config/immich-config/ml-cache:/cache
     networks:
       - home-network
     restart: always

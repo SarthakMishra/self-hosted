@@ -195,3 +195,5 @@ cloudflare.ini
 *.secret.*
 middlewares.yml
 **/cronicle/data/
+mcp-config.json
+frigate_config.yaml

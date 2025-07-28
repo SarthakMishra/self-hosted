@@ -75,6 +75,42 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  mcpo:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcpo
+    container_name: mcpo
+    restart: unless-stopped
+    
+    # Environment configuration
+    env_file:
+      - .env
+    
+    environment:
+      - MCPO_API_KEY=${MCPO_API_KEY}
+      - MCPO_PORT=${MCPO_PORT:-8001}
+    
+    command: ["--config", "/app/config.json", "--port", "${MCPO_PORT:-8001}", "--api-key", "${MCPO_API_KEY}"]
+    
+    # Internal service - not exposed through Traefik
+    labels:
+      - "traefik.enable=false"
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:${MCPO_PORT:-8001}/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    # Network configuration - accessible internally by OpenWebUI
+    networks:
+      - app-network
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+
 # External network created by Traefik
 networks:
   app-network:

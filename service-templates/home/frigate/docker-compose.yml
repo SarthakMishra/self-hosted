@@ -1,38 +1,20 @@
 ---
 services:
-
   frigate:
+    build:
+      context: .
+      dockerfile: Dockerfile.frigate
     container_name: frigate
     restart: unless-stopped
     stop_grace_period: 30s
-    image: ghcr.io/blakeblackshear/frigate:stable-tensorrt
-    # Environment configuration
     env_file:
       - .env
     
     environment:
-      - YOLO_MODELS=yolov7-320.trt
-      - USE_FP16=true
       - TZ=UTC
-      # Camera credentials for config file substitution
-      - CAMERA_USER_1=${CAMERA_USER_1}
-      - CAMERA_PASS_1=${CAMERA_PASS_1}
-      - CAMERA_IP_1=${CAMERA_IP_1}
-      - CAMERA_USER_2=${CAMERA_USER_2}
-      - CAMERA_PASS_2=${CAMERA_PASS_2}
-      - CAMERA_IP_2=${CAMERA_IP_2}
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities:
-                - gpu
     volumes:
-      - /opt/docker/config/frigate-config:/config
-      - /opt/docker/data/media/cctv:/media/frigate
-      - ./frigate_config.yaml:/config/config.yaml:ro
+      - /mnt/Data/Shared_Storage/Rishi/Selfhosted/config/frigate-config:/config
+      - /mnt/Data/Shared_Storage/Rishi/Selfhosted/data/cctv:/media/frigate
     ports:
       - "5000:5000"        # Keep for RTMP streams and API access
       - "8554:8554"  # Keep for RTSP restreaming

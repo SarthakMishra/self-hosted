@@ -1,16 +1,5 @@
 ---
 services:
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: cloudflared
-    restart: unless-stopped
-    volumes:
-      - ./cloudflared-config.yml:/cloudflared-config.yml
-      - ./cloudflared-credentials.json:/cloudflared-credentials.json
-    command: tunnel --no-autoupdate --config=/cloudflared-config.yml run
-    networks:
-      - local-network
-
   sonarr:
     image: lscr.io/linuxserver/sonarr:latest
     container_name: sonarr
@@ -124,7 +113,7 @@ services:
       - TORRENTING_PORT=${QBITTORRENT_TORRENTING_PORT}
     volumes:
       - ${BASE_CONFIG_PATH}/qbittorrent-config:/config
-      - ${BASE_DATA_PATH}/torrents/downloads:/downloads
+      - ${BASE_DATA_PATH}/torrents:/downloads
       - qbt-gluetun-shared:/shared
     networks:
       - local-network
@@ -235,116 +224,6 @@ services:
       - local-network
     restart: unless-stopped
 
-  immich:
-    container_name: immich
-    image: ghcr.io/immich-app/immich-server:release
-    volumes:
-      - ${BASE_DATA_PATH}/media/photos:/usr/src/app/upload
-      - /etc/localtime:/etc/localtime:ro
-    environment:
-      # Remove nginx-proxy configurations as they're not needed with Traefik
-      - DB_HOSTNAME=immich-database
-      - DB_USERNAME=postgres
-      - DB_PASSWORD=postgres
-      - DB_DATABASE_NAME=immich
-      - REDIS_HOSTNAME=immich-redis
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.immich.rule=Host(`immich.local`)"
-      - "traefik.http.routers.immich.entrypoints=web"
-      - "traefik.http.services.immich.loadbalancer.server.port=${IMMICH_PORT}"
-      - "traefik.docker.network=local-network"
-      # Handle large uploads
-      - "traefik.http.routers.immich.middlewares=immich-headers"
-      - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-Proto=http"
-      - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-For=$$remote_addr"
-    networks:
-      - local-network
-    depends_on:
-      - immich-redis
-      - immich-database
-    restart: always
-    healthcheck:
-      disable: false
-
-  immich-machine-learning:
-    container_name: immich_machine_learning
-    image: ghcr.io/immich-app/immich-machine-learning:release-cuda
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities:
-                - gpu
-    volumes:
-      - ${BASE_CONFIG_PATH}/immich-config/ml-cache:/cache
-    networks:
-      - local-network
-    restart: always
-    healthcheck:
-      disable: false
-
-  immich-redis:
-    container_name: immich_redis
-    image: docker.io/valkey/valkey:8-bookworm@sha256:fec42f399876eb6faf9e008570597741c87ff7662a54185593e74b09ce83d177
-    healthcheck:
-      test: redis-cli ping || exit 1
-    networks:
-      local-network:
-        aliases:
-          - redis
-    restart: always
-
-  immich-database:
-    container_name: immich_postgres
-    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
-    environment:
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_USER: postgres
-      POSTGRES_DB: immich
-      POSTGRES_INITDB_ARGS: '--data-checksums'
-    volumes:
-      - immich-postgres-data:/var/lib/postgresql/data
-    restart: always
-    networks:
-      local-network:
-        aliases:
-          - database
-
-  frigate:
-    container_name: frigate
-    restart: unless-stopped
-    stop_grace_period: 30s
-    image: ghcr.io/blakeblackshear/frigate:stable-tensorrt
-    environment:
-      - YOLO_MODELS=yolov7-320,yolov7x-640
-      - USE_FP16=false
-      - TZ=${TZ_MAIN}
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities:
-                - gpu
-    volumes:
-      - ${BASE_CONFIG_PATH}/frigate-config:/config
-      - ${BASE_DATA_PATH}/media/cctv:/media/frigate
-      - ./frigate_config.yaml:/config/config.yaml:ro
-    ports:
-      - "${FRIGATE_RTSP_PORT}:${FRIGATE_RTSP_PORT}"  # Keep RTSP port for camera streams
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.frigate.rule=Host(`frigate.local`)"
-      - "traefik.http.routers.frigate.entrypoints=web"
-      - "traefik.http.services.frigate.loadbalancer.server.port=${FRIGATE_PORT}"
-      - "traefik.docker.network=local-network"
-    networks:
-      - local-network
-
 # Networks
 networks:
   local-network:
@@ -354,6 +233,5 @@ networks:
     internal: false
 
 volumes:
-  immich-postgres-data:
   gluetun-data:
   qbt-gluetun-shared:

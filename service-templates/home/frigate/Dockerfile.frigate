@@ -1,0 +1,2 @@
+FROM ghcr.io/blakeblackshear/frigate:stable
+COPY frigate_config.yaml /config/config.yaml
