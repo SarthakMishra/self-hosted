@@ -7,17 +7,33 @@ services:
     container_name: frigate
     restart: unless-stopped
     stop_grace_period: 30s
+    privileged: true  # May be needed for hardware access
+    
+    # Increase shared memory size for multiple high-resolution cameras
+    shm_size: "256mb"  # Increased from default 64mb to support 4+ cameras
+    
     env_file:
       - .env
     
     environment:
       - TZ=UTC
+    
     volumes:
-      - /mnt/Data/Shared_Storage/Rishi/Selfhosted/config/frigate-config:/config
       - /mnt/Data/Shared_Storage/Rishi/Selfhosted/data/cctv:/media/frigate
+      - type: tmpfs  # Cache for recordings - reduces SSD wear
+        target: /tmp/cache
+        tmpfs:
+          size: 1000000000  # 1GB
+    
+    devices:
+      # Intel hardware acceleration (if available)
+      - /dev/dri/renderD128:/dev/dri/renderD128
+    
     ports:
-      - "5000:5000"        # Keep for RTMP streams and API access
-      - "8554:8554"  # Keep for RTSP restreaming
+      - "5000:5000"        # Web interface and API
+      - "8554:8554"        # RTSP restreaming  
+      - "8555:8555/tcp"    # WebRTC over TCP
+      - "8555:8555/udp"    # WebRTC over UDP
     
     labels:
       # Enable Traefik
