@@ -1,4 +1,0 @@
-.env
-frigate_config.yaml
-cloudflared-credentials.json
-cloudflared-config.yml
