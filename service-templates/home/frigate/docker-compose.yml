@@ -17,6 +17,7 @@ services:
     
     environment:
       - TZ=UTC
+      - FRIGATE_JWT_SECRET=${FRIGATE_JWT_SECRET}
     
     volumes:
       - /mnt/Data/Shared_Storage/Rishi/Selfhosted/data/cctv:/media/frigate

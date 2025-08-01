@@ -67,6 +67,13 @@ services:
       # Enable Traefik for itself
       - "traefik.enable=true"
       
+      # Traefik dashboard router
+      - "traefik.http.routers.api.rule=Host(`traefik.${ROOT_DOMAIN}`)"
+      - "traefik.http.routers.api.service=api@internal"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls=true"
+      - "traefik.http.routers.api.middlewares=security-headers"
+      
       # Simplified security headers for home use
       - "traefik.http.middlewares.security-headers.headers.browserxssfilter=true"
       - "traefik.http.middlewares.security-headers.headers.contenttypenosniff=true"
@@ -87,9 +94,19 @@ services:
     networks:
       - home-network
 
-    # Security options
-    security_opt:
-      - no-new-privileges:true
+  # Cloudflare Tunnel
+  cloudflared-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-tunnel
+    restart: unless-stopped
+    
+    command: tunnel run
+    
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    
+    networks:
+      - home-network
 
 # Networks
 networks:
@@ -98,4 +115,4 @@ networks:
 
 volumes:
   traefik_letsencrypt:
-    external: true 
+    external: true

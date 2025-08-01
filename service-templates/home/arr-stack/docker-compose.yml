@@ -1,154 +1,17 @@
 ---
 services:
-
-  flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr:latest
-    container_name: flaresolverr
-    
-    # Environment configuration
-    env_file:
-      - .env
-    
-    environment:
-      - LOG_LEVEL=info
-      - LOG_HTML=false
-      - CAPTCHA_SOLVER=none
-      - TZ=UTC
-    
-    labels:
-      # Enable Traefik
-      - "traefik.enable=true"
-      
-      # Web interface routing - HTTP
-      - "traefik.http.routers.flaresolverr-http.rule=Host(`${FLARESOLVERR_DOMAIN}`)"
-      - "traefik.http.routers.flaresolverr-http.entrypoints=web"
-      - "traefik.http.routers.flaresolverr-http.service=flaresolverr"
-      
-      # Web interface routing - HTTPS  
-      - "traefik.http.routers.flaresolverr-https.rule=Host(`${FLARESOLVERR_DOMAIN}`)"
-      - "traefik.http.routers.flaresolverr-https.entrypoints=websecure"
-      - "traefik.http.routers.flaresolverr-https.tls=true"
-      - "traefik.http.routers.flaresolverr-https.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.flaresolverr-https.service=flaresolverr"
-      
-      # Service configuration (Flaresolverr on port 8191)
-      - "traefik.http.services.flaresolverr.loadbalancer.server.port=8191"
-    
-    networks:
-      - home-network
-    restart: unless-stopped
-
-  gluetun:
-    image: qmcgaw/gluetun:latest
-    container_name: gluetun
-    cap_add:
-      - NET_ADMIN
-    devices:
-      - /dev/net/tun:/dev/net/tun
-    environment:
-      - VPN_SERVICE_PROVIDER=custom
-      - VPN_TYPE=wireguard
-      - TZ=UTC
-      - FIREWALL_VPN_INPUT_PORTS=9696,8080
-    volumes:
-      - gluetun-data:/gluetun
-      - ./wg0.conf:/gluetun/wireguard/wg0.conf
-    ports:
-      - "9696:9696"  # Direct access for VPN service
-      - "8080:8080"  # qBittorrent web UI
-      - "6881:6881"  # qBittorrent torrenting
-      - "6881:6881/udp"  # qBittorrent torrenting UDP
-    
-    labels:
-      # Enable Traefik
-      - "traefik.enable=true"
-      
-      # Prowlarr routing - HTTP
-      - "traefik.http.routers.prowlarr-http.rule=Host(`${PROWLARR_DOMAIN}`)"
-      - "traefik.http.routers.prowlarr-http.entrypoints=web"
-      - "traefik.http.routers.prowlarr-http.service=prowlarr"
-      
-      # Prowlarr routing - HTTPS  
-      - "traefik.http.routers.prowlarr-https.rule=Host(`${PROWLARR_DOMAIN}`)"
-      - "traefik.http.routers.prowlarr-https.entrypoints=websecure"
-      - "traefik.http.routers.prowlarr-https.tls=true"
-      - "traefik.http.routers.prowlarr-https.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.prowlarr-https.service=prowlarr"
-      
-      # Prowlarr service configuration
-      - "traefik.http.services.prowlarr.loadbalancer.server.port=9696"
-      
-      # qBittorrent routing - HTTP
-      - "traefik.http.routers.qbittorrent-http.rule=Host(`${QBITTORRENT_DOMAIN}`)"
-      - "traefik.http.routers.qbittorrent-http.entrypoints=web"
-      - "traefik.http.routers.qbittorrent-http.service=qbittorrent"
-      
-      # qBittorrent routing - HTTPS  
-      - "traefik.http.routers.qbittorrent-https.rule=Host(`${QBITTORRENT_DOMAIN}`)"
-      - "traefik.http.routers.qbittorrent-https.entrypoints=websecure"
-      - "traefik.http.routers.qbittorrent-https.tls=true"
-      - "traefik.http.routers.qbittorrent-https.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.qbittorrent-https.service=qbittorrent"
-      
-      # qBittorrent service configuration
-      - "traefik.http.services.qbittorrent.loadbalancer.server.port=8080"
-    
-    networks:
-      - home-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/openvpn/status"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  prowlarr:
-    image: lscr.io/linuxserver/prowlarr:develop
-    container_name: prowlarr
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - UMASK=002
-      - TZ=UTC
-      # Note: Using gluetun network, accessible via Traefik at PROWLARR_DOMAIN
-    volumes:
-      - /opt/docker/config/prowlarr-config:/config
-    network_mode: "service:gluetun"
-    depends_on:
-      - gluetun
-    restart: unless-stopped
-
-  qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:latest
-    container_name: qbittorrent
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - UMASK=002
-      - TZ=UTC
-      - WEBUI_PORT=8080
-      - TORRENTING_PORT=6881
-      # Note: Using gluetun network, accessible via Traefik at QBITTORRENT_DOMAIN
-    volumes:
-      - /opt/docker/config/qbittorrent-config:/config
-      - /opt/docker/data/downloads:/downloads
-    network_mode: "service:gluetun"
-    depends_on:
-      - gluetun
-    restart: unless-stopped
-
   sonarr:
     image: lscr.io/linuxserver/sonarr:latest
     container_name: sonarr
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=${PUID_SONARR}
+      - PGID=${PGID_SHARED}
       - UMASK=002
-      - TZ=UTC
+      - TZ=${TZ_MAIN}
     volumes:
-      - /opt/docker/config/sonarr-config:/config
-      - /opt/docker/data:/data
-    
+      - ${BASE_CONFIG_PATH}/sonarr-config:/config
+      - ${BASE_DATA_PATH}:/data
+    restart: unless-stopped
     labels:
       # Enable Traefik
       - "traefik.enable=true"
@@ -165,10 +28,15 @@ services:
       - "traefik.http.routers.sonarr-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.sonarr-https.service=sonarr"
       
-      # Service configuration (Sonarr on port 8989)
+      # Service configuration
       - "traefik.http.services.sonarr.loadbalancer.server.port=8989"
-    
-    restart: unless-stopped
+      
+      # HTTP to HTTPS redirect
+      - "traefik.http.middlewares.sonarr-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.sonarr-http.middlewares=sonarr-redirect"
+      
+      # Network specification for Traefik
+      - "traefik.docker.network=home-network"
     networks:
       - home-network
 
@@ -176,14 +44,14 @@ services:
     image: lscr.io/linuxserver/radarr:latest
     container_name: radarr
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=${PUID_RADARR}
+      - PGID=${PGID_SHARED}
       - UMASK=002
-      - TZ=UTC
+      - TZ=${TZ_MAIN}
     volumes:
-      - /opt/docker/config/radarr-config:/config
-      - /opt/docker/data:/data
-    
+      - ${BASE_CONFIG_PATH}/radarr-config:/config
+      - ${BASE_DATA_PATH}:/data
+    restart: unless-stopped
     labels:
       # Enable Traefik
       - "traefik.enable=true"
@@ -200,25 +68,174 @@ services:
       - "traefik.http.routers.radarr-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.radarr-https.service=radarr"
       
-      # Service configuration (Radarr on port 7878)
+      # Service configuration
       - "traefik.http.services.radarr.loadbalancer.server.port=7878"
-    
-    restart: unless-stopped
+      
+      # HTTP to HTTPS redirect
+      - "traefik.http.middlewares.radarr-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.radarr-http.middlewares=radarr-redirect"
+      
+      # Network specification for Traefik
+      - "traefik.docker.network=home-network"
     networks:
       - home-network
+
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - VPN_SERVICE_PROVIDER=private internet access
+      - VPN_PORT_FORWARDING=true
+      - PORT_FORWARD_ONLY=true
+      - VPN_PORT_FORWARDING_STATUS_FILE=/shared/forwarded_port
+      - TZ=${TZ_MAIN}
+      - OPENVPN_USER=${OPENVPN_USER}
+      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
+      - UPDATER_PERIOD=24h
+      - DOT_PROVIDERS=cloudflare,google
+      - PUBLICIP_API=ip2location
+      - HTTPPROXY=on
+      - HTTPPROXY_LOG=true
+    volumes:
+      - gluetun-data:/gluetun
+      - qbt-gluetun-shared:/shared
+    networks:
+      - vpn-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/openvpn/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:develop
+    container_name: prowlarr
+    environment:
+      - PUID=${PUID_PROWLARR}
+      - PGID=${PGID_SHARED}
+      - UMASK=002
+      - TZ=${TZ_MAIN}
+      # Configure HTTP proxy for external requests
+      - HTTP_PROXY=http://gluetun:8888
+      - HTTPS_PROXY=http://gluetun:8888
+      - NO_PROXY=localhost,127.0.0.1,radarr,sonarr,qbittorrent,*.local
+    volumes:
+      - ${BASE_CONFIG_PATH}/prowlarr-config:/config
+    networks:
+      - home-network
+      - vpn-network
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+      
+      # Web interface routing - HTTP
+      - "traefik.http.routers.prowlarr-http.rule=Host(`${PROWLARR_DOMAIN}`)"
+      - "traefik.http.routers.prowlarr-http.entrypoints=web"
+      - "traefik.http.routers.prowlarr-http.service=prowlarr"
+      
+      # Web interface routing - HTTPS  
+      - "traefik.http.routers.prowlarr-https.rule=Host(`${PROWLARR_DOMAIN}`)"
+      - "traefik.http.routers.prowlarr-https.entrypoints=websecure"
+      - "traefik.http.routers.prowlarr-https.tls=true"
+      - "traefik.http.routers.prowlarr-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.prowlarr-https.service=prowlarr"
+      
+      # Service configuration
+      - "traefik.http.services.prowlarr.loadbalancer.server.port=9696"
+      
+      # HTTP to HTTPS redirect
+      - "traefik.http.middlewares.prowlarr-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.prowlarr-http.middlewares=prowlarr-redirect"
+      
+      # Network specification for Traefik
+      - "traefik.docker.network=home-network"
+    restart: unless-stopped
+    depends_on:
+      - gluetun
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      - PUID=${PUID_QBITTORRENT}
+      - PGID=${PGID_SHARED}
+      - TZ=${TZ_MAIN}
+      - WEBUI_PORT=${QBITTORRENT_WEBUI_PORT}
+      - WEBUI_ADDRESS=0.0.0.0
+      - TORRENTING_PORT=${QBITTORRENT_TORRENTING_PORT}
+    volumes:
+      - ${BASE_CONFIG_PATH}/qbittorrent-config:/config
+      - ${BASE_DATA_PATH}/torrents:/downloads
+      - qbt-gluetun-shared:/shared
+    networks:
+      - home-network
+      - vpn-network
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+      
+      # Web interface routing - HTTP
+      - "traefik.http.routers.qbittorrent-http.rule=Host(`${QBITTORRENT_DOMAIN}`)"
+      - "traefik.http.routers.qbittorrent-http.entrypoints=web"
+      - "traefik.http.routers.qbittorrent-http.service=qbittorrent"
+      
+      # Web interface routing - HTTPS  
+      - "traefik.http.routers.qbittorrent-https.rule=Host(`${QBITTORRENT_DOMAIN}`)"
+      - "traefik.http.routers.qbittorrent-https.entrypoints=websecure"
+      - "traefik.http.routers.qbittorrent-https.tls=true"
+      - "traefik.http.routers.qbittorrent-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.qbittorrent-https.service=qbittorrent"
+      
+      # Service configuration
+      - "traefik.http.services.qbittorrent.loadbalancer.server.port=${QBITTORRENT_WEBUI_PORT}"
+      
+      # HTTP to HTTPS redirect
+      - "traefik.http.middlewares.qbittorrent-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.qbittorrent-http.middlewares=qbittorrent-redirect"
+      
+      # Network specification for Traefik
+      - "traefik.docker.network=home-network"
+    restart: unless-stopped
+    depends_on:
+      - gluetun
+
+  qbittorrent-port-updater:
+    image: alpine:latest
+    container_name: qbittorrent-port-updater
+    environment:
+      - QBT_USERNAME=${QBT_USERNAME}
+      - QBT_PASSWORD=${QBT_PASSWORD}
+      - QBT_HOST=qbittorrent
+      - QBT_PORT=${QBITTORRENT_WEBUI_PORT}
+      - CHECK_INTERVAL=60
+      - PORT_FILE=/shared/forwarded_port
+    volumes:
+      - qbt-gluetun-shared:/shared
+      - ./qbt-port-updater.sh:/usr/local/bin/qbt-port-updater.sh:ro
+    networks:
+      - vpn-network
+    restart: unless-stopped
+    depends_on:
+      - qbittorrent
+    command: sh /usr/local/bin/qbt-port-updater.sh
 
   bazarr:
     image: lscr.io/linuxserver/bazarr:latest
     container_name: bazarr
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=${PUID_BAZARR}
+      - PGID=${PGID_SHARED}
       - UMASK=002
-      - TZ=UTC
+      - TZ=${TZ_MAIN}
     volumes:
-      - /opt/docker/config/bazarr-config:/config
-      - /opt/docker/data:/data
-    
+      - ${BASE_CONFIG_PATH}/bazarr-config:/config
+      - ${BASE_DATA_PATH}:/data
+    restart: unless-stopped
     labels:
       # Enable Traefik
       - "traefik.enable=true"
@@ -235,24 +252,40 @@ services:
       - "traefik.http.routers.bazarr-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.bazarr-https.service=bazarr"
       
-      # Service configuration (Bazarr on port 6767)
+      # Service configuration
       - "traefik.http.services.bazarr.loadbalancer.server.port=6767"
-    
-    restart: unless-stopped
+      
+      # HTTP to HTTPS redirect
+      - "traefik.http.middlewares.bazarr-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.bazarr-http.middlewares=bazarr-redirect"
+      
+      # Network specification for Traefik
+      - "traefik.docker.network=home-network"
     networks:
       - home-network
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_HTML=${LOG_HTML:-false}
+      - CAPTCHA_SOLVER=${CAPTCHA_SOLVER:-none}
+      - TZ=${TZ_MAIN}
+    networks:
+      - home-network
+    restart: unless-stopped
 
   plex:
     image: plexinc/pms-docker
     container_name: plex
     environment:
-      - TZ=UTC
+      - TZ=${TZ_MAIN}
+      - PLEX_UID=1010
+      - PLEX_GID=3000
     volumes:
-      - /opt/docker/config/plex-config:/config
-      - /opt/docker/data/media:/data
-    ports:
-      - "32400:32400"  # Keep for direct access and client discovery
-    
+      - ${BASE_CONFIG_PATH}/plex-config:/config
+      - ${BASE_DATA_PATH}:/data
     labels:
       # Enable Traefik
       - "traefik.enable=true"
@@ -269,9 +302,15 @@ services:
       - "traefik.http.routers.plex-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.plex-https.service=plex"
       
-      # Service configuration (Plex on port 32400)
-      - "traefik.http.services.plex.loadbalancer.server.port=32400"
-    
+      # Service configuration
+      - "traefik.http.services.plex.loadbalancer.server.port=${PLEX_PORT}"
+      
+      # HTTP to HTTPS redirect
+      - "traefik.http.middlewares.plex-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.plex-http.middlewares=plex-redirect"
+      
+      # Network specification for Traefik
+      - "traefik.docker.network=home-network"
     networks:
       - home-network
     restart: unless-stopped
@@ -281,11 +320,10 @@ services:
     container_name: jellyseerr
     environment:
       - LOG_LEVEL=debug
-      - TZ=UTC
-      - PORT=5055
+      - TZ=${TZ_MAIN}
+      - PORT=${JELLYSEERR_PORT}
     volumes:
-      - /opt/docker/config/jellyseerr-config:/app/config
-    
+      - ${BASE_CONFIG_PATH}/jellyseerr-config:/app/config
     labels:
       # Enable Traefik
       - "traefik.enable=true"
@@ -302,16 +340,27 @@ services:
       - "traefik.http.routers.jellyseerr-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.jellyseerr-https.service=jellyseerr"
       
-      # Service configuration (Jellyseerr on port 5055)
-      - "traefik.http.services.jellyseerr.loadbalancer.server.port=5055"
-    
-    restart: unless-stopped
+      # Service configuration
+      - "traefik.http.services.jellyseerr.loadbalancer.server.port=${JELLYSEERR_PORT}"
+      
+      # HTTP to HTTPS redirect
+      - "traefik.http.middlewares.jellyseerr-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.jellyseerr-http.middlewares=jellyseerr-redirect"
+      
+      # Network specification for Traefik
+      - "traefik.docker.network=home-network"
     networks:
       - home-network
+    restart: unless-stopped
 
+# Networks
 networks:
   home-network:
     external: true
+  vpn-network:
+    driver: bridge
+    internal: false
 
 volumes:
   gluetun-data:
+  qbt-gluetun-shared:

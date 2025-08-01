@@ -1,0 +1,91 @@
+services:
+  ghost-db:
+    image: mysql:8.0
+    container_name: ghost-db
+    restart: unless-stopped
+    
+    environment:
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD}"
+      MYSQL_DATABASE: "${DB_DATABASE}"
+      MYSQL_USER: "${DB_USER}"
+      MYSQL_PASSWORD: "${DB_PASSWORD}"
+    
+    volumes:
+      - ghost_db_data:/var/lib/mysql
+      - ./mysql-config:/etc/mysql/conf.d
+    
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    networks:
+      - ghost-internal
+
+  ghost:
+    image: ghost:5-alpine
+    container_name: ghost
+    restart: unless-stopped
+    
+    # Environment configuration
+    env_file:
+      - .env
+    
+    environment:
+      # Core Ghost configuration
+      url: "https://${GHOST_DOMAIN}"
+      NODE_ENV: production
+      
+      # Database configuration
+      database__client: mysql
+      database__connection__host: ghost-db
+      database__connection__port: 3306
+      database__connection__database: "${DB_DATABASE}"
+      database__connection__user: "${DB_USER}"
+      database__connection__password: "${DB_PASSWORD}"
+      
+      # Mail configuration (optional)
+      mail__transport: "${GHOST_MAIL_TRANSPORT:-SMTP}"
+      mail__options__service: "${GHOST_MAIL_SERVICE}"
+      mail__options__host: "${GHOST_MAIL_HOST}"
+      mail__options__port: "${GHOST_MAIL_PORT:-587}"
+      mail__options__auth__user: "${GHOST_MAIL_USER}"
+      mail__options__auth__pass: "${GHOST_MAIL_PASSWORD}"
+      mail__from: "${GHOST_MAIL_FROM}"
+    
+    volumes:
+      - ghost_content:/var/lib/ghost/content
+    
+    depends_on:
+      ghost-db:
+        condition: service_healthy
+    
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ghost-https.rule=Host(`${GHOST_DOMAIN}`)"
+      - "traefik.http.routers.ghost-https.entrypoints=websecure"
+      - "traefik.http.routers.ghost-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.ghost-https.service=ghost"
+      - "traefik.http.services.ghost.loadbalancer.server.port=2368"
+      - "traefik.http.routers.ghost-https.middlewares=security-headers@file,crowdsec@file"
+    
+    # Network configuration
+    networks:
+      - app-network
+      - ghost-internal
+
+# External network created by Traefik
+networks:
+  app-network:
+    external: true
+  ghost-internal:
+    driver: bridge
+
+# Persistent volumes
+volumes:
+  ghost_content:
+    driver: local
+  ghost_db_data:
+    driver: local 
