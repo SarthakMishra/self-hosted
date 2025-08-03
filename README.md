@@ -1,8 +1,5 @@
 # Self-Hosted Infrastructure
 
-> [!WARNING] 
-> ⚠️ **This project has AI-generated code. Use with caution!**
-
 Complete automation for self-hosted server deployment.
 
 ## 📦 Components
