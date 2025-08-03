@@ -4,8 +4,8 @@ services:
     image: lscr.io/linuxserver/sonarr:latest
     container_name: sonarr
     environment:
-      - PUID=${PUID_SONARR}
-      - PGID=${PGID_SHARED}
+      - PUID=1010
+      - PGID=3000
       - UMASK=002
       - TZ=${TZ_MAIN}
     volumes:
@@ -44,8 +44,8 @@ services:
     image: lscr.io/linuxserver/radarr:latest
     container_name: radarr
     environment:
-      - PUID=${PUID_RADARR}
-      - PGID=${PGID_SHARED}
+      - PUID=1010
+      - PGID=3000
       - UMASK=002
       - TZ=${TZ_MAIN}
     volumes:
@@ -116,8 +116,8 @@ services:
     image: lscr.io/linuxserver/prowlarr:develop
     container_name: prowlarr
     environment:
-      - PUID=${PUID_PROWLARR}
-      - PGID=${PGID_SHARED}
+      - PUID=1010
+      - PGID=3000
       - UMASK=002
       - TZ=${TZ_MAIN}
       # Configure HTTP proxy for external requests
@@ -162,8 +162,9 @@ services:
     image: lscr.io/linuxserver/qbittorrent:latest
     container_name: qbittorrent
     environment:
-      - PUID=${PUID_QBITTORRENT}
-      - PGID=${PGID_SHARED}
+      - PUID=1010
+      - PGID=3000
+      - UMASK=002
       - TZ=${TZ_MAIN}
       - WEBUI_PORT=${QBITTORRENT_WEBUI_PORT}
       - WEBUI_ADDRESS=0.0.0.0
@@ -228,8 +229,8 @@ services:
     image: lscr.io/linuxserver/bazarr:latest
     container_name: bazarr
     environment:
-      - PUID=${PUID_BAZARR}
-      - PGID=${PGID_SHARED}
+      - PUID=1010
+      - PGID=3000
       - UMASK=002
       - TZ=${TZ_MAIN}
     volumes:
@@ -286,6 +287,8 @@ services:
     volumes:
       - ${BASE_CONFIG_PATH}/plex-config:/config
       - ${BASE_DATA_PATH}:/data
+    ports:
+      - "192.168.29.131:32400:32400"
     labels:
       # Enable Traefik
       - "traefik.enable=true"
