@@ -1,0 +1,210 @@
+services:
+  affine:
+    image: ghcr.io/toeverything/affine:${AFFINE_REVISION:-stable}
+    container_name: affine_server
+    restart: unless-stopped
+    
+    # Environment configuration
+    env_file:
+      - .env
+    
+    environment:
+      # Core Affine configuration
+      - AFFINE_SERVER_HOST=${AFFINE_DOMAIN}
+      - AFFINE_SERVER_PORT=3010
+      - NODE_ENV=production
+      
+      # Database configuration
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@affine-postgres:5432/${POSTGRES_DB}
+      
+      # Redis configuration
+      - REDIS_SERVER_HOST=affine-redis
+      - REDIS_SERVER_PORT=6379
+      - REDIS_SERVER_PASSWORD=${REDIS_PASSWORD}
+      
+      # Storage configuration
+      - AFFINE_STORAGE_PATH=/root/.affine/storage
+      - AFFINE_CONFIG_PATH=/root/.affine/config
+      
+      # Feature toggles
+      - AFFINE_INDEXER_ENABLED=${AFFINE_INDEXER_ENABLED:-false}
+      - AFFINE_TELEMETRY_ENABLED=${AFFINE_TELEMETRY_ENABLED:-false}
+      
+      # Security configuration
+      - AFFINE_SECRET=${AFFINE_SECRET}
+      - JWT_SECRET=${AFFINE_JWT_SECRET}
+      
+      # Optional: Email configuration
+      - MAILER_HOST=${AFFINE_MAILER_HOST}
+      - MAILER_PORT=${AFFINE_MAILER_PORT:-587}
+      - MAILER_USER=${AFFINE_MAILER_USER}
+      - MAILER_PASS=${AFFINE_MAILER_PASS}
+      - MAILER_SENDER=${AFFINE_MAILER_SENDER}
+
+    depends_on:
+      affine-redis:
+        condition: service_healthy
+      affine-postgres:
+        condition: service_healthy
+      affine-migration:
+        condition: service_completed_successfully
+
+    volumes:
+      # Persistent storage for user data
+      - affine_storage:/root/.affine/storage
+      
+      # Configuration files
+      - affine_config:/root/.affine/config
+      
+      # Optional: Custom configurations
+      # - ./custom-config:/root/.affine/custom:ro
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.affine-https.rule=Host(`${AFFINE_DOMAIN}`)"
+      - "traefik.http.routers.affine-https.entrypoints=websecure"
+      - "traefik.http.routers.affine-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.affine-https.service=affine"
+      - "traefik.http.services.affine.loadbalancer.server.port=3010"
+      - "traefik.http.routers.affine-https.middlewares=security-headers@file,crowdsec@file"
+
+    # Network configuration
+    networks:
+      - app-network
+      - affine-internal
+
+  affine-migration:
+    image: ghcr.io/toeverything/affine:${AFFINE_REVISION:-stable}
+    container_name: affine_migration_job
+    
+    # Migration command
+    command: ['sh', '-c', 'node ./scripts/self-host-predeploy.js']
+    
+    # Environment configuration
+    env_file:
+      - .env
+    
+    environment:
+      # Database configuration
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@affine-postgres:5432/${POSTGRES_DB}
+      
+      # Redis configuration
+      - REDIS_SERVER_HOST=affine-redis
+      - REDIS_SERVER_PORT=6379
+      - REDIS_SERVER_PASSWORD=${REDIS_PASSWORD}
+      
+      # Feature toggles
+      - AFFINE_INDEXER_ENABLED=${AFFINE_INDEXER_ENABLED:-false}
+      
+      # Security configuration
+      - AFFINE_SECRET=${AFFINE_SECRET}
+
+    depends_on:
+      affine-postgres:
+        condition: service_healthy
+      affine-redis:
+        condition: service_healthy
+
+    volumes:
+      # Persistent storage for user data
+      - affine_storage:/root/.affine/storage
+      
+      # Configuration files
+      - affine_config:/root/.affine/config
+
+    # Network configuration (only internal network needed for migration)
+    networks:
+      - affine-internal
+
+    # Labels for organization (not exposed to Traefik)
+    labels:
+      - "traefik.enable=false"
+
+  affine-redis:
+    image: redis:7-alpine
+    container_name: affine_redis
+    restart: unless-stopped
+    
+    # Redis configuration
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+
+    volumes:
+      # Persistent Redis data
+      - affine_redis_data:/data
+      
+      # Optional: Custom Redis configuration
+      # - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD} --raw incr ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+    # Network configuration (only internal network)
+    networks:
+      - affine-internal
+
+    # Labels for organization (not exposed to Traefik)
+    labels:
+      - "traefik.enable=false"
+
+  affine-postgres:
+    image: pgvector/pgvector:pg16
+    container_name: affine_postgres
+    restart: unless-stopped
+    
+    # Environment configuration
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_INITDB_ARGS=${POSTGRES_INITDB_ARGS:---data-checksums --encoding=UTF-8 --lc-collate=C --lc-ctype=C}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    
+    volumes:
+      # Persistent database storage
+      - affine_postgres_data:/var/lib/postgresql/data
+
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+    # Network configuration (only internal network)
+    networks:
+      - affine-internal
+
+    # Labels for organization (not exposed to Traefik)
+    labels:
+      - "traefik.enable=false"
+
+# Networks
+networks:
+  # External network for Traefik communication
+  app-network:
+    external: true
+    
+  # Internal network for database communication
+  affine-internal:
+    driver: bridge
+    internal: true
+
+# Persistent volumes
+volumes:
+  affine_storage:
+    driver: local
+  affine_config:
+    driver: local
+  affine_redis_data:
+    driver: local
+  affine_postgres_data:
+    driver: local

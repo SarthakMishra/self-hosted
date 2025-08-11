@@ -82,6 +82,10 @@ services:
     container_name: mcpo
     restart: unless-stopped
     
+    # Enable access to host services
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    
     # Environment configuration
     env_file:
       - .env
@@ -95,13 +99,6 @@ services:
     # Internal service - not exposed through Traefik
     labels:
       - "traefik.enable=false"
-
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:${MCPO_PORT:-8001}/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
 
     # Network configuration - accessible internally by OpenWebUI
     networks:
