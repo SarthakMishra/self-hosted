@@ -34,6 +34,8 @@ services:
       - "traefik.http.services.vaultwarden.loadbalancer.server.port=80"
       - "traefik.http.routers.vaultwarden-https.middlewares=security-headers@file,crowdsec@file"
 
+      - "com.centurylinklabs.watchtower.enable=true"
+
     networks:
       - app-network
 

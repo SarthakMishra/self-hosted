@@ -33,6 +33,8 @@ services:
       - "traefik.http.services.serpbear.loadbalancer.server.port=3000"
       - "traefik.http.routers.serpbear.middlewares=security-headers@file,crowdsec@file"
 
+      - "com.centurylinklabs.watchtower.enable=true"
+
     # Network configuration
     networks:
       - app-network

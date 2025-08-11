@@ -60,6 +60,8 @@ services:
       - "traefik.http.services.openwebui.loadbalancer.server.port=8080"
       - "traefik.http.routers.openwebui.middlewares=security-headers@file,crowdsec@file"
 
+      - "com.centurylinklabs.watchtower.enable=true"
+
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
       interval: 30s

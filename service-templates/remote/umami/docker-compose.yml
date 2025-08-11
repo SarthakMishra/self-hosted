@@ -47,6 +47,8 @@ services:
       - "traefik.http.services.umami.loadbalancer.server.port=3000"
       - "traefik.http.routers.umami-https.middlewares=security-headers@file,crowdsec@file"
 
+      - "com.centurylinklabs.watchtower.enable=true"
+
     # Health check
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3000/api/heartbeat || exit 1"]
