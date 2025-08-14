@@ -1,0 +1,19 @@
+services:
+  litellm-proxy:
+    image: ghcr.io/berriai/litellm:main-stable
+    container_name: litellm-proxy
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./config.yaml:/app/config.yaml
+    environment:
+      - LITELLM_PROXY_API_KEY=${LITELLM_PROXY_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    networks:
+      - local-network
+    command: ["--config", "/app/config.yaml"]
+
+networks:
+  local-network:
+    external: true

@@ -1,0 +1,26 @@
+{
+    "ServerApp": {
+        "token": "",
+        "password": "",
+        "disable_check_xsrf": true,
+        "allow_origin": "*",
+        "allow_root": true,
+        "ip": "0.0.0.0",
+        "open_browser": false,
+        "tornado_settings": {
+            "xsrf_cookies": false,
+            "check_origin": false
+        },
+        "log_level": "ERROR"
+    },
+    "KernelManager": {
+        "shutdown_wait_time": 10,
+        "kernel_info_timeout": 60,
+        "shell_timeout": 60
+    },
+    "IPKernelApp": {
+        "pylab": "inline",
+        "matplotlib": "inline",
+        "pydevd_use_frame_eval": false
+    }
+}
