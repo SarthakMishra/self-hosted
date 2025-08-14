@@ -1,0 +1,181 @@
+services:
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: openwebui
+    restart: unless-stopped
+    
+    # Enable access to host services
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    
+    # Environment configuration
+    env_file:
+      - .env
+    
+    environment:
+      # Core Open WebUI configuration
+      - WEBUI_NAME=${WEBUI_NAME:-Open WebUI}
+      - WEBUI_URL=http://chat.local
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
+      
+      # Database configuration
+      - DATABASE_URL=postgresql://openwebui:${POSTGRES_PASSWORD:-openwebui}@postgresql:5432/openwebui
+      - VECTOR_DB=pgvector
+      
+      # User authentication and registration
+      - ENABLE_SIGNUP=${ENABLE_SIGNUP:-false}
+      - DEFAULT_USER_ROLE=${DEFAULT_USER_ROLE:-pending}
+      - ENABLE_LOGIN_FORM=${ENABLE_LOGIN_FORM:-true}
+      - ENABLE_ADMIN_SHOW=${ENABLE_ADMIN_SHOW:-true}
+      - ENABLE_MESSAGE_RATING=${ENABLE_MESSAGE_RATING:-true}
+      - ENABLE_USER_WEBHOOKS=${ENABLE_USER_WEBHOOKS:-true}
+      
+      # API key configuration
+      - ENABLE_API_KEY=${ENABLE_API_KEY:-true}
+      
+      # Model management
+      - MODEL_FILTER_ENABLED=${MODEL_FILTER_ENABLED:-false}
+      - MODEL_FILTER_LIST=${MODEL_FILTER_LIST}
+      
+      # RAG configuration
+      - ENABLE_RAG=${ENABLE_RAG:-true}
+      - RAG_TEMPLATE=${RAG_TEMPLATE}
+      - RAG_TOP_K=${RAG_TOP_K:-3}
+      - RAG_RELEVANCE_THRESHOLD=${RAG_RELEVANCE_THRESHOLD:-0.0}
+      - RAG_ENABLE_HYBRID_SEARCH=${RAG_ENABLE_HYBRID_SEARCH:-false}
+      - RAG_HYBRID_BM25_WEIGHT=${RAG_HYBRID_BM25_WEIGHT:-0.5}
+      - RAG_EMBEDDING_MODEL=${RAG_EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L12-v2}
+      
+      # Web search configuration
+      - ENABLE_RAG_WEB_SEARCH=${ENABLE_WEB_SEARCH:-true}
+      - RAG_WEB_SEARCH_ENGINE=${WEB_SEARCH_ENGINE:-tavily}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - RAG_WEB_SEARCH_RESULT_COUNT=${WEB_SEARCH_RESULT_COUNT:-5}
+      - RAG_WEB_SEARCH_CONCURRENT_REQUESTS=${WEB_SEARCH_CONCURRENT_REQUESTS:-10}
+      - GOOGLE_PSE_API_KEY=${GOOGLE_PSE_API_KEY}
+      - GOOGLE_PSE_ENGINE_ID=${GOOGLE_PSE_ENGINE_ID}
+      - BRAVE_SEARCH_API_KEY=${BRAVE_SEARCH_API_KEY}
+      
+      # File uploads and document processing
+      - ENABLE_IMAGE_GENERATION=${ENABLE_IMAGE_GENERATION:-true}
+      - ENABLE_COMMUNITY_SHARING=${ENABLE_COMMUNITY_SHARING:-false}
+      - PDF_EXTRACT_IMAGES=${PDF_EXTRACT_IMAGES:-true}
+      - ENABLE_ADMIN_EXPORT=${ENABLE_ADMIN_EXPORT:-true}
+      - FILE_MAX_SIZE=${FILE_MAX_SIZE:-100}
+      - FILE_MAX_COUNT=${FILE_MAX_COUNT:-10}
+      - FILE_ALLOWED_EXTENSIONS=${FILE_ALLOWED_EXTENSIONS:-txt,doc,docx,pdf,csv,json,md}
+      
+      # Ollama configuration
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      
+      # OpenAI API configuration
+      - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL:-https://openrouter.ai/api/v1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      
+      # Audio and speech
+      - AUDIO_STT_ENGINE=${AUDIO_STT_ENGINE:-}
+      - AUDIO_TTS_ENGINE=${AUDIO_TTS_ENGINE:-}
+      
+      # Advanced features
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - JWT_EXPIRY=${JWT_EXPIRY:--1}
+      - CACHE_EXPIRY=${CACHE_EXPIRY:-3600}
+      
+    volumes:
+      # Persistent data storage
+      - openwebui_data:/app/backend/data
+
+    ports:
+      - 8080:8080
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.openwebui.rule=Host(`chat.local`)"
+      - "traefik.http.routers.openwebui.entrypoints=web"
+      - "traefik.http.services.openwebui.loadbalancer.server.port=8080"
+      - "traefik.docker.network=local-network"
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    # Network configuration
+    networks:
+      - local-network
+    # Ensure postgresql service is started before openwebui
+    depends_on:
+      - postgresql
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+
+  mcpo:
+    image: ghcr.io/open-webui/mcpo:main
+    container_name: mcpo
+    restart: unless-stopped
+    
+    # Enable access to host services
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    
+    # Environment configuration
+    env_file:
+      - .env
+    
+    environment:
+      - MCPO_API_KEY=${MCPO_API_KEY}
+      - MCPO_PORT=${MCPO_PORT:-8001}
+    
+    command: ["--config", "/app/config.json", "--port", "${MCPO_PORT:-8001}", "--api-key", "${MCPO_API_KEY}"]
+
+    volumes:
+      - ./mcp-config.json:/app/config.json
+
+    # Internal service - not exposed through Traefik
+    labels:
+      - "traefik.enable=false"
+
+    # Network configuration - accessible internally by OpenWebUI
+    networks:
+      - local-network
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+
+  postgresql:
+    image: ankane/pgvector:latest
+    container_name: openwebui_postgresql
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=openwebui
+      - POSTGRES_USER=openwebui
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-openwebui}
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+      # Initialize pgvector extension
+      - ./init-pgvector.sh:/docker-entrypoint-initdb.d/init-pgvector.sh:ro
+    networks:
+      - local-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openwebui -d openwebui"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# External network created by Traefik
+networks:
+  local-network:
+    external: true
+
+# Persistent volumes
+volumes:
+  openwebui_data:
+    driver: local
+  postgresql_data:
+    driver: local

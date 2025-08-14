@@ -1,2 +1,0 @@
-FROM ghcr.io/open-webui/mcpo:main
-COPY mcp-config.json /app/config.json
