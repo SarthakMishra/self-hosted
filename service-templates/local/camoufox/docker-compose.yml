@@ -1,0 +1,34 @@
+services:
+  camoufox:
+    build: .
+    container_name: camoufox_service
+    restart: unless-stopped
+    networks:
+      - local-network
+    ports:
+      - "9222:9222"  # Camoufox WebSocket port
+      - "3000:3000"  # Camoufox API port
+    volumes:
+      - camoufox-data:/app/data
+      - /dev/shm:/dev/shm  # Shared memory for browser performance
+    environment:
+      # Core server configuration
+      - PYTHONUNBUFFERED=1
+      - CAMOUFOX_PORT=9222
+      - CAMOUFOX_WS_PATH=camoufox
+      - CAMOUFOX_HEADLESS=true
+      - CAMOUFOX_GEOIP=true
+      
+      # Proxy configuration (optional - leave empty to disable)
+      - CAMOUFOX_PROXY_SERVER=
+      - CAMOUFOX_PROXY_USERNAME=
+      - CAMOUFOX_PROXY_PASSWORD=
+      - CAMOUFOX_DISABLE_COOP=true
+networks:
+  local-network:
+    external: true
+
+volumes:
+  camoufox-data:
+    driver: local
+

@@ -108,6 +108,7 @@ services:
     # Ensure postgresql service is started before openwebui
     depends_on:
       - postgresql
+      - camoufox
 
     # Security options
     security_opt:

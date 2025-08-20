@@ -76,6 +76,7 @@ Complete automation for self-hosted server deployment with production-ready Dock
 | **[Jupyter](service-templates/local/jupyter/)** | Interactive notebooks | `localhost:8888` |
 | **[Cronicle](service-templates/local/cronicle/)** | Visual cron job scheduler | `cron.local` |
 | **[SearXNG](service-templates/local/searxng/)** | Privacy-focused search engine | `search.local` |
+| **[Camoufox](service-templates/local/camoufox/)** | Stealth browser automation service | `localhost:3000` |
 
 ---
 
@@ -108,7 +109,7 @@ docker compose up -d
 ### 3. Production Services
 ```bash
 # Deploy all services
-ansible-playbook -i inventory/stage2-production.yml playbooks/services.yml
+ansible-playbook -i inventory/stage2-hardened.yml playbooks/services.yml
 ```
 
 ---
