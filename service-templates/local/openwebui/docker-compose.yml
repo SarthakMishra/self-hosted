@@ -105,10 +105,10 @@ services:
     # Network configuration
     networks:
       - local-network
-    # Ensure postgresql service is started before openwebui
+    # Ensure services are started before openwebui
     depends_on:
       - postgresql
-      - camoufox
+      - mcpo
 
     # Security options
     security_opt:
