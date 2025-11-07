@@ -1,40 +1,43 @@
 services:
   traefik:
-    image: traefik:v3.1
+    image: traefik:latest
     container_name: traefik
     restart: unless-stopped
-    
+
     # Environment configuration
     env_file:
       - .env
-    
+
     environment:
       # Cloudflare DNS API for Let's Encrypt DNS-01 challenge
       - CF_API_EMAIL=${CLOUDFLARE_EMAIL}
       - CF_API_KEY=${CLOUDFLARE_API_KEY}
       # Alternative: CF_DNS_API_TOKEN (for API tokens instead of Global API Key)
       # - CF_DNS_API_TOKEN=${CLOUDFLARE_DNS_API_TOKEN}
-    
+
     command:
+      # Ping endpoint for healthcheck
+      - --ping=true
+
       # API and Dashboard
       - --api.dashboard=true
       - --api.debug=${TRAEFIK_DEBUG:-false}
-      - --api.insecure=${TRAEFIK_API_INSECURE:-false}
-      
+      - --api.insecure=true
+
       # Entry points
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
-      
+
       # HTTP to HTTPS redirect (DISABLED for flexible home access)
       # - --entrypoints.web.http.redirections.entrypoint.to=websecure
       # - --entrypoints.web.http.redirections.entrypoint.scheme=https
       # - --entrypoints.web.http.redirections.entrypoint.permanent=true
-      
+
       # Docker provider
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
       - --providers.docker.network=home-network
-      
+
       # Let's Encrypt certificate resolver with DNS-01 challenge
       - --certificatesresolvers.letsencrypt.acme.tlschallenge=false
       - --certificatesresolvers.letsencrypt.acme.dnschallenge=true
@@ -43,7 +46,7 @@ services:
       - --certificatesresolvers.letsencrypt.acme.dnschallenge.delaybeforecheck=30
       - --certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}
       - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
-      
+
       # Logging
       - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
       - --accesslog=true
@@ -58,27 +61,26 @@ services:
     volumes:
       # Docker socket for service discovery
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      
+
       # Let's Encrypt certificates storage
       - traefik_letsencrypt:/letsencrypt
-      
 
     labels:
       # Enable Traefik for itself
       - "traefik.enable=true"
-      
+
       # Traefik dashboard router
       - "traefik.http.routers.api.rule=Host(`traefik.${ROOT_DOMAIN}`)"
       - "traefik.http.routers.api.service=api@internal"
       - "traefik.http.routers.api.entrypoints=websecure"
       - "traefik.http.routers.api.tls=true"
       - "traefik.http.routers.api.middlewares=security-headers"
-      
+
       # Simplified security headers for home use
       - "traefik.http.middlewares.security-headers.headers.browserxssfilter=true"
       - "traefik.http.middlewares.security-headers.headers.contenttypenosniff=true"
       - "traefik.http.middlewares.security-headers.headers.referrerpolicy=strict-origin-when-cross-origin"
-      
+
       # HTTPS redirect middleware
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
@@ -99,12 +101,12 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared-tunnel
     restart: unless-stopped
-    
+
     command: tunnel run
-    
+
     environment:
       - TUNNEL_TOKEN=${TUNNEL_TOKEN}
-    
+
     networks:
       - home-network
 
