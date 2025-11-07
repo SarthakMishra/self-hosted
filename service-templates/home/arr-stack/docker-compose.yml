@@ -15,26 +15,26 @@ services:
     labels:
       # Enable Traefik
       - "traefik.enable=true"
-      
+
       # Web interface routing - HTTP
       - "traefik.http.routers.sonarr-http.rule=Host(`${SONARR_DOMAIN}`)"
       - "traefik.http.routers.sonarr-http.entrypoints=web"
       - "traefik.http.routers.sonarr-http.service=sonarr"
-      
-      # Web interface routing - HTTPS  
+
+      # Web interface routing - HTTPS
       - "traefik.http.routers.sonarr-https.rule=Host(`${SONARR_DOMAIN}`)"
       - "traefik.http.routers.sonarr-https.entrypoints=websecure"
       - "traefik.http.routers.sonarr-https.tls=true"
       - "traefik.http.routers.sonarr-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.sonarr-https.service=sonarr"
-      
+
       # Service configuration
       - "traefik.http.services.sonarr.loadbalancer.server.port=8989"
-      
+
       # HTTP to HTTPS redirect
       - "traefik.http.middlewares.sonarr-redirect.redirectscheme.scheme=https"
       - "traefik.http.routers.sonarr-http.middlewares=sonarr-redirect"
-      
+
       # Network specification for Traefik
       - "traefik.docker.network=home-network"
     networks:
@@ -55,26 +55,26 @@ services:
     labels:
       # Enable Traefik
       - "traefik.enable=true"
-      
+
       # Web interface routing - HTTP
       - "traefik.http.routers.radarr-http.rule=Host(`${RADARR_DOMAIN}`)"
       - "traefik.http.routers.radarr-http.entrypoints=web"
       - "traefik.http.routers.radarr-http.service=radarr"
-      
-      # Web interface routing - HTTPS  
+
+      # Web interface routing - HTTPS
       - "traefik.http.routers.radarr-https.rule=Host(`${RADARR_DOMAIN}`)"
       - "traefik.http.routers.radarr-https.entrypoints=websecure"
       - "traefik.http.routers.radarr-https.tls=true"
       - "traefik.http.routers.radarr-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.radarr-https.service=radarr"
-      
+
       # Service configuration
       - "traefik.http.services.radarr.loadbalancer.server.port=7878"
-      
+
       # HTTP to HTTPS redirect
       - "traefik.http.middlewares.radarr-redirect.redirectscheme.scheme=https"
       - "traefik.http.routers.radarr-http.middlewares=radarr-redirect"
-      
+
       # Network specification for Traefik
       - "traefik.docker.network=home-network"
     networks:
@@ -132,26 +132,26 @@ services:
     labels:
       # Enable Traefik
       - "traefik.enable=true"
-      
+
       # Web interface routing - HTTP
       - "traefik.http.routers.prowlarr-http.rule=Host(`${PROWLARR_DOMAIN}`)"
       - "traefik.http.routers.prowlarr-http.entrypoints=web"
       - "traefik.http.routers.prowlarr-http.service=prowlarr"
-      
-      # Web interface routing - HTTPS  
+
+      # Web interface routing - HTTPS
       - "traefik.http.routers.prowlarr-https.rule=Host(`${PROWLARR_DOMAIN}`)"
       - "traefik.http.routers.prowlarr-https.entrypoints=websecure"
       - "traefik.http.routers.prowlarr-https.tls=true"
       - "traefik.http.routers.prowlarr-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.prowlarr-https.service=prowlarr"
-      
+
       # Service configuration
       - "traefik.http.services.prowlarr.loadbalancer.server.port=9696"
-      
+
       # HTTP to HTTPS redirect
       - "traefik.http.middlewares.prowlarr-redirect.redirectscheme.scheme=https"
       - "traefik.http.routers.prowlarr-http.middlewares=prowlarr-redirect"
-      
+
       # Network specification for Traefik
       - "traefik.docker.network=home-network"
     restart: unless-stopped
@@ -179,51 +179,29 @@ services:
     labels:
       # Enable Traefik
       - "traefik.enable=true"
-      
+
       # Web interface routing - HTTP
       - "traefik.http.routers.qbittorrent-http.rule=Host(`${QBITTORRENT_DOMAIN}`)"
       - "traefik.http.routers.qbittorrent-http.entrypoints=web"
       - "traefik.http.routers.qbittorrent-http.service=qbittorrent"
-      
-      # Web interface routing - HTTPS  
+
+      # Web interface routing - HTTPS
       - "traefik.http.routers.qbittorrent-https.rule=Host(`${QBITTORRENT_DOMAIN}`)"
       - "traefik.http.routers.qbittorrent-https.entrypoints=websecure"
       - "traefik.http.routers.qbittorrent-https.tls=true"
       - "traefik.http.routers.qbittorrent-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.qbittorrent-https.service=qbittorrent"
-      
+
       # Service configuration
       - "traefik.http.services.qbittorrent.loadbalancer.server.port=${QBITTORRENT_WEBUI_PORT}"
-      
+
       # HTTP to HTTPS redirect
       - "traefik.http.middlewares.qbittorrent-redirect.redirectscheme.scheme=https"
       - "traefik.http.routers.qbittorrent-http.middlewares=qbittorrent-redirect"
-      
+
       # Network specification for Traefik
       - "traefik.docker.network=home-network"
     restart: unless-stopped
-    depends_on:
-      - gluetun
-
-  qbittorrent-port-updater:
-    image: alpine:latest
-    container_name: qbittorrent-port-updater
-    environment:
-      - QBT_USERNAME=${QBT_USERNAME}
-      - QBT_PASSWORD=${QBT_PASSWORD}
-      - QBT_HOST=qbittorrent
-      - QBT_PORT=${QBITTORRENT_WEBUI_PORT}
-      - CHECK_INTERVAL=60
-      - PORT_FILE=/shared/forwarded_port
-    volumes:
-      - qbt-gluetun-shared:/shared
-      - ./qbt-port-updater.sh:/usr/local/bin/qbt-port-updater.sh:ro
-    networks:
-      - vpn-network
-    restart: unless-stopped
-    depends_on:
-      - qbittorrent
-    command: sh /usr/local/bin/qbt-port-updater.sh
 
   bazarr:
     image: lscr.io/linuxserver/bazarr:latest
@@ -240,26 +218,26 @@ services:
     labels:
       # Enable Traefik
       - "traefik.enable=true"
-      
+
       # Web interface routing - HTTP
       - "traefik.http.routers.bazarr-http.rule=Host(`${BAZARR_DOMAIN}`)"
       - "traefik.http.routers.bazarr-http.entrypoints=web"
       - "traefik.http.routers.bazarr-http.service=bazarr"
-      
-      # Web interface routing - HTTPS  
+
+      # Web interface routing - HTTPS
       - "traefik.http.routers.bazarr-https.rule=Host(`${BAZARR_DOMAIN}`)"
       - "traefik.http.routers.bazarr-https.entrypoints=websecure"
       - "traefik.http.routers.bazarr-https.tls=true"
       - "traefik.http.routers.bazarr-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.bazarr-https.service=bazarr"
-      
+
       # Service configuration
       - "traefik.http.services.bazarr.loadbalancer.server.port=6767"
-      
+
       # HTTP to HTTPS redirect
       - "traefik.http.middlewares.bazarr-redirect.redirectscheme.scheme=https"
       - "traefik.http.routers.bazarr-http.middlewares=bazarr-redirect"
-      
+
       # Network specification for Traefik
       - "traefik.docker.network=home-network"
     networks:
@@ -292,26 +270,26 @@ services:
     labels:
       # Enable Traefik
       - "traefik.enable=true"
-      
+
       # Web interface routing - HTTP
       - "traefik.http.routers.plex-http.rule=Host(`${PLEX_DOMAIN}`)"
       - "traefik.http.routers.plex-http.entrypoints=web"
       - "traefik.http.routers.plex-http.service=plex"
-      
-      # Web interface routing - HTTPS  
+
+      # Web interface routing - HTTPS
       - "traefik.http.routers.plex-https.rule=Host(`${PLEX_DOMAIN}`)"
       - "traefik.http.routers.plex-https.entrypoints=websecure"
       - "traefik.http.routers.plex-https.tls=true"
       - "traefik.http.routers.plex-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.plex-https.service=plex"
-      
+
       # Service configuration
       - "traefik.http.services.plex.loadbalancer.server.port=${PLEX_PORT}"
-      
+
       # HTTP to HTTPS redirect
       - "traefik.http.middlewares.plex-redirect.redirectscheme.scheme=https"
       - "traefik.http.routers.plex-http.middlewares=plex-redirect"
-      
+
       # Network specification for Traefik
       - "traefik.docker.network=home-network"
     networks:
@@ -330,26 +308,26 @@ services:
     labels:
       # Enable Traefik
       - "traefik.enable=true"
-      
+
       # Web interface routing - HTTP
       - "traefik.http.routers.jellyseerr-http.rule=Host(`${JELLYSEERR_DOMAIN}`)"
       - "traefik.http.routers.jellyseerr-http.entrypoints=web"
       - "traefik.http.routers.jellyseerr-http.service=jellyseerr"
-      
-      # Web interface routing - HTTPS  
+
+      # Web interface routing - HTTPS
       - "traefik.http.routers.jellyseerr-https.rule=Host(`${JELLYSEERR_DOMAIN}`)"
       - "traefik.http.routers.jellyseerr-https.entrypoints=websecure"
       - "traefik.http.routers.jellyseerr-https.tls=true"
       - "traefik.http.routers.jellyseerr-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.jellyseerr-https.service=jellyseerr"
-      
+
       # Service configuration
       - "traefik.http.services.jellyseerr.loadbalancer.server.port=${JELLYSEERR_PORT}"
-      
+
       # HTTP to HTTPS redirect
       - "traefik.http.middlewares.jellyseerr-redirect.redirectscheme.scheme=https"
       - "traefik.http.routers.jellyseerr-http.middlewares=jellyseerr-redirect"
-      
+
       # Network specification for Traefik
       - "traefik.docker.network=home-network"
     networks:
