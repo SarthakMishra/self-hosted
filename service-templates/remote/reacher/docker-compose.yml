@@ -1,0 +1,31 @@
+services:
+  reacher:
+    image: reacherhq/backend:latest
+    container_name: reacher
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - RCH__HTTP_HOST=0.0.0.0
+      - RCH__HTTP_PORT=8080
+      - RCH__SMTP_TIMEOUT=${REACHER_SMTP_TIMEOUT:-90}
+    ports:
+      - "${REACHER_PORT:-9876}:8080"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:8080/v0/version || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - app-network
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  app-network:
+    external: true
