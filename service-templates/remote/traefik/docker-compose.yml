@@ -5,32 +5,32 @@ services:
       dockerfile: Dockerfile.traefik
     container_name: traefik
     restart: unless-stopped
-    
+
     # Environment configuration
     env_file:
       - .env
-    
+
     environment:
       # Cloudflare DNS API for Let's Encrypt DNS-01 challenge
       - CF_API_EMAIL=${CLOUDFLARE_EMAIL}
       - CF_API_KEY=${CLOUDFLARE_API_KEY}
       # CrowdSec API key for plugin
       - CROWDSEC_API_KEY=${CROWDSEC_API_KEY}
-    
+
     command:
       # API and Dashboard (disabled for production)
       - --api.dashboard=false
       - --api.debug=false
-      
+
       # Entry points
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
-      
+
       # HTTP to HTTPS redirect
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
       - --entrypoints.web.http.redirections.entrypoint.permanent=true
-      
+
       # Trust forwarded headers configuration (handled by middlewares.yml)
       - --entrypoints.websecure.forwardedheaders.insecure=false
 
@@ -39,7 +39,7 @@ services:
       - --providers.file.filename=/etc/traefik/middlewares.yml
       - --providers.docker.exposedbydefault=false
       - --providers.docker.network=app-network
-      
+
       # Let's Encrypt certificate resolver with DNS-01 challenge
       - --certificatesresolvers.letsencrypt.acme.tlschallenge=false
       - --certificatesresolvers.letsencrypt.acme.dnschallenge=true
@@ -47,7 +47,7 @@ services:
       - --certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
       - --certificatesresolvers.letsencrypt.acme.dnschallenge.delaybeforecheck=30
       - --certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}
-      
+
       # CrowdSec plugin configuration
       - --experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
       - --experimental.plugins.bouncer.version=v1.4.4
@@ -55,7 +55,7 @@ services:
       # API Key Authentication
       - --experimental.plugins.traefik-api-key-auth.modulename=github.com/Septima/traefik-api-key-auth
       - --experimental.plugins.traefik-api-key-auth.version=v0.3.0
-      
+
       # Logging
       - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
       - --accesslog=true
@@ -84,7 +84,7 @@ services:
       dockerfile: Dockerfile.crowdsec
     container_name: crowdsec
     restart: unless-stopped
-    
+
     environment:
       # CrowdSec configuration
       - BOUNCER_KEY_TRAEFIK=${CROWDSEC_API_KEY}
@@ -92,12 +92,12 @@ services:
       # Enable LAPI for Traefik plugin
       - LAPI_HOST=0.0.0.0
       - LAPI_PORT=8080
-    
+
     volumes:
       # CrowdSec configuration and data
       - crowdsec_config:/etc/crowdsec
       - crowdsec_data:/var/lib/crowdsec
-      
+
       # Log files to monitor
       - logs-traefik:/var/log/traefik
 

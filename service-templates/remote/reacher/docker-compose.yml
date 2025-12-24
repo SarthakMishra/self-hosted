@@ -3,14 +3,12 @@ services:
     image: reacherhq/backend:latest
     container_name: reacher
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
       - RCH__HTTP_HOST=0.0.0.0
       - RCH__HTTP_PORT=8080
-      - RCH__SMTP_TIMEOUT=${REACHER_SMTP_TIMEOUT:-90}
+      - RCH__SMTP_TIMEOUT=90
     ports:
-      - "${REACHER_PORT:-9876}:8080"
+      - "9876:8080"
     healthcheck:
       test:
         [
