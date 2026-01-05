@@ -17,7 +17,7 @@ cloudflared_network_name: "home-network"
 # Tunnel Configuration
 cloudflared_tunnel_name: "home-server"
 cloudflared_tunnel_id: "{{ vault_cloudflared_tunnel_id | default('') }}"
-cloudflared_external_domain: "{{ vault_cloudflared_external_domain | default('gooffy.in') }}"
+cloudflared_external_domain: "{{ vault_cloudflared_external_domain | default('srtk.me') }}"
 
 # Cloudflare API Configuration
 cloudflared_api_token: "{{ vault_cloudflared_api_token | default('') }}"

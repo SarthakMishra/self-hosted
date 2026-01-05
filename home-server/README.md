@@ -326,7 +326,7 @@ services:
       - /srv/storage/downloads:/app/downloads
     labels:
       # Optional: External access via Cloudflare tunnel
-      - "cloudflare.zero_trust.access.tunnel.public_hostname=myapp.gooffy.in"
+      - "cloudflare.zero_trust.access.tunnel.public_hostname=myapp.srtk.me"
       - "cloudflare.zero_trust.access.tunnel.service=http://myapp:80"
 
 networks:
@@ -336,7 +336,7 @@ networks:
 
 **Access Methods:**
 - **Local Web**: `http://myapp.home` (no SSL needed, resolved by local DNS)
-- **External Web**: `https://myapp.gooffy.in` (automatic SSL + security via Cloudflare)
+- **External Web**: `https://myapp.srtk.me` (automatic SSL + security via Cloudflare)
 - **File Access**: `\\YOUR_SERVER_IP\storage` (Windows) - same files your Docker apps use!
 
 **Popular Service Examples:**

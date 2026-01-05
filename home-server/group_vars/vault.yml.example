@@ -45,4 +45,4 @@ vault_cloudflared_api_token: "your-cloudflare-api-token-here"
 vault_cloudflared_account_id: "your-cloudflare-account-id-here"
 
 # External domain for Cloudflare tunnel access
-vault_cloudflared_external_domain: "gooffy.in"
+vault_cloudflared_external_domain: "srtk.me"
