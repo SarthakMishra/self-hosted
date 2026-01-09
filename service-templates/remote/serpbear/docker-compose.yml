@@ -3,11 +3,11 @@ services:
     image: towfiqi/serpbear:latest
     container_name: serpbear
     restart: unless-stopped
-    
+
     # Environment configuration
     env_file:
       - .env
-    
+
     environment:
       # Core SerpBear configuration
       - USER=${SERPBEAR_USER:-admin}
@@ -15,10 +15,21 @@ services:
       - SECRET=${SERPBEAR_SECRET}
       - APIKEY=${SERPBEAR_APIKEY}
       - NEXT_PUBLIC_APP_URL=https://${SERPBEAR_DOMAIN}
-      
+
       # Optional: Additional configuration
       - NODE_ENV=${NODE_ENV:-production}
       - PORT=3000
+      - SEARCH_CONSOLE_CLIENT_EMAIL=${SEARCH_CONSOLE_CLIENT_EMAIL}
+      - SEARCH_CONSOLE_PRIVATE_KEY=${SEARCH_CONSOLE_PRIVATE_KEY}
+      - ADWORDS_CLIENT_ID=${ADWORDS_CLIENT_ID}
+      - ADWORDS_CLIENT_SECRET=${ADWORDS_CLIENT_SECRET}
+
+      # SMTP configuration
+      - SMTP_SERVER=${SMTP_SERVER}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - NOTIFICATION_EMAIL_FROM=${NOTIFICATION_EMAIL_FROM}
 
     volumes:
       # Persistent data storage
