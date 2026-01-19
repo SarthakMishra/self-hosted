@@ -1,0 +1,109 @@
+services:
+  meilisearch:
+    image: getmeili/meilisearch:latest
+    container_name: meilisearch
+    restart: unless-stopped
+
+    # Environment configuration
+    env_file:
+      - .env
+
+    environment:
+      # Master key for API authentication (required)
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
+
+      # Environment mode: development or production
+      - MEILI_ENV=${MEILI_ENV:-production}
+
+      # Optional: Database path (default: /meili_data)
+      - MEILI_DB_PATH=${MEILI_DB_PATH:-/meili_data}
+
+      # Optional: HTTP address and port
+      - MEILI_HTTP_ADDR=${MEILI_HTTP_ADDR:-0.0.0.0:7700}
+
+      # Optional: Maximum indexing memory (in bytes)
+      # - MEILI_MAX_INDEXING_MEMORY=${MEILI_MAX_INDEXING_MEMORY:-}
+
+      # Optional: Maximum indexing threads
+      # - MEILI_MAX_INDEXING_THREADS=${MEILI_MAX_INDEXING_THREADS:-}
+
+      # Optional: Log level (DEBUG, INFO, WARN, ERROR)
+      # - MEILI_LOG_LEVEL=${MEILI_LOG_LEVEL:-INFO}
+
+      # Optional: Disable analytics
+      # - MEILI_NO_ANALYTICS=${MEILI_NO_ANALYTICS:-false}
+
+      # Optional: SSL authentication paths
+      # - MEILI_SSL_AUTH_PATH=${MEILI_SSL_AUTH_PATH:-}
+      # - MEILI_SSL_CERT_PATH=${MEILI_SSL_CERT_PATH:-}
+      # - MEILI_SSL_KEY_PATH=${MEILI_SSL_KEY_PATH:-}
+
+      # Optional: SSL OCSP path
+      # - MEILI_SSL_OCSP_PATH=${MEILI_SSL_OCSP_PATH:-}
+
+      # Optional: SSL require auth
+      # - MEILI_SSL_RESUMPTION=${MEILI_SSL_RESUMPTION:-}
+
+      # Optional: SSL tickets
+      # - MEILI_SSL_TICKETS=${MEILI_SSL_TICKETS:-}
+
+    volumes:
+      # Persistent data storage
+      - meilisearch_data:/meili_data
+
+    ports:
+      # Expose port 7700 for direct access via Tailscale (admin endpoints)
+      - "7700:7700"
+
+    labels:
+      - "traefik.enable=true"
+
+      # Search endpoints router (GET, POST, and OPTIONS for CORS preflight, with CORS)
+      # Handles: /indexes/{index}/search (GET/POST/OPTIONS), /health (GET)
+      # Note: Admin endpoints are accessed directly via Tailscale (port 7700)
+      - "traefik.http.routers.meilisearch-search.rule=Host(`${MEILISEARCH_DOMAIN}`) && (PathRegexp(`/indexes/[^/]+/search`) && (Method(`GET`) || Method(`POST`) || Method(`OPTIONS`)) || Path(`/health`))"
+      - "traefik.http.routers.meilisearch-search.entrypoints=websecure"
+      - "traefik.http.routers.meilisearch-search.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.meilisearch-search.service=meilisearch"
+      - "traefik.http.routers.meilisearch-search.middlewares=security-headers@file,crowdsec@file,meilisearch-ratelimit@file,meilisearch-cors@file"
+
+      # Service configuration
+      - "traefik.http.services.meilisearch.loadbalancer.server.port=7700"
+
+      - "com.centurylinklabs.watchtower.enable=true"
+
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:7700/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+        reservations:
+          memory: 512M
+          cpus: "0.5"
+
+    # Network configuration
+    networks:
+      - app-network
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+
+# External network created by Traefik
+networks:
+  app-network:
+    external: true
+
+# Persistent volumes
+volumes:
+  meilisearch_data:
+    driver: local

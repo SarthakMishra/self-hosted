@@ -76,3 +76,97 @@ http:
         users:
           - "admin:$2y$10$your_hashed_password_here"  # Generate with: htpasswd -nbB admin your_password
         removeHeader: true
+
+    # Rate limiting middleware for Meilisearch (distributed via Redis/Valkey)
+    # This middleware limits requests to 100 per second average, with bursts up to 200
+    # Requires Valkey/Redis container to be running for distributed rate limiting
+    meilisearch-ratelimit:
+      rateLimit:
+        # Average number of requests allowed per period
+        # 100 requests per second average
+        average: 100
+        # Maximum burst of requests allowed
+        # Allows up to 200 requests in a burst
+        burst: 200
+        # Time period for rate limiting (1 second)
+        period: 1s
+        # Redis configuration for distributed rate limiting
+        # Valkey is Redis-compatible and can be used here
+        redis:
+          # Valkey/Redis server endpoints (use service name from docker-compose)
+          endpoints:
+            - "valkey:6379"
+          # Connection pool size (0 = default: 10 per CPU core)
+          poolSize: 0
+          # Minimum idle connections to maintain
+          minIdleConns: 0
+          # Maximum active connections (0 = no limit)
+          maxActiveConns: 0
+          # Read timeout (3 seconds)
+          readTimeout: 3s
+          # Write timeout (3 seconds)
+          writeTimeout: 3s
+          # Dial timeout for new connections (5 seconds)
+          dialTimeout: 5s
+        # Source criterion: rate limit by client IP
+        sourceCriterion:
+          ipStrategy:
+            # Use the client IP from X-Forwarded-For header
+            # Depth 0 = use the rightmost IP (original client)
+            depth: 0
+            # Exclude Cloudflare IPs to get real client IP
+            # Adjust these IPs based on your CDN/proxy setup
+            excludedIPs:
+              - "173.245.48.0/20"
+              - "103.21.244.0/22"
+              - "103.22.200.0/22"
+              - "103.31.4.0/22"
+              - "141.101.64.0/18"
+              - "108.162.192.0/18"
+              - "190.93.240.0/20"
+              - "188.114.96.0/20"
+              - "197.234.240.0/22"
+              - "198.41.128.0/17"
+              - "162.158.0.0/15"
+              - "104.16.0.0/13"
+              - "104.24.0.0/14"
+              - "172.64.0.0/13"
+              - "131.0.72.0/22"
+              - "2400:cb00::/32"
+              - "2606:4700::/32"
+              - "2803:f800::/32"
+              - "2405:b500::/32"
+              - "2405:8100::/32"
+              - "2a06:98c0::/29"
+              - "2c0f:f248::/32"
+
+    # CORS middleware for Meilisearch Search endpoints (GET and POST)
+    # Allows cross-origin requests from specified origins for search operations
+    # IMPORTANT: Update accessControlAllowOriginList with your actual frontend domain(s)
+    meilisearch-cors:
+      headers:
+        # Allow GET and POST methods for search endpoints
+        accessControlAllowMethods:
+          - "GET"
+          - "POST"
+          - "OPTIONS"
+        # Allowed headers in CORS requests
+        accessControlAllowHeaders:
+          - "*"
+        # List of allowed origins (domains that can access the API)
+        # IMPORTANT: Replace with your actual frontend domain(s)
+        # For development, you can temporarily use "*" but this is NOT recommended for production
+        accessControlAllowOriginList:
+          - "https://search.example.com"
+          # Add additional allowed origins as needed:
+          # - "https://your-frontend-domain.com"
+          # - "https://app.yourdomain.com"
+          # - "http://localhost:3000"  # For local development only
+        # Maximum age (in seconds) for preflight request caching
+        # 86400 = 24 hours (adjust based on your needs)
+        accessControlMaxAge: 86400
+        # Add Vary header to indicate response varies based on Origin
+        addVaryHeader: true
+        # Expose headers that can be accessed by JavaScript
+        accessControlExposeHeaders:
+          - "Content-Type"
