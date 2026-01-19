@@ -226,7 +226,10 @@ runcmd:
     - systemctl start tailscaled
 
     # Connect Tailscale with SSH enabled
-    - tailscale up --ssh --hostname=<TAILSCALE_HOSTNAME> --authkey=<TAILSCALE_AUTH_KEY>
+    # --accept-dns=false: Prevents Tailscale MagicDNS from becoming the default DNS resolver
+    # Without this, all DNS queries route through Tailscale (100.100.100.100) which may not
+    # forward external queries properly, causing DNS timeouts for Docker Hub, apt, etc.
+    - tailscale up --ssh --accept-dns=false --hostname=<TAILSCALE_HOSTNAME> --authkey=<TAILSCALE_AUTH_KEY>
 
     # Enable unattended upgrades
     - systemctl enable unattended-upgrades

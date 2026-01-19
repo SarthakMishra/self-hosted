@@ -225,3 +225,33 @@ hcloud server delete prod-web-01
 hcloud firewall list
 hcloud firewall delete default-server-firewall
 ```
+
+---
+
+## Troubleshooting
+
+### DNS Resolution Fails (Docker Can't Pull Images)
+
+**Symptom**: Docker builds fail with errors like:
+```
+dial tcp: lookup registry-1.docker.io on 127.0.0.53:53: i/o timeout
+```
+
+**Cause**: By default, Tailscale's MagicDNS (`--accept-dns=true`) takes over as the default DNS resolver for ALL domains. However, MagicDNS may not properly forward external DNS queries, causing timeouts.
+
+**Solution**: The cloud-config already disables Tailscale's DNS override with `--accept-dns=false`. If you're experiencing this issue on an existing server:
+
+```bash
+sudo tailscale set --accept-dns=false
+```
+
+**Verification**:
+```bash
+# Test DNS resolution
+nslookup registry-1.docker.io
+
+# Test Docker can pull
+docker pull hello-world
+```
+
+**Trade-off**: With `--accept-dns=false`, you cannot resolve Tailscale MagicDNS names (like `hostname.tailnet-name.ts.net`) from the server itself. This is usually fine since you connect *to* the server via Tailscale, not from it to other nodes. Use Tailscale IPs directly if needed.
