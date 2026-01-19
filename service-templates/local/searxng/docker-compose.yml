@@ -9,7 +9,7 @@ services:
       - local-network
     volumes:
       - valkey-data:/data
-    
+
     # Health check for Redis
     healthcheck:
       test: ["CMD", "valkey-cli", "ping"]
@@ -17,53 +17,45 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    
+
     # Security options
     security_opt:
       - no-new-privileges:true
-    
-    # Internal service - not exposed through Traefik
-    labels:
-      - "traefik.enable=false"
 
   searxng:
     container_name: searxng
     image: docker.io/searxng/searxng:latest
     restart: unless-stopped
-    
+    ports:
+      - "8083:8080"
+
     # Environment configuration
     env_file:
       - .env
-    
+
     networks:
       - searxng
       - local-network
     volumes:
       - ./data:/etc/searxng:rw
       - searxng-data:/var/cache/searxng:rw
-    environment:
-      - SEARXNG_BASE_URL=${SEARXNG_BASE_URL:-http://search.local}
-    
-    # Traefik labels for routing
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.searxng.rule=Host(`search.local`)"
-      - "traefik.http.routers.searxng.entrypoints=web"
-      - "traefik.http.services.searxng.loadbalancer.server.port=8080"
-      - "traefik.docker.network=local-network"
-    
+
     # Health check
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/healthz || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:8080/healthz || exit 1",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
-    
+
     # Security options
     security_opt:
       - no-new-privileges:true
-    
+
     # Ensure Redis is started before SearxNG
     depends_on:
       - searxng-redis
