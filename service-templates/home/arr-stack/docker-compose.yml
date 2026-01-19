@@ -159,23 +159,33 @@ services:
       - gluetun
 
   qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:latest
+    image: ghcr.io/hotio/qbittorrent:latest
     container_name: qbittorrent
     environment:
-      - PUID=1010
-      - PGID=3000
+      - PUID=${PUID_QBITTORRENT:-1010}
+      - PGID=${PGID_SHARED:-3000}
       - UMASK=002
       - TZ=${TZ_MAIN}
-      - WEBUI_PORT=${QBITTORRENT_WEBUI_PORT}
-      - WEBUI_ADDRESS=0.0.0.0
-      - TORRENTING_PORT=${QBITTORRENT_TORRENTING_PORT}
+      - WEBUI_PORTS=${QBITTORRENT_WEBUI_PORT:-8080}/tcp
+      - LIBTORRENT=${LIBTORRENT:-v1}
+
+      # WireGuard (PIA) VPN configuration
+      - VPN_ENABLED=true
+      - VPN_PROVIDER=pia
+      - VPN_PIA_USER=${PIA_USERNAME}
+      - VPN_PIA_PASS=${PIA_PASSWORD}
+      - VPN_PIA_PREFERRED_REGION=${PIA_REGION}
+      - VPN_LAN_NETWORK=${VPN_LAN_NETWORK}
+      - VPN_PIA_PORT_FORWARD_PERSIST=${VPN_PIA_PORT_FORWARD_PERSIST:-false}
+      - VPN_AUTO_PORT_FORWARD=${VPN_AUTO_PORT_FORWARD:-true}
+    cap_add:
+      - NET_ADMIN
     volumes:
       - ${BASE_CONFIG_PATH}/qbittorrent-config:/config
+      - ${BASE_DATA_PATH}:/data
       - ${BASE_DATA_PATH}/torrents:/downloads
-      - qbt-gluetun-shared:/shared
     networks:
       - home-network
-      - vpn-network
     labels:
       # Enable Traefik
       - "traefik.enable=true"

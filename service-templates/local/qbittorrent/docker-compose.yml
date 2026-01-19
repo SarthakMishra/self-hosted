@@ -1,0 +1,49 @@
+services:
+  qbittorrent:
+    container_name: qbittorrent
+    image: ghcr.io/hotio/qbittorrent:latest
+    restart: unless-stopped
+
+    # Environment configuration
+    env_file:
+      - .env
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - UMASK=${UMASK:-002}
+      - TZ=${TZ:-Etc/UTC}
+      - WEBUI_PORTS=${WEBUI_PORT:-8080}/tcp
+      - LIBTORRENT=${LIBTORRENT:-v1}
+
+      # WireGuard (PIA) VPN configuration
+      - VPN_ENABLED=true
+      - VPN_PROVIDER=pia
+      - VPN_PIA_USER=${VPN_PIA_USER}
+      - VPN_PIA_PASS=${VPN_PIA_PASS}
+      - VPN_PIA_PREFERRED_REGION=${VPN_PIA_PREFERRED_REGION}
+      - VPN_PIA_DIP_TOKEN=${VPN_PIA_DIP_TOKEN}
+      - VPN_PIA_PORT_FORWARD_PERSIST=${VPN_PIA_PORT_FORWARD_PERSIST:-false}
+      - VPN_LAN_NETWORK=${VPN_LAN_NETWORK}
+      - VPN_AUTO_PORT_FORWARD=${VPN_AUTO_PORT_FORWARD:-true}
+
+    ports:
+      - "${WEBUI_PORT:-8080}:${WEBUI_PORT:-8080}"
+
+    volumes:
+      - ./config:/config
+      - ./data:/data
+
+    cap_add:
+      - NET_ADMIN
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+
+    networks:
+      - local-network
+
+# Networks
+networks:
+  local-network:
+    external: true
