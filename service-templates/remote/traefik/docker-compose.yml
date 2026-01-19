@@ -1,179 +1,179 @@
 services:
-  traefik:
-    build:
-      context: .
-      dockerfile: Dockerfile.traefik
-    container_name: traefik
-    restart: unless-stopped
+    traefik:
+        build:
+            context: .
+            dockerfile: Dockerfile.traefik
+        container_name: traefik
+        restart: unless-stopped
 
-    # Environment configuration
-    env_file:
-      - .env
+        # Environment configuration
+        env_file:
+            - .env
 
-    environment:
-      # Cloudflare DNS API for Let's Encrypt DNS-01 challenge
-      - CF_API_EMAIL=${CLOUDFLARE_EMAIL}
-      - CF_API_KEY=${CLOUDFLARE_API_KEY}
-      # CrowdSec API key for plugin
-      - CROWDSEC_API_KEY=${CROWDSEC_API_KEY}
+        environment:
+            # Cloudflare DNS API for Let's Encrypt DNS-01 challenge
+            - CF_API_EMAIL=${CLOUDFLARE_EMAIL}
+            - CF_API_KEY=${CLOUDFLARE_API_KEY}
+            # CrowdSec API key for plugin
+            - CROWDSEC_API_KEY=${CROWDSEC_API_KEY}
 
-    command:
-      # API and Dashboard (disabled for production)
-      - --api.dashboard=false
-      - --api.debug=false
+        command:
+            # API and Dashboard (disabled for production)
+            - --api.dashboard=false
+            - --api.debug=false
 
-      # Entry points
-      - --entrypoints.web.address=:80
-      - --entrypoints.websecure.address=:443
+            # Entry points
+            - --entrypoints.web.address=:80
+            - --entrypoints.websecure.address=:443
 
-      # HTTP to HTTPS redirect
-      - --entrypoints.web.http.redirections.entrypoint.to=websecure
-      - --entrypoints.web.http.redirections.entrypoint.scheme=https
-      - --entrypoints.web.http.redirections.entrypoint.permanent=true
+            # HTTP to HTTPS redirect
+            - --entrypoints.web.http.redirections.entrypoint.to=websecure
+            - --entrypoints.web.http.redirections.entrypoint.scheme=https
+            - --entrypoints.web.http.redirections.entrypoint.permanent=true
 
-      # Trust forwarded headers configuration (handled by middlewares.yml)
-      - --entrypoints.websecure.forwardedheaders.insecure=false
+            # Trust forwarded headers configuration (handled by middlewares.yml)
+            - --entrypoints.websecure.forwardedheaders.insecure=false
 
-      # Docker provider
-      - --providers.docker=true
-      - --providers.file.filename=/etc/traefik/middlewares.yml
-      - --providers.docker.exposedbydefault=false
-      - --providers.docker.network=app-network
+            # Docker provider
+            - --providers.docker=true
+            - --providers.file.filename=/etc/traefik/middlewares.yml
+            - --providers.docker.exposedbydefault=false
+            - --providers.docker.network=app-network
 
-      # Let's Encrypt certificate resolver with DNS-01 challenge
-      - --certificatesresolvers.letsencrypt.acme.tlschallenge=false
-      - --certificatesresolvers.letsencrypt.acme.dnschallenge=true
-      - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare
-      - --certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
-      - --certificatesresolvers.letsencrypt.acme.dnschallenge.delaybeforecheck=30
-      - --certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}
+            # Let's Encrypt certificate resolver with DNS-01 challenge
+            - --certificatesresolvers.letsencrypt.acme.tlschallenge=false
+            - --certificatesresolvers.letsencrypt.acme.dnschallenge=true
+            - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare
+            - --certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
+            - --certificatesresolvers.letsencrypt.acme.dnschallenge.propagation.delayBeforeChecks=30
+            - --certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}
 
-      # CrowdSec plugin configuration
-      - --experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
-      - --experimental.plugins.bouncer.version=v1.4.4
+            # CrowdSec plugin configuration
+            - --experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+            - --experimental.plugins.bouncer.version=v1.4.4
 
-      # API Key Authentication
-      - --experimental.plugins.traefik-api-key-auth.modulename=github.com/Septima/traefik-api-key-auth
-      - --experimental.plugins.traefik-api-key-auth.version=v0.3.0
+            # API Key Authentication
+            - --experimental.plugins.traefik-api-key-auth.modulename=github.com/Septima/traefik-api-key-auth
+            - --experimental.plugins.traefik-api-key-auth.version=v0.3.0
 
-      # Logging
-      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
-      - --accesslog=true
-      - --accesslog.format=json
+            # Logging
+            - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
+            - --accesslog=true
+            - --accesslog.format=json
 
-    ports:
-      # Standard HTTP/HTTPS ports
-      - "80:80"
-      - "443:443"
+        ports:
+            # Standard HTTP/HTTPS ports
+            - "80:80"
+            - "443:443"
 
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - logs-traefik:/var/log/traefik
+        volumes:
+            - "/var/run/docker.sock:/var/run/docker.sock:ro"
+            - logs-traefik:/var/log/traefik
 
-    # Network configuration
-    networks:
-      - app-network
+        # Network configuration
+        networks:
+            - app-network
 
-    depends_on:
-      - crowdsec
-      - valkey
+        depends_on:
+            - crowdsec
+            - valkey
 
-  # CrowdSec for threat detection
-  crowdsec:
-    build:
-      context: .
-      dockerfile: Dockerfile.crowdsec
-    container_name: crowdsec
-    restart: unless-stopped
+    # CrowdSec for threat detection
+    crowdsec:
+        build:
+            context: .
+            dockerfile: Dockerfile.crowdsec
+        container_name: crowdsec
+        restart: unless-stopped
 
-    environment:
-      # CrowdSec configuration
-      - BOUNCER_KEY_TRAEFIK=${CROWDSEC_API_KEY}
-      - COLLECTIONS=crowdsecurity/traefik crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules
-      # Enable LAPI for Traefik plugin
-      - LAPI_HOST=0.0.0.0
-      - LAPI_PORT=8080
+        environment:
+            # CrowdSec configuration
+            - BOUNCER_KEY_TRAEFIK=${CROWDSEC_API_KEY}
+            - COLLECTIONS=crowdsecurity/traefik crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules
+            # Enable LAPI for Traefik plugin
+            - LAPI_HOST=0.0.0.0
+            - LAPI_PORT=8080
 
-    volumes:
-      # CrowdSec configuration and data
-      - crowdsec_config:/etc/crowdsec
-      - crowdsec_data:/var/lib/crowdsec
+        volumes:
+            # CrowdSec configuration and data
+            - crowdsec_config:/etc/crowdsec
+            - crowdsec_data:/var/lib/crowdsec
 
-      # Log files to monitor
-      - logs-traefik:/var/log/traefik
+            # Log files to monitor
+            - logs-traefik:/var/log/traefik
 
-    networks:
-      - app-network
+        networks:
+            - app-network
 
-    labels:
-      - "traefik.enable=false"
+        labels:
+            - "traefik.enable=false"
 
-    # Health check
-    healthcheck:
-      test: ["CMD-SHELL", "cscli lapi status || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
+        # Health check
+        healthcheck:
+            test: ["CMD-SHELL", "cscli lapi status || exit 1"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 60s
 
-  # Valkey (Redis-compatible) for distributed rate limiting
-  valkey:
-    image: valkey/valkey:7.2-alpine
-    container_name: valkey
-    restart: unless-stopped
+    # Valkey (Redis-compatible) for distributed rate limiting
+    valkey:
+        image: valkey/valkey:7.2-alpine
+        container_name: valkey
+        restart: unless-stopped
 
-    command:
-      # Disable protected mode for container networking
-      - --protected-mode
-      - "no"
-      # Set max memory (adjust based on your needs)
-      - --maxmemory
-      - "256mb"
-      # Eviction policy for when memory limit is reached
-      - --maxmemory-policy
-      - "allkeys-lru"
+        command:
+            # Disable protected mode for container networking
+            - --protected-mode
+            - "no"
+            # Set max memory (adjust based on your needs)
+            - --maxmemory
+            - "256mb"
+            # Eviction policy for when memory limit is reached
+            - --maxmemory-policy
+            - "allkeys-lru"
 
-    volumes:
-      # Persistent data storage
-      - valkey_data:/data
+        volumes:
+            # Persistent data storage
+            - valkey_data:/data
 
-    # Health check
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+        # Health check
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 10s
 
-    # Network configuration
-    networks:
-      - app-network
+        # Network configuration
+        networks:
+            - app-network
 
-    labels:
-      - "traefik.enable=false"
+        labels:
+            - "traefik.enable=false"
 
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: "0.5"
-        reservations:
-          memory: 256M
-          cpus: "0.25"
+        # Resource limits
+        deploy:
+            resources:
+                limits:
+                    memory: 512M
+                    cpus: "0.5"
+                reservations:
+                    memory: 256M
+                    cpus: "0.25"
 
-    # Security options
-    security_opt:
-      - no-new-privileges:true
+        # Security options
+        security_opt:
+            - no-new-privileges:true
 
 # Networks
 networks:
-  app-network:
-    external: true
+    app-network:
+        external: true
 
 # Persistent volumes
 volumes:
-  logs-traefik:
-  crowdsec_config:
-  crowdsec_data:
-  valkey_data:
+    logs-traefik:
+    crowdsec_config:
+    crowdsec_data:
+    valkey_data:
