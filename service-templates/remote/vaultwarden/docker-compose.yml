@@ -1,48 +1,48 @@
 services:
-  vaultwarden:
-    image: vaultwarden/server:latest
-    container_name: vaultwarden
-    restart: unless-stopped
-    
-    env_file:
-      - .env
-    
-    environment:
-      # Core Configuration
-      - DOMAIN=https://${VAULTWARDEN_DOMAIN}
-      - WEBSOCKET_ENABLED=true
-      
-      # Security
-      - SIGNUPS_ALLOWED=true
-      
-      # SMTP (Optional)
-      - SMTP_HOST=${VAULTWARDEN_SMTP_HOST:-}
-      - SMTP_FROM=${VAULTWARDEN_SMTP_FROM:-}
-      - SMTP_PORT=${VAULTWARDEN_SMTP_PORT:-587}
-      - SMTP_USERNAME=${VAULTWARDEN_SMTP_USERNAME:-}
-      - SMTP_PASSWORD=${VAULTWARDEN_SMTP_PASSWORD:-}
+    vaultwarden:
+        image: vaultwarden/server:latest
+        container_name: vaultwarden
+        restart: unless-stopped
 
-    volumes:
-      - vaultwarden_data:/data
+        env_file:
+            - .env
 
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.vaultwarden-https.rule=Host(`${VAULTWARDEN_DOMAIN}`)"
-      - "traefik.http.routers.vaultwarden-https.entrypoints=websecure"
-      - "traefik.http.routers.vaultwarden-https.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.vaultwarden-https.service=vaultwarden"
-      - "traefik.http.services.vaultwarden.loadbalancer.server.port=80"
-      - "traefik.http.routers.vaultwarden-https.middlewares=security-headers@file,crowdsec@file"
+        environment:
+            # Core Configuration
+            - DOMAIN=https://${VAULTWARDEN_DOMAIN}
+            - WEBSOCKET_ENABLED=true
 
-      - "com.centurylinklabs.watchtower.enable=true"
+            # Security
+            - SIGNUPS_ALLOWED=false
 
-    networks:
-      - app-network
+            # SMTP (Optional)
+            - SMTP_HOST=${VAULTWARDEN_SMTP_HOST:-}
+            - SMTP_FROM=${VAULTWARDEN_SMTP_FROM:-}
+            - SMTP_PORT=${VAULTWARDEN_SMTP_PORT:-587}
+            - SMTP_USERNAME=${VAULTWARDEN_SMTP_USERNAME:-}
+            - SMTP_PASSWORD=${VAULTWARDEN_SMTP_PASSWORD:-}
+
+        volumes:
+            - vaultwarden_data:/data
+
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.vaultwarden-https.rule=Host(`${VAULTWARDEN_DOMAIN}`)"
+            - "traefik.http.routers.vaultwarden-https.entrypoints=websecure"
+            - "traefik.http.routers.vaultwarden-https.tls.certresolver=letsencrypt"
+            - "traefik.http.routers.vaultwarden-https.service=vaultwarden"
+            - "traefik.http.services.vaultwarden.loadbalancer.server.port=80"
+            - "traefik.http.routers.vaultwarden-https.middlewares=security-headers@file,crowdsec@file"
+
+            - "com.centurylinklabs.watchtower.enable=true"
+
+        networks:
+            - app-network
 
 networks:
-  app-network:
-    external: true
+    app-network:
+        external: true
 
 volumes:
-  vaultwarden_data:
-    driver: local 
+    vaultwarden_data:
+        driver: local

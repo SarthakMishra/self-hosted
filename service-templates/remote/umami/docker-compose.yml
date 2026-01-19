@@ -1,146 +1,171 @@
 services:
-  umami:
-    image: ghcr.io/umami-software/umami:latest
-    container_name: umami
-    restart: unless-stopped
+    umami:
+        image: ghcr.io/umami-software/umami:latest
+        container_name: umami
+        restart: unless-stopped
 
-    # Environment configuration
-    env_file:
-      - .env
+        # Environment configuration
+        env_file:
+            - .env
 
-    environment:
-      # Database configuration
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@umami-db:5432/${POSTGRES_DB}
-      - DATABASE_TYPE=postgresql
+        environment:
+            # Database configuration
+            - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@umami-db:5432/${POSTGRES_DB}
+            - DATABASE_TYPE=postgresql
 
-      # Application secret for JWT tokens
-      - APP_SECRET=${UMAMI_APP_SECRET}
+            # Application secret for JWT tokens
+            - APP_SECRET=${UMAMI_APP_SECRET}
 
-      # Optional: Disable registration (set to 1 to disable)
-      - DISABLE_REGISTRATION=${UMAMI_DISABLE_REGISTRATION:-0}
+            # Optional: Disable registration (set to 1 to disable)
+            - DISABLE_REGISTRATION=${UMAMI_DISABLE_REGISTRATION:-0}
 
-      # Optional: Analytics script name (default: script.js)
-      - TRACKER_SCRIPT_NAME=${UMAMI_TRACKER_SCRIPT_NAME:-script.js}
+            # Optional: Analytics script name (default: script.js)
+            - TRACKER_SCRIPT_NAME=${UMAMI_TRACKER_SCRIPT_NAME:-script.js}
 
-      # Optional: Force SSL in production
-      - FORCE_SSL=${UMAMI_FORCE_SSL:-1}
+            # Optional: Force SSL in production
+            - FORCE_SSL=${UMAMI_FORCE_SSL:-1}
 
-      # Optional: Base path if serving from subdirectory
-      - BASE_PATH=${UMAMI_BASE_PATH:-}
+            # Optional: Base path if serving from subdirectory
+            - BASE_PATH=${UMAMI_BASE_PATH:-}
 
-      # Optional: Enable debug logging
-      - DEBUG=${UMAMI_DEBUG:-0}
+            # Optional: Enable debug logging
+            - DEBUG=${UMAMI_DEBUG:-0}
 
-      # Optional: Log query execution (for debugging)
-      - LOG_QUERY=${UMAMI_LOG_QUERY:-0}
+            # Optional: Log query execution (for debugging)
+            - LOG_QUERY=${UMAMI_LOG_QUERY:-0}
 
-    depends_on:
-      umami-db:
-        condition: service_healthy
+        depends_on:
+            umami-db:
+                condition: service_healthy
 
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.umami-https.rule=Host(`${UMAMI_DOMAIN}`)"
-      - "traefik.http.routers.umami-https.entrypoints=websecure"
-      - "traefik.http.routers.umami-https.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.umami-https.service=umami"
-      - "traefik.http.services.umami.loadbalancer.server.port=3000"
-      - "traefik.http.routers.umami-https.middlewares=security-headers@file,crowdsec@file"
+        labels:
+            - "traefik.enable=true"
 
-      - "com.centurylinklabs.watchtower.enable=true"
+            # Root path redirect router (higher priority)
+            # Redirects UMAMI_BASE_PATH origin to configured UMAMI_ROOT_REDIRECT_URL
+            # Only active when UMAMI_ROOT_REDIRECT_URL is set
+            - "traefik.http.routers.umami-root-redirect.rule=Host(`${UMAMI_DOMAIN}`) && Path(`/`)"
+            - "traefik.http.routers.umami-root-redirect.entrypoints=websecure"
+            - "traefik.http.routers.umami-root-redirect.tls.certresolver=letsencrypt"
+            - "traefik.http.routers.umami-root-redirect.priority=100"
+            - "traefik.http.routers.umami-root-redirect.middlewares=redirect-to-homepage"
+            - "traefik.http.routers.umami-root-redirect.service=umami"
 
-    # Health check
-    healthcheck:
-      test:
-        ["CMD-SHELL", "curl -f http://localhost:3000/api/heartbeat || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
+            # Redirect middleware to configured homepage
+            - "traefik.http.middlewares.redirect-to-homepage.redirectregex.regex=^https?://[^/]+/?$$"
+            - "traefik.http.middlewares.redirect-to-homepage.redirectregex.replacement=${UMAMI_ROOT_REDIRECT_URL}"
+            - "traefik.http.middlewares.redirect-to-homepage.redirectregex.permanent=true"
 
-    # Resource limits (adjust based on your needs)
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: "0.5"
-        reservations:
-          memory: 256M
-          cpus: "0.25"
+            # Main Umami router (lower priority, handles all other paths)
+            - "traefik.http.routers.umami-https.rule=Host(`${UMAMI_DOMAIN}`)"
+            - "traefik.http.routers.umami-https.entrypoints=websecure"
+            - "traefik.http.routers.umami-https.tls.certresolver=letsencrypt"
+            - "traefik.http.routers.umami-https.priority=1"
+            - "traefik.http.routers.umami-https.service=umami"
+            - "traefik.http.services.umami.loadbalancer.server.port=3000"
+            - "traefik.http.routers.umami-https.middlewares=security-headers@file,crowdsec@file"
 
-    # Network configuration
-    networks:
-      - app-network
-      - umami-internal
+            - "com.centurylinklabs.watchtower.enable=true"
 
-    # Security options
-    security_opt:
-      - no-new-privileges:true
+        # Health check
+        healthcheck:
+            test:
+                [
+                    "CMD-SHELL",
+                    "curl -f http://localhost:3000/api/heartbeat || exit 1",
+                ]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 60s
 
-  umami-db:
-    image: postgres:15-alpine
-    container_name: umami-db
-    restart: unless-stopped
+        # Resource limits (adjust based on your needs)
+        deploy:
+            resources:
+                limits:
+                    memory: 512M
+                    cpus: "0.5"
+                reservations:
+                    memory: 256M
+                    cpus: "0.25"
 
-    # Environment configuration
-    environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_INITDB_ARGS=${POSTGRES_INITDB_ARGS:---encoding=UTF-8 --lc-collate=C --lc-ctype=C}
+        # Network configuration
+        networks:
+            - app-network
+            - umami-internal
 
-    volumes:
-      # Persistent database storage
-      - umami_db_data:/var/lib/postgresql/data
+        # Security options
+        security_opt:
+            - no-new-privileges:true
 
-      # Optional: Custom PostgreSQL configuration
-      # - ./postgres.conf:/etc/postgresql/postgresql.conf:ro
+    umami-db:
+        image: postgres:15-alpine
+        container_name: umami-db
+        restart: unless-stopped
 
-      # Optional: Database initialization scripts
-      # - ./init-scripts:/docker-entrypoint-initdb.d:ro
+        # Environment configuration
+        environment:
+            - POSTGRES_DB=${POSTGRES_DB}
+            - POSTGRES_USER=${POSTGRES_USER}
+            - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+            - POSTGRES_INITDB_ARGS=${POSTGRES_INITDB_ARGS:---encoding=UTF-8 --lc-collate=C --lc-ctype=C}
 
-    # Health check
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+        volumes:
+            # Persistent database storage
+            - umami_db_data:/var/lib/postgresql/data
 
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: "0.25"
-        reservations:
-          memory: 128M
-          cpus: "0.1"
+            # Optional: Custom PostgreSQL configuration
+            # - ./postgres.conf:/etc/postgresql/postgresql.conf:ro
 
-    # Network configuration (only internal network)
-    networks:
-      - umami-internal
+            # Optional: Database initialization scripts
+            # - ./init-scripts:/docker-entrypoint-initdb.d:ro
 
-    # Security options
-    security_opt:
-      - no-new-privileges:true
+        # Health check
+        healthcheck:
+            test:
+                [
+                    "CMD-SHELL",
+                    "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}",
+                ]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
 
-    # Labels for organization (not exposed to Traefik)
-    labels:
-      - "traefik.enable=false"
+        # Resource limits
+        deploy:
+            resources:
+                limits:
+                    memory: 256M
+                    cpus: "0.25"
+                reservations:
+                    memory: 128M
+                    cpus: "0.1"
+
+        # Network configuration (only internal network)
+        networks:
+            - umami-internal
+
+        # Security options
+        security_opt:
+            - no-new-privileges:true
+
+        # Labels for organization (not exposed to Traefik)
+        labels:
+            - "traefik.enable=false"
 
 # Networks
 networks:
-  # External network for Traefik communication
-  app-network:
-    external: true
+    # External network for Traefik communication
+    app-network:
+        external: true
 
-  # Internal network for database communication
-  umami-internal:
-    driver: bridge
-    internal: true
+    # Internal network for database communication
+    umami-internal:
+        driver: bridge
+        internal: true
 
 # Persistent volumes
 volumes:
-  umami_db_data:
-    driver: local
+    umami_db_data:
+        driver: local
