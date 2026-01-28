@@ -136,7 +136,6 @@ services:
     volumes:
       - ${BASE_CONFIG_PATH}/qbittorrent-config:/config
       - ${BASE_DATA_PATH}:/data
-      - ${BASE_DATA_PATH}/torrents:/downloads
     labels:
       <<: *traefik-common
       traefik.http.routers.qbittorrent-http.rule: Host(`${QBITTORRENT_DOMAIN}`)
