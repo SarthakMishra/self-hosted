@@ -40,9 +40,6 @@ repos:
         name: Lint YAML files
         args: [-c, .yamllint.yml]
 
-  # NOTE: For Ansible linting, run manually with collections path:
-  # ANSIBLE_COLLECTIONS_PATH=~/.ansible/collections uv tool run ansible-lint home-server/ remote-server/
-
   # Docker Compose validation
   - repo: https://github.com/IamTheFij/docker-pre-commit
     rev: v3.0.1
@@ -53,6 +50,13 @@ repos:
   # Local hooks
   - repo: local
     hooks:
+      - id: ansible-lint
+        name: Lint Ansible playbooks
+        entry: ansible-lint --offline
+        language: system
+        files: ^(home-server|remote-server)/.*\.ya?ml$
+        pass_filenames: true
+
       - id: check-env-placeholders
         name: Check env.example placeholders
         entry: ./scripts/check-env-placeholders.sh
