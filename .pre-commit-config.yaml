@@ -49,3 +49,13 @@ repos:
     hooks:
       - id: docker-compose-check
         name: Validate Docker Compose files
+
+  # Local hooks
+  - repo: local
+    hooks:
+      - id: check-env-placeholders
+        name: Check env.example placeholders
+        entry: ./scripts/check-env-placeholders.sh
+        language: script
+        files: \.(example|env\.example)$
+        pass_filenames: false
