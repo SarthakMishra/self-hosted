@@ -1,7 +1,0 @@
----
-# Kernel Hardening Role - Handlers
-# Manages sysctl configuration reloads
-
-- name: reload sysctl
-  ansible.builtin.command: sysctl --system
-  listen: "reload sysctl" 

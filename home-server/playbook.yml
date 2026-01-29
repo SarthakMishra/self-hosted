@@ -1,0 +1,618 @@
+---
+# =============================================================================
+# Home Server Setup Playbook
+# =============================================================================
+# Single-file deployment for Ubuntu home servers with Docker and Tailscale.
+# Optional ZFS and SAMBA support via tags.
+#
+# Usage:
+#   # Core only (Docker + Tailscale)
+#   ansible-playbook -i inventory.yml playbook.yml -e @secrets.yml
+#
+#   # With ZFS storage
+#   ansible-playbook -i inventory.yml playbook.yml -e @secrets.yml --tags all,zfs
+#
+#   # With ZFS + SAMBA (full NAS)
+#   ansible-playbook -i inventory.yml playbook.yml -e @secrets.yml --tags all,zfs,samba
+# =============================================================================
+
+- name: Home Server Setup
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    # -------------------------------------------------------------------------
+    # Connection Settings (override via secrets.yml)
+    # -------------------------------------------------------------------------
+    server_host: "{{ vault_server_host }}"
+    bootstrap_user: "{{ vault_bootstrap_user | default('ubuntu') }}"
+    admin_user: "{{ vault_admin_user | default('admin') }}"
+    admin_ssh_public_key: "{{ vault_admin_ssh_public_key }}"
+
+    # -------------------------------------------------------------------------
+    # Tailscale Configuration (override via secrets.yml)
+    # -------------------------------------------------------------------------
+    tailscale_auth_key: "{{ vault_tailscale_auth_key }}"
+    tailscale_hostname: "{{ vault_tailscale_hostname }}"
+    tailscale_accept_dns: false
+    tailscale_ssh_enabled: true
+
+    # -------------------------------------------------------------------------
+    # ZFS Configuration (optional, override via secrets.yml)
+    # -------------------------------------------------------------------------
+    zfs_pool_name: "{{ vault_zfs_pool_name | default('tank') }}"
+    zfs_devices: "{{ vault_zfs_devices | default([]) }}"
+    zfs_raid_type: "{{ vault_zfs_raid_type | default('mirror') }}"
+    zfs_mount_point: "/{{ zfs_pool_name }}"
+
+    # -------------------------------------------------------------------------
+    # SAMBA Configuration (optional, override via secrets.yml)
+    # -------------------------------------------------------------------------
+    samba_user: "{{ vault_samba_user | default(admin_user) }}"
+    samba_password: "{{ vault_samba_password | default('') }}"
+    samba_shares: "{{ vault_samba_shares | default([]) }}"
+
+    # -------------------------------------------------------------------------
+    # System Configuration
+    # -------------------------------------------------------------------------
+    docker_root: "/opt/docker"
+
+    required_packages:
+      - curl
+      - wget
+      - gnupg
+      - lsb-release
+      - ca-certificates
+      - apt-transport-https
+      - software-properties-common
+      - unattended-upgrades
+      - net-tools
+      - dnsutils
+      - rsyslog
+      - jq
+      - nfs-common
+      - cifs-utils
+
+    kernel_security_params:
+      net.ipv4.ip_forward: 1
+      fs.file-max: 1048576
+      vm.max_map_count: 262144
+      vm.overcommit_memory: 1
+      kernel.kptr_restrict: 2
+      kernel.dmesg_restrict: 1
+      kernel.perf_event_paranoid: 3
+      kernel.unprivileged_bpf_disabled: 1
+      net.core.bpf_jit_harden: 2
+      kernel.yama.ptrace_scope: 2
+
+    docker_daemon_config:
+      log-driver: "json-file"
+      log-opts:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+      live-restore: true
+      userland-proxy: false
+      no-new-privileges: true
+      icc: true
+      features:
+        buildkit: true
+      default-ulimits:
+        nofile:
+          Name: "nofile"
+          Hard: 64000
+          Soft: 64000
+        nproc:
+          Name: "nproc"
+          Hard: 8192
+          Soft: 4096
+      storage-driver: "overlay2"
+      exec-opts:
+        - "native.cgroupdriver=systemd"
+      metrics-addr: "127.0.0.1:9323"
+      experimental: false
+      max-concurrent-downloads: 3
+      max-concurrent-uploads: 5
+      default-shm-size: "64M"
+      shutdown-timeout: 15
+
+  handlers:
+    - name: restart docker
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+
+    - name: reload sysctl
+      ansible.builtin.command: sysctl --system
+      changed_when: true
+
+    - name: restart smbd
+      ansible.builtin.systemd:
+        name: smbd
+        state: restarted
+
+  pre_tasks:
+    - name: Display setup banner
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "Home Server Setup"
+          - "=============================================="
+          - "Target: {{ inventory_hostname }}"
+          - "Admin User: {{ admin_user }}"
+          - "Tailscale: {{ tailscale_hostname }}"
+
+    - name: Check system requirements
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "Ubuntu"
+          - ansible_distribution_major_version | int >= 20
+        fail_msg: "Requires Ubuntu 20.04+"
+
+  tasks:
+    # =========================================================================
+    # USER MANAGEMENT
+    # =========================================================================
+    - name: Ensure passwordless sudo for bootstrap user
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/bootstrap-user
+        line: "{{ bootstrap_user }} ALL=(ALL) NOPASSWD:ALL"
+        create: true
+        mode: '0440'
+        validate: 'visudo -cf %s'
+      tags: [users, always]
+
+    - name: Create admin user
+      ansible.builtin.user:
+        name: "{{ admin_user }}"
+        shell: /bin/bash
+        groups: sudo
+        append: true
+        create_home: true
+      tags: [users, always]
+
+    - name: Configure passwordless sudo for admin user
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/admin-user
+        line: "{{ admin_user }} ALL=(ALL) NOPASSWD:ALL"
+        create: true
+        mode: '0440'
+        validate: 'visudo -cf %s'
+      tags: [users, always]
+
+    - name: Create admin .ssh directory
+      ansible.builtin.file:
+        path: "/home/{{ admin_user }}/.ssh"
+        state: directory
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        mode: '0700'
+      tags: [users, always]
+
+    - name: Install SSH public key for admin user
+      ansible.builtin.authorized_key:
+        user: "{{ admin_user }}"
+        key: "{{ admin_ssh_public_key }}"
+      tags: [users, always]
+
+    # =========================================================================
+    # SYSTEM UPDATES & PACKAGES
+    # =========================================================================
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      tags: [packages, always]
+
+    - name: Upgrade all packages
+      ansible.builtin.apt:
+        upgrade: dist
+        autoremove: true
+      tags: [packages, always]
+
+    - name: Install required packages
+      ansible.builtin.apt:
+        name: "{{ required_packages }}"
+        state: present
+      tags: [packages, always]
+
+    # =========================================================================
+    # KERNEL HARDENING
+    # =========================================================================
+    - name: Configure kernel security parameters
+      ansible.builtin.copy:
+        content: |
+          # Kernel Security Hardening - Managed by Ansible
+          {% for param, value in kernel_security_params.items() %}
+          {{ param }} = {{ value }}
+          {% endfor %}
+        dest: /etc/sysctl.d/99-security-hardening.conf
+        mode: '0644'
+      notify: reload sysctl
+      tags: [hardening, always]
+
+    - name: Configure system limits for Docker
+      ansible.builtin.copy:
+        content: |
+          # System Limits for Docker - Managed by Ansible
+          * soft nofile 1048576
+          * hard nofile 1048576
+          root soft nofile 1048576
+          root hard nofile 1048576
+          * soft nproc 65535
+          * hard nproc 65535
+        dest: /etc/security/limits.d/99-docker-limits.conf
+        mode: '0644'
+      tags: [hardening, always]
+
+    # =========================================================================
+    # DOCKER INSTALLATION
+    # =========================================================================
+    - name: Remove old Docker packages
+      ansible.builtin.apt:
+        name: [docker, docker-engine, docker.io, containerd, runc]
+        state: absent
+      tags: [docker, always]
+
+    - name: Add Docker GPG key
+      ansible.builtin.shell: |
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+        chmod 644 /usr/share/keyrings/docker-archive-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/docker-archive-keyring.gpg
+      tags: [docker, always]
+
+    - name: Add Docker repository
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        filename: docker
+      tags: [docker, always]
+
+    - name: Install Docker packages
+      ansible.builtin.apt:
+        name: [docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin, docker-compose-plugin]
+        state: present
+        update_cache: true
+      notify: restart docker
+      tags: [docker, always]
+
+    - name: Add admin user to docker group
+      ansible.builtin.user:
+        name: "{{ admin_user }}"
+        groups: docker
+        append: true
+      tags: [docker, always]
+
+    - name: Configure Docker daemon
+      ansible.builtin.copy:
+        content: "{{ docker_daemon_config | to_nice_json }}"
+        dest: /etc/docker/daemon.json
+        mode: '0644'
+      notify: restart docker
+      tags: [docker, always]
+
+    - name: Enable and start Docker
+      ansible.builtin.systemd:
+        name: docker
+        enabled: true
+        state: started
+      tags: [docker, always]
+
+    - name: Create Docker directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        mode: '0755'
+      loop:
+        - "{{ docker_root }}"
+        - "{{ docker_root }}/compose"
+        - "{{ docker_root }}/data"
+        - "{{ docker_root }}/config"
+        - "{{ docker_root }}/logs"
+      tags: [docker, always]
+
+    - name: Create Docker cleanup script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          echo "Starting Docker cleanup..."
+          docker container prune -f --filter "until=24h"
+          docker image prune -f --filter "until=48h"
+          docker volume prune -f
+          docker builder prune -f --keep-storage=20GB
+          docker network prune -f
+          echo "Docker cleanup completed."
+        dest: /usr/local/bin/docker-cleanup
+        mode: '0755'
+      tags: [docker, always]
+
+    - name: Create Docker status script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          echo "=== Docker System Info ==="
+          docker system info 2>/dev/null | grep -E "Containers|Images|Server Version|Storage Driver|Docker Root Dir"
+          echo ""
+          echo "=== Running Containers ==="
+          docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+          echo ""
+          echo "=== Disk Usage ==="
+          docker system df
+        dest: /usr/local/bin/docker-status
+        mode: '0755'
+      tags: [docker, always]
+
+    - name: Setup Docker cleanup cron job
+      ansible.builtin.cron:
+        name: "Docker cleanup"
+        minute: "0"
+        hour: "2"
+        job: "/usr/local/bin/docker-cleanup >> /var/log/docker-cleanup.log 2>&1"
+      tags: [docker, always]
+
+    # =========================================================================
+    # TAILSCALE
+    # =========================================================================
+    - name: Add Tailscale GPG key
+      ansible.builtin.get_url:
+        url: "https://pkgs.tailscale.com/stable/ubuntu/{{ ansible_distribution_release }}.noarmor.gpg"
+        dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
+        mode: '0644'
+      tags: [tailscale, always]
+
+    - name: Add Tailscale repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu {{ ansible_distribution_release }} main"
+        filename: tailscale
+      tags: [tailscale, always]
+
+    - name: Install Tailscale
+      ansible.builtin.apt:
+        name: tailscale
+        state: present
+        update_cache: true
+      tags: [tailscale, always]
+
+    - name: Enable and start Tailscale
+      ansible.builtin.systemd:
+        name: tailscaled
+        enabled: true
+        state: started
+      tags: [tailscale, always]
+
+    - name: Check Tailscale status
+      ansible.builtin.command: tailscale status --json
+      register: tailscale_status
+      changed_when: false
+      failed_when: false
+      tags: [tailscale, always]
+
+    - name: Connect Tailscale
+      ansible.builtin.command: >
+        tailscale up
+        --accept-dns={{ tailscale_accept_dns | lower }}
+        --hostname={{ tailscale_hostname }}
+        {% if tailscale_ssh_enabled %}--ssh{% endif %}
+        --authkey={{ tailscale_auth_key }}
+      when: tailscale_status.rc != 0 or (tailscale_status.stdout | from_json).BackendState != 'Running'
+      tags: [tailscale, always]
+
+    - name: Get Tailscale IP
+      ansible.builtin.command: tailscale ip --4
+      register: tailscale_ip
+      changed_when: false
+      failed_when: false
+      tags: [tailscale, always]
+
+    # =========================================================================
+    # AUTOMATIC UPDATES
+    # =========================================================================
+    - name: Configure unattended upgrades
+      ansible.builtin.copy:
+        content: |
+          Unattended-Upgrade::Allowed-Origins {
+            "${distro_id}:${distro_codename}";
+            "${distro_id}:${distro_codename}-security";
+            "${distro_id}ESMApps:${distro_codename}-apps-security";
+            "${distro_id}ESM:${distro_codename}-infra-security";
+          };
+          Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+          Unattended-Upgrade::Remove-Unused-Dependencies "true";
+          Unattended-Upgrade::Automatic-Reboot "false";
+        dest: /etc/apt/apt.conf.d/50unattended-upgrades
+        mode: '0644'
+      tags: [updates, always]
+
+    - name: Enable unattended upgrades
+      ansible.builtin.systemd:
+        name: unattended-upgrades
+        enabled: true
+        state: started
+      tags: [updates, always]
+
+    # =========================================================================
+    # DISABLE DEFAULT USER
+    # =========================================================================
+    - name: Disable default ubuntu user if exists
+      ansible.builtin.user:
+        name: ubuntu
+        shell: /usr/sbin/nologin
+        password_lock: true
+      when: bootstrap_user != 'ubuntu' or admin_user != 'ubuntu'
+      failed_when: false
+      tags: [security, always]
+
+    # =========================================================================
+    # ZFS STORAGE (optional - use --tags zfs)
+    # =========================================================================
+    - name: Install ZFS packages
+      ansible.builtin.apt:
+        name: zfsutils-linux
+        state: present
+      tags: [zfs, never]
+
+    - name: Check if ZFS pool exists
+      ansible.builtin.command: zpool list {{ zfs_pool_name }}
+      register: zfs_pool_check
+      changed_when: false
+      failed_when: false
+      tags: [zfs, never]
+
+    - name: Create ZFS pool
+      ansible.builtin.command: >
+        zpool create -f
+        -o ashift=12
+        -O acltype=posixacl
+        -O compression=lz4
+        -O dnodesize=auto
+        -O normalization=formD
+        -O relatime=on
+        -O xattr=sa
+        -O mountpoint={{ zfs_mount_point }}
+        {{ zfs_pool_name }}
+        {{ zfs_raid_type }}
+        {{ zfs_devices | join(' ') }}
+      when:
+        - zfs_pool_check.rc != 0
+        - zfs_devices | length > 0
+      tags: [zfs, never]
+
+    - name: Create ZFS datasets
+      ansible.builtin.command: zfs create {{ zfs_pool_name }}/{{ item }}
+      loop:
+        - media
+        - downloads
+        - backups
+        - docker
+      register: zfs_dataset_result
+      failed_when: false
+      changed_when: zfs_dataset_result.rc == 0
+      when: zfs_pool_check.rc != 0 or zfs_pool_check.rc == 0
+      tags: [zfs, never]
+
+    - name: Set ZFS mount permissions
+      ansible.builtin.file:
+        path: "{{ zfs_mount_point }}"
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        mode: '0755'
+        recurse: true
+      when: zfs_devices | length > 0
+      tags: [zfs, never]
+
+    - name: Enable ZFS auto-import
+      ansible.builtin.systemd:
+        name: zfs-import-cache
+        enabled: true
+      tags: [zfs, never]
+
+    - name: Enable ZFS auto-mount
+      ansible.builtin.systemd:
+        name: zfs-mount
+        enabled: true
+      tags: [zfs, never]
+
+    # =========================================================================
+    # SAMBA FILE SHARING (optional - use --tags samba)
+    # =========================================================================
+    - name: Install Samba packages
+      ansible.builtin.apt:
+        name:
+          - samba
+          - samba-common-bin
+        state: present
+      tags: [samba, never]
+
+    - name: Create Samba configuration
+      ansible.builtin.copy:
+        content: |
+          [global]
+          workgroup = WORKGROUP
+          server string = {{ tailscale_hostname }}
+          security = user
+          map to guest = never
+          dns proxy = no
+          log file = /var/log/samba/log.%m
+          max log size = 1000
+          logging = file
+          panic action = /usr/share/samba/panic-action %d
+          server role = standalone server
+          obey pam restrictions = yes
+          unix password sync = yes
+          passwd program = /usr/bin/passwd %u
+          passwd chat = *Enter\snew\s*\spassword:* %n\n *Retype\snew\s*\spassword:* %n\n *password\supdated\ssuccessfully* .
+          pam password change = yes
+          
+          # Performance tuning
+          socket options = TCP_NODELAY IPTOS_LOWDELAY
+          read raw = yes
+          write raw = yes
+          use sendfile = yes
+          aio read size = 16384
+          aio write size = 16384
+
+          {% for share in samba_shares %}
+          [{{ share.name }}]
+          path = {{ share.path }}
+          browseable = yes
+          read only = no
+          guest ok = no
+          valid users = {{ samba_user }}
+          create mask = 0664
+          directory mask = 0775
+          force user = {{ admin_user }}
+          force group = {{ admin_user }}
+
+          {% endfor %}
+        dest: /etc/samba/smb.conf
+        mode: '0644'
+      notify: restart smbd
+      when: samba_shares | length > 0
+      tags: [samba, never]
+
+    - name: Create Samba user
+      ansible.builtin.shell: |
+        (echo "{{ samba_password }}"; echo "{{ samba_password }}") | smbpasswd -a {{ samba_user }} -s
+      when: samba_password | length > 0
+      changed_when: true
+      no_log: true
+      tags: [samba, never]
+
+    - name: Enable Samba user
+      ansible.builtin.command: smbpasswd -e {{ samba_user }}
+      when: samba_password | length > 0
+      changed_when: true
+      tags: [samba, never]
+
+    - name: Enable and start Samba services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop:
+        - smbd
+        - nmbd
+      tags: [samba, never]
+
+  post_tasks:
+    - name: Display completion summary
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "Setup Complete!"
+          - "=============================================="
+          - ""
+          - "SSH Access:"
+          - "  ssh {{ admin_user }}@{{ tailscale_hostname }}"
+          - "  ssh {{ admin_user }}@{{ tailscale_ip.stdout | default('TAILSCALE_IP') }}"
+          - ""
+          - "Docker:"
+          - "  Status: /usr/local/bin/docker-status"
+          - "  Cleanup: /usr/local/bin/docker-cleanup"
+          - "  Directory: {{ docker_root }}"
+          - ""
+          - "Reboot recommended:"
+          - "  ssh {{ admin_user }}@{{ tailscale_hostname }} 'sudo reboot'"

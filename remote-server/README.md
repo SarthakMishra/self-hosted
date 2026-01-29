@@ -2,6 +2,17 @@
 
 Single-playbook deployment for Ubuntu servers with Docker, Tailscale, and UFW.
 
+## Prerequisites
+
+1. **Ubuntu Server** - Provision Ubuntu 20.04+ from any cloud provider (Hetzner, DigitalOcean, AWS, etc.)
+2. **SSH Key Pair** - Generate with:
+   ```bash
+   ssh-keygen -t ed25519 -C "your@email.com"
+   ```
+3. **Tailscale Account** - [Sign up here](https://tailscale.com/)
+4. **Tailscale Auth Key** - Get from [Tailscale Admin Console](https://login.tailscale.com/admin/settings/keys)
+5. **Ansible** - Install with `brew install ansible` or `apt install ansible`
+
 ## What It Does
 
 - **Admin User**: Non-root user with SSH key and sudo access
