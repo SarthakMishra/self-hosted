@@ -1,132 +1,111 @@
 # Self-Hosted Infrastructure
 
-Complete automation for self-hosted server deployment with production-ready Docker services.
+Ansible automation and Docker Compose templates for self-hosted server deployment.
 
-## 📦 Components
+## Repository Structure
 
-- **`home-server/`** - Ansible automation for home lab deployment
-- **`remote-server/`** - Ansible automation for VPS/cloud deployment
-- **`service-templates/`** - Production-ready Docker Compose services
+```
+home-server/       # Ansible playbook for home lab deployment
+remote-server/     # Ansible playbook for VPS/cloud deployment
+hetzner/           # Hetzner cloud-init configuration
+service-templates/ # Docker Compose service templates
+  ├── home/        # Home network services
+  ├── remote/      # Production/cloud services
+  └── local/       # Local development services
+scripts/           # Utility scripts
+```
 
----
+## Quick Start
 
-## 🏠 Home Server
+### 1. Clone and Setup
 
-**Infrastructure**: Ansible automation for home lab setup with hardware optimization.
+```bash
+git clone <repo-url>
+cd self-hosted
+```
 
-- [**Complete Setup Guide**](home-server/README.md) - Automated deployment
-- [**Service Deployment**](home-server/docs/service-deployment-guide.md) - Deploy applications
-- [**Manual Storage Setup**](home-server/docs/manual-storage.md) - Storage configuration
+### 2. Deploy Infrastructure
 
-### Available Services
-
-| Service | Description | Domain Example |
-|---------|-------------|----------------|
-| **[Traefik](service-templates/home/traefik/)** | Reverse proxy with SSL automation | `traefik.home.local` |
-| **[AdGuard](service-templates/home/adguard/)** | Network-wide ad blocking & DNS | `dns.home.local` |
-| **[Portainer](service-templates/home/portainer/)** | Docker container management | `portainer.home` |
-| **[Immich](service-templates/home/immich/)** | Google Photos alternative | `photos.home.local` |
-| **[Frigate](service-templates/home/frigate/)** | NVR with AI object detection | `nvr.home.local` |
-| **[ARR Stack](service-templates/home/arr-stack/)** | Complete media automation suite | Multiple domains |
-
-#### ARR Stack Components
-- **Sonarr** - TV show management | `sonarr.home.local`
-- **Radarr** - Movie management | `radarr.home.local`
-- **Prowlarr** - Indexer management | `prowlarr.home.local`
-- **Bazarr** - Subtitle management | `bazarr.home.local`
-- **qBittorrent** - Torrent client with VPN | `qbt.home.local`
-- **Plex** - Media streaming server | `plex.home.local`
-- **Jellyseerr** - Media request management | `requests.home.local`
-
----
-
-## ☁️ Remote Server
-
-**Infrastructure**: Ansible automation for VPS deployment with enterprise security.
-
-- [**Complete Setup Guide**](remote-server/README.md) - Automated deployment
-- [**Service Deployment**](remote-server/docs/service-deployment-guide.md) - Deploy applications
-
-### Available Services
-
-| Service | Description | Use Case |
-|---------|-------------|----------|
-| **[Traefik](service-templates/remote/traefik/)** | Reverse proxy with CrowdSec security | Load balancer |
-| **[Vaultwarden](service-templates/remote/vaultwarden/)** | Bitwarden-compatible password manager | Security |
-| **[Umami](service-templates/remote/umami/)** | Privacy-focused web analytics | Analytics |
-| **[Affine](service-templates/remote/affine/)** | Modern knowledge base & docs | Productivity |
-| **[n8n](service-templates/remote/n8n/)** | Workflow automation platform | Automation |
-| **[NocoDB](service-templates/remote/nocodb/)** | Airtable alternative database | Database |
-| **[Prefect](service-templates/remote/prefect/)** | Modern data workflow orchestration | Data Engineering |
-| **[Directus](service-templates/remote/directus/)** | Headless CMS with admin panel | Content Management |
-| **[SerpBear](service-templates/remote/serpbear/)** | Search engine rank tracking | SEO |
-| **[Watchtower](service-templates/remote/watchtower/)** | Automated container updates | Maintenance |
-
----
-
-## 💻 Local Development
-
-**Infrastructure**: Services for local development and AI workflows.
-
-| Service | Description | Access |
-|---------|-------------|---------|
-| **[Traefik](service-templates/local/traefik/)** | Local reverse proxy | `traefik.local` |
-| **[Open WebUI](service-templates/local/openwebui/)** | ChatGPT-like interface for LLMs | `chat.local` |
-| **[LiteLLM Proxy](service-templates/local/litellm-proxy/)** | Universal LLM API gateway | `localhost:4000` |
-| **[Jupyter](service-templates/local/jupyter/)** | Interactive notebooks | `localhost:8888` |
-| **[Cronicle](service-templates/local/cronicle/)** | Visual cron job scheduler | `cron.local` |
-| **[SearXNG](service-templates/local/searxng/)** | Privacy-focused search engine | `search.local` |
-| **[Camoufox](service-templates/local/camoufox/)** | Stealth browser automation service | `localhost:3000` |
-
----
-
-## 🚀 Quick Start
-
-### 1. Infrastructure Deployment
 ```bash
 # Home Server
 cd home-server
-ansible-playbook -i inventory/stage1-bootstrap.yml playbooks/bootstrap.yml
+cp secrets.example.yml secrets.yml  # Edit with your values
+ansible-playbook -i inventory.yml playbook.yml
 
 # Remote Server
 cd remote-server
-ansible-playbook -i inventory/stage1-system-setup.yml playbooks/system-setup.yml
+cp secrets.example.yml secrets.yml  # Edit with your values
+ansible-playbook -i inventory.yml playbook.yml
 ```
 
-### 2. Service Deployment
+### 3. Deploy Services
+
 ```bash
-# Copy service template
-cp -r service-templates/home/traefik /path/to/docker/services/
+# Setup Docker context for remote deployment
+docker context create myserver --docker "host=ssh://user@server"
+docker context use myserver
 
-# Configure environment
-cp env.example .env
-# Edit .env with your settings
-
-# Deploy
+# Deploy service
+cd service-templates/remote/n8n
+cp env.example .env  # Edit with your values
 docker compose up -d
 ```
 
-### 3. Production Services
+## Service Templates
+
+### Home Services
+
+| Service | Description |
+|---------|-------------|
+| [traefik](service-templates/home/traefik/) | Reverse proxy with Let's Encrypt |
+| [adguard](service-templates/home/adguard/) | DNS ad-blocking |
+| [portainer](service-templates/home/portainer/) | Docker management UI |
+| [immich](service-templates/home/immich/) | Photo management |
+| [frigate](service-templates/home/frigate/) | NVR with AI detection |
+| [arr-stack](service-templates/home/arr-stack/) | Media automation suite |
+
+### Remote Services
+
+| Service | Description |
+|---------|-------------|
+| [traefik](service-templates/remote/traefik/) | Reverse proxy with CrowdSec |
+| [vaultwarden](service-templates/remote/vaultwarden/) | Password manager |
+| [n8n](service-templates/remote/n8n/) | Workflow automation |
+| [umami](service-templates/remote/umami/) | Web analytics |
+| [affine](service-templates/remote/affine/) | Knowledge base |
+| [nocodb](service-templates/remote/nocodb/) | Database UI |
+| [directus](service-templates/remote/directus/) | Headless CMS |
+| [prefect](service-templates/remote/prefect/) | Workflow orchestration |
+| [meilisearch](service-templates/remote/meilisearch/) | Search engine |
+| [serpbear](service-templates/remote/serpbear/) | SEO rank tracking |
+| [reacher](service-templates/remote/reacher/) | Email verification |
+| [watchtower](service-templates/remote/watchtower/) | Container updates |
+
+### Local Services
+
+| Service | Description |
+|---------|-------------|
+| [traefik](service-templates/local/traefik/) | Local reverse proxy |
+| [openwebui](service-templates/local/openwebui/) | LLM chat interface |
+| [litellm-proxy](service-templates/local/litellm-proxy/) | LLM API gateway |
+| [jupyter](service-templates/local/jupyter/) | Notebooks |
+| [cronicle](service-templates/local/cronicle/) | Job scheduler |
+| [searxng](service-templates/local/searxng/) | Search engine |
+| [openhands](service-templates/local/openhands/) | AI coding agent |
+| [qbittorrent](service-templates/local/qbittorrent/) | Torrent client with VPN |
+
+## Development
+
+### Pre-commit Hooks
+
+This repo uses pre-commit hooks for code quality:
+
 ```bash
-# Deploy all services
-ansible-playbook -i inventory/stage2-hardened.yml playbooks/services.yml
+# Install hooks
+pre-commit install
+
+# Run manually
+pre-commit run --all-files
 ```
 
----
-
-## 🔧 Architecture
-
-### Network Design
-- **Home**: Bridge networks with Traefik SSL termination
-- **Remote**: App network with CrowdSec protection
-- **Local**: Development network for local services
-
-### Security Features
-- **Remote**: CrowdSec intrusion prevention, security headers
-- **Home**: DNS filtering, VPN integration, SSL automation
-- **All**: Non-root containers, health checks, resource limits
-
-### Storage Strategy
-- **Persistent volumes**: Application data
-- **Bind mounts**: Configuration files
-- **Shared storage**: Multi-service data access
+Hooks include: gitleaks, yamllint, ansible-lint, docker-compose validation.
