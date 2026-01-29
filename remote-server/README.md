@@ -1,79 +1,59 @@
 # Remote Server Ansible Setup
 
-2-stage deployment for Ubuntu servers with SSH key authentication.
+Single-playbook deployment for Ubuntu servers with Docker, Tailscale, and UFW.
 
-## Prerequisites
+## What It Does
 
-- Ubuntu 20.04+ server with SSH key access
-- Sudo-enabled user (ubuntu/admin)
-- SSH private key configured
+- **Admin User**: Non-root user with SSH key and sudo access
+- **Kernel Hardening**: Secure sysctl parameters
+- **Docker CE**: With security configurations
+- **Tailscale VPN**: Secure access via Tailscale SSH
+- **UFW Firewall**: With Docker security fix (prevents Docker from bypassing firewall)
+- **Automatic Updates**: Unattended security upgrades
 
-## Setup
+## Files
 
-### 1. Configure Vault
+```
+remote-server/
+├── ansible.cfg         # Ansible configuration
+├── inventory.yml       # Server inventory
+├── playbook.yml        # Main playbook (all config included)
+├── secrets.example.yml # Template for secrets
+└── README.md
+```
+
+## Usage
+
+### 1. Configure Secrets
 
 ```bash
-cp group_vars/vault.yml.example group_vars/vault.yml
-nano group_vars/vault.yml  # Add server details and SSH keys
-ansible-vault encrypt group_vars/vault.yml  # Optional
+cp secrets.example.yml secrets.yml
+nano secrets.yml
 ```
 
-### 2. Stage 1: System Hardening
-
-System hardening, user creation, and Tailscale:
+### 2. Run Playbook
 
 ```bash
-ansible-playbook -i inventory/stage1-system-setup.yml playbooks/system-setup.yml
+ansible-playbook -i inventory.yml playbook.yml -e @secrets.yml
 ```
 
-**Manual reboot required:**
+With encrypted secrets:
 ```bash
-ssh <admin_user>@<tailscale_machine_name> 'sudo reboot'
+ansible-vault encrypt secrets.yml
+ansible-playbook -i inventory.yml playbook.yml -e @secrets.yml --ask-vault-pass
 ```
 
-### 3. Stage 2: Services
-
-CrowdSec security, Docker, Traefik reverse proxy, and monitoring:
+### 3. Reboot
 
 ```bash
-ansible-playbook -i inventory/stage2-production.yml playbooks/services.yml
-```
-
-## Configuration
-
-Key variables in `group_vars/vault.yml`:
-
-```yaml
-vault_bootstrap_host: "203.0.113.1"           # Server IP
-vault_bootstrap_user: "ubuntu"                # Base user
-vault_production_host: "myserver"             # Tailscale hostname
-vault_production_user: "admin"                # Admin user to create
-vault_admin_ssh_public_key: "ssh-ed25519 ..."
-vault_ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
-vault_tailscale_auth_key: "tskey-auth-xxxxx..."
-vault_traefik_acme_email: "your@email.com"
-```
-
-## Deploy Applications
-
-Add Traefik labels for automatic SSL:
-
-```yaml
-services:
-  myapp:
-    image: myapp:latest
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.myapp.rule=Host(`myapp.yourdomain.com`)
-      - traefik.http.routers.myapp.entrypoints=websecure
-      - traefik.http.routers.myapp.tls.certresolver=letsencrypt
+ssh admin@your-tailscale-hostname 'sudo reboot'
 ```
 
 ## Access
 
-- SSH: `ssh admin@myserver` (Tailscale) or `ssh admin@server-ip`
-- Traefik: `https://traefik.yourdomain.com`
-- Netdata: `http://myserver:19999`
+```bash
+ssh admin@your-tailscale-hostname
+```
 
 ## Management
 
@@ -82,8 +62,31 @@ services:
 /usr/local/bin/docker-status
 /usr/local/bin/docker-cleanup
 
-# Security (CrowdSec)
-sudo cscli collections list
-sudo cscli alerts list
-sudo cscli decisions list
+# Firewall
+sudo ufw status verbose
+
+# Tailscale
+tailscale status
 ```
+
+## UFW + Docker
+
+Docker normally bypasses UFW. This setup includes the UFW-Docker fix which:
+- Blocks all Docker container ports by default
+- Only allows ports 80/443
+- To expose additional ports:
+
+```bash
+sudo ufw route allow proto tcp from any to any port 3000
+```
+
+## Tags
+
+Run specific parts:
+```bash
+ansible-playbook -i inventory.yml playbook.yml -e @secrets.yml --tags docker
+ansible-playbook -i inventory.yml playbook.yml -e @secrets.yml --tags firewall
+ansible-playbook -i inventory.yml playbook.yml -e @secrets.yml --tags users,tailscale
+```
+
+Available: `users`, `packages`, `hardening`, `docker`, `tailscale`, `firewall`, `updates`, `security`

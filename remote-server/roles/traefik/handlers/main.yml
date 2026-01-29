@@ -1,9 +1,0 @@
----
-# Traefik Role - Handlers
-
-- name: restart traefik
-  community.docker.docker_compose:
-    project_src: "{{ traefik_root_dir }}"
-    state: present
-    restarted: true
-  listen: "restart traefik" 

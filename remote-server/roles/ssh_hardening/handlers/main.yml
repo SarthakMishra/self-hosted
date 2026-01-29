@@ -1,9 +1,0 @@
----
-# SSH Hardening Role - Handlers
-# Manages SSH service restarts
-
-- name: restart ssh
-  ansible.builtin.systemd:
-    name: ssh
-    state: restarted
-  listen: "restart ssh" 

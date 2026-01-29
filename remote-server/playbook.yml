@@ -1,0 +1,526 @@
+---
+# =============================================================================
+# Remote Server Setup Playbook
+# =============================================================================
+# Single-file deployment for Ubuntu servers with Docker, Tailscale, and UFW.
+#
+# Usage:
+#   ansible-playbook -i inventory.yml playbook.yml -e @secrets.yml
+# =============================================================================
+
+- name: Remote Server Setup
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    # -------------------------------------------------------------------------
+    # Connection Settings (override via secrets.yml)
+    # -------------------------------------------------------------------------
+    server_host: "{{ vault_server_host }}"
+    bootstrap_user: "{{ vault_bootstrap_user | default('ubuntu') }}"
+    admin_user: "{{ vault_admin_user | default('admin') }}"
+    admin_ssh_public_key: "{{ vault_admin_ssh_public_key }}"
+
+    # -------------------------------------------------------------------------
+    # Tailscale Configuration (override via secrets.yml)
+    # -------------------------------------------------------------------------
+    tailscale_auth_key: "{{ vault_tailscale_auth_key }}"
+    tailscale_hostname: "{{ vault_tailscale_hostname }}"
+    tailscale_accept_dns: false
+    tailscale_ssh_enabled: true
+
+    # -------------------------------------------------------------------------
+    # System Configuration
+    # -------------------------------------------------------------------------
+    docker_root: "/opt/docker"
+
+    required_packages:
+      - curl
+      - wget
+      - gnupg
+      - lsb-release
+      - ca-certificates
+      - apt-transport-https
+      - software-properties-common
+      - ufw
+      - unattended-upgrades
+      - net-tools
+      - dnsutils
+      - rsyslog
+      - jq
+
+    kernel_security_params:
+      net.ipv4.ip_forward: 1
+      fs.file-max: 1048576
+      vm.max_map_count: 262144
+      vm.overcommit_memory: 1
+      kernel.kptr_restrict: 2
+      kernel.dmesg_restrict: 1
+      kernel.perf_event_paranoid: 3
+      kernel.unprivileged_bpf_disabled: 1
+      net.core.bpf_jit_harden: 2
+      kernel.yama.ptrace_scope: 2
+      net.ipv4.conf.all.accept_redirects: 0
+      net.ipv4.conf.default.accept_redirects: 0
+      net.ipv6.conf.all.accept_redirects: 0
+      net.ipv6.conf.default.accept_redirects: 0
+      net.ipv4.conf.all.accept_source_route: 0
+      net.ipv4.conf.default.accept_source_route: 0
+      net.ipv4.tcp_syncookies: 1
+      net.ipv4.conf.all.log_martians: 1
+
+    docker_daemon_config:
+      log-driver: "json-file"
+      log-opts:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+      live-restore: true
+      userland-proxy: false
+      no-new-privileges: true
+      icc: true
+      features:
+        buildkit: true
+      default-ulimits:
+        nofile:
+          Name: "nofile"
+          Hard: 64000
+          Soft: 64000
+        nproc:
+          Name: "nproc"
+          Hard: 8192
+          Soft: 4096
+      storage-driver: "overlay2"
+      exec-opts:
+        - "native.cgroupdriver=systemd"
+      metrics-addr: "127.0.0.1:9323"
+      experimental: false
+      max-concurrent-downloads: 3
+      max-concurrent-uploads: 5
+      default-shm-size: "64M"
+      shutdown-timeout: 15
+
+  handlers:
+    - name: restart docker
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+
+    - name: reload sysctl
+      ansible.builtin.command: sysctl --system
+      changed_when: true
+
+    - name: restart ufw
+      ansible.builtin.systemd:
+        name: ufw
+        state: restarted
+
+  pre_tasks:
+    - name: Display setup banner
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "Remote Server Setup"
+          - "=============================================="
+          - "Target: {{ inventory_hostname }}"
+          - "Admin User: {{ admin_user }}"
+          - "Tailscale: {{ tailscale_hostname }}"
+
+    - name: Check system requirements
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "Ubuntu"
+          - ansible_distribution_major_version | int >= 20
+        fail_msg: "Requires Ubuntu 20.04+"
+
+  tasks:
+    # =========================================================================
+    # USER MANAGEMENT
+    # =========================================================================
+    - name: Ensure passwordless sudo for bootstrap user
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/bootstrap-user
+        line: "{{ bootstrap_user }} ALL=(ALL) NOPASSWD:ALL"
+        create: true
+        mode: '0440'
+        validate: 'visudo -cf %s'
+      tags: [users]
+
+    - name: Create admin user
+      ansible.builtin.user:
+        name: "{{ admin_user }}"
+        shell: /bin/bash
+        groups: sudo
+        append: true
+        create_home: true
+      tags: [users]
+
+    - name: Configure passwordless sudo for admin user
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/admin-user
+        line: "{{ admin_user }} ALL=(ALL) NOPASSWD:ALL"
+        create: true
+        mode: '0440'
+        validate: 'visudo -cf %s'
+      tags: [users]
+
+    - name: Create admin .ssh directory
+      ansible.builtin.file:
+        path: "/home/{{ admin_user }}/.ssh"
+        state: directory
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        mode: '0700'
+      tags: [users]
+
+    - name: Install SSH public key for admin user
+      ansible.builtin.authorized_key:
+        user: "{{ admin_user }}"
+        key: "{{ admin_ssh_public_key }}"
+      tags: [users]
+
+    # =========================================================================
+    # SYSTEM UPDATES & PACKAGES
+    # =========================================================================
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      tags: [packages]
+
+    - name: Upgrade all packages
+      ansible.builtin.apt:
+        upgrade: dist
+        autoremove: true
+      tags: [packages]
+
+    - name: Install required packages
+      ansible.builtin.apt:
+        name: "{{ required_packages }}"
+        state: present
+      tags: [packages]
+
+    # =========================================================================
+    # KERNEL HARDENING
+    # =========================================================================
+    - name: Configure kernel security parameters
+      ansible.builtin.copy:
+        content: |
+          # Kernel Security Hardening - Managed by Ansible
+          {% for param, value in kernel_security_params.items() %}
+          {{ param }} = {{ value }}
+          {% endfor %}
+        dest: /etc/sysctl.d/99-security-hardening.conf
+        mode: '0644'
+      notify: reload sysctl
+      tags: [hardening]
+
+    - name: Configure system limits for Docker
+      ansible.builtin.copy:
+        content: |
+          # System Limits for Docker - Managed by Ansible
+          * soft nofile 1048576
+          * hard nofile 1048576
+          root soft nofile 1048576
+          root hard nofile 1048576
+          * soft nproc 65535
+          * hard nproc 65535
+        dest: /etc/security/limits.d/99-docker-limits.conf
+        mode: '0644'
+      tags: [hardening]
+
+    # =========================================================================
+    # DOCKER INSTALLATION
+    # =========================================================================
+    - name: Remove old Docker packages
+      ansible.builtin.apt:
+        name: [docker, docker-engine, docker.io, containerd, runc]
+        state: absent
+      tags: [docker]
+
+    - name: Add Docker GPG key
+      ansible.builtin.shell: |
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+        chmod 644 /usr/share/keyrings/docker-archive-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/docker-archive-keyring.gpg
+      tags: [docker]
+
+    - name: Add Docker repository
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        filename: docker
+      tags: [docker]
+
+    - name: Install Docker packages
+      ansible.builtin.apt:
+        name: [docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin, docker-compose-plugin]
+        state: present
+        update_cache: true
+      notify: restart docker
+      tags: [docker]
+
+    - name: Add admin user to docker group
+      ansible.builtin.user:
+        name: "{{ admin_user }}"
+        groups: docker
+        append: true
+      tags: [docker]
+
+    - name: Configure Docker daemon
+      ansible.builtin.copy:
+        content: "{{ docker_daemon_config | to_nice_json }}"
+        dest: /etc/docker/daemon.json
+        mode: '0644'
+      notify: restart docker
+      tags: [docker]
+
+    - name: Enable and start Docker
+      ansible.builtin.systemd:
+        name: docker
+        enabled: true
+        state: started
+      tags: [docker]
+
+    - name: Create Docker directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        mode: '0755'
+      loop:
+        - "{{ docker_root }}"
+        - "{{ docker_root }}/compose"
+        - "{{ docker_root }}/data"
+        - "{{ docker_root }}/config"
+        - "{{ docker_root }}/logs"
+      tags: [docker]
+
+    - name: Create Docker cleanup script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          echo "Starting Docker cleanup..."
+          docker container prune -f --filter "until=24h"
+          docker image prune -f --filter "until=48h"
+          docker volume prune -f
+          docker builder prune -f --keep-storage=20GB
+          docker network prune -f
+          echo "Docker cleanup completed."
+        dest: /usr/local/bin/docker-cleanup
+        mode: '0755'
+      tags: [docker]
+
+    - name: Create Docker status script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          echo "=== Docker System Info ==="
+          docker system info 2>/dev/null | grep -E "Containers|Images|Server Version|Storage Driver|Docker Root Dir"
+          echo ""
+          echo "=== Running Containers ==="
+          docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+          echo ""
+          echo "=== Disk Usage ==="
+          docker system df
+        dest: /usr/local/bin/docker-status
+        mode: '0755'
+      tags: [docker]
+
+    - name: Setup Docker cleanup cron job
+      ansible.builtin.cron:
+        name: "Docker cleanup"
+        minute: "0"
+        hour: "2"
+        job: "/usr/local/bin/docker-cleanup >> /var/log/docker-cleanup.log 2>&1"
+      tags: [docker]
+
+    # =========================================================================
+    # TAILSCALE
+    # =========================================================================
+    - name: Add Tailscale GPG key
+      ansible.builtin.get_url:
+        url: "https://pkgs.tailscale.com/stable/ubuntu/{{ ansible_distribution_release }}.noarmor.gpg"
+        dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
+        mode: '0644'
+      tags: [tailscale]
+
+    - name: Add Tailscale repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu {{ ansible_distribution_release }} main"
+        filename: tailscale
+      tags: [tailscale]
+
+    - name: Install Tailscale
+      ansible.builtin.apt:
+        name: tailscale
+        state: present
+        update_cache: true
+      tags: [tailscale]
+
+    - name: Enable and start Tailscale
+      ansible.builtin.systemd:
+        name: tailscaled
+        enabled: true
+        state: started
+      tags: [tailscale]
+
+    - name: Check Tailscale status
+      ansible.builtin.command: tailscale status --json
+      register: tailscale_status
+      changed_when: false
+      failed_when: false
+      tags: [tailscale]
+
+    - name: Connect Tailscale
+      ansible.builtin.command: >
+        tailscale up
+        --accept-dns={{ tailscale_accept_dns | lower }}
+        --hostname={{ tailscale_hostname }}
+        {% if tailscale_ssh_enabled %}--ssh{% endif %}
+        --authkey={{ tailscale_auth_key }}
+      when: tailscale_status.rc != 0 or (tailscale_status.stdout | from_json).BackendState != 'Running'
+      tags: [tailscale]
+
+    - name: Get Tailscale IP
+      ansible.builtin.command: tailscale ip --4
+      register: tailscale_ip
+      changed_when: false
+      failed_when: false
+      tags: [tailscale]
+
+    # =========================================================================
+    # UFW FIREWALL (with Docker security fix)
+    # =========================================================================
+    - name: Reset UFW to clean state
+      community.general.ufw:
+        state: reset
+      tags: [firewall]
+
+    - name: Set UFW default policies
+      community.general.ufw:
+        direction: "{{ item.direction }}"
+        policy: "{{ item.policy }}"
+      loop:
+        - { direction: 'incoming', policy: 'deny' }
+        - { direction: 'outgoing', policy: 'allow' }
+      tags: [firewall]
+
+    - name: Allow HTTP access
+      community.general.ufw:
+        rule: allow
+        to_port: "80"
+        proto: tcp
+        comment: "HTTP access"
+      tags: [firewall]
+
+    - name: Allow HTTPS access
+      community.general.ufw:
+        rule: allow
+        to_port: "443"
+        proto: tcp
+        comment: "HTTPS access"
+      tags: [firewall]
+
+    - name: Add UFW-Docker security rules to prevent Docker bypass
+      ansible.builtin.blockinfile:
+        path: /etc/ufw/after.rules
+        block: |
+          # BEGIN UFW AND DOCKER
+          *filter
+          :ufw-user-forward - [0:0]
+          :ufw-docker-logging-deny - [0:0]
+          :DOCKER-USER - [0:0]
+          -A DOCKER-USER -j ufw-user-forward
+
+          -A DOCKER-USER -j RETURN -s 10.0.0.0/8
+          -A DOCKER-USER -j RETURN -s 172.16.0.0/12
+          -A DOCKER-USER -j RETURN -s 192.168.0.0/16
+
+          -A DOCKER-USER -p udp -m udp --sport 53 --dport 1024:65535 -j RETURN
+
+          -A DOCKER-USER -j ufw-docker-logging-deny -p tcp -m tcp --tcp-flags FIN,SYN,RST,ACK SYN -d 192.168.0.0/16
+          -A DOCKER-USER -j ufw-docker-logging-deny -p tcp -m tcp --tcp-flags FIN,SYN,RST,ACK SYN -d 10.0.0.0/8
+          -A DOCKER-USER -j ufw-docker-logging-deny -p tcp -m tcp --tcp-flags FIN,SYN,RST,ACK SYN -d 172.16.0.0/12
+          -A DOCKER-USER -j ufw-docker-logging-deny -p udp -m udp --dport 0:32767 -d 192.168.0.0/16
+          -A DOCKER-USER -j ufw-docker-logging-deny -p udp -m udp --dport 0:32767 -d 10.0.0.0/8
+          -A DOCKER-USER -j ufw-docker-logging-deny -p udp -m udp --dport 0:32767 -d 172.16.0.0/12
+
+          -A DOCKER-USER -j RETURN
+
+          -A ufw-docker-logging-deny -m limit --limit 3/min --limit-burst 10 -j LOG --log-prefix "[UFW DOCKER BLOCK] "
+          -A ufw-docker-logging-deny -j DROP
+
+          COMMIT
+          # END UFW AND DOCKER
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - UFW DOCKER SECURITY"
+        backup: true
+      notify: restart ufw
+      tags: [firewall]
+
+    - name: Enable UFW
+      community.general.ufw:
+        state: enabled
+      tags: [firewall]
+
+    # =========================================================================
+    # AUTOMATIC UPDATES
+    # =========================================================================
+    - name: Configure unattended upgrades
+      ansible.builtin.copy:
+        content: |
+          Unattended-Upgrade::Allowed-Origins {
+            "${distro_id}:${distro_codename}";
+            "${distro_id}:${distro_codename}-security";
+            "${distro_id}ESMApps:${distro_codename}-apps-security";
+            "${distro_id}ESM:${distro_codename}-infra-security";
+          };
+          Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+          Unattended-Upgrade::Remove-Unused-Dependencies "true";
+          Unattended-Upgrade::Automatic-Reboot "false";
+        dest: /etc/apt/apt.conf.d/50unattended-upgrades
+        mode: '0644'
+      tags: [updates]
+
+    - name: Enable unattended upgrades
+      ansible.builtin.systemd:
+        name: unattended-upgrades
+        enabled: true
+        state: started
+      tags: [updates]
+
+    # =========================================================================
+    # DISABLE DEFAULT USER
+    # =========================================================================
+    - name: Disable default ubuntu user if exists
+      ansible.builtin.user:
+        name: ubuntu
+        shell: /usr/sbin/nologin
+        password_lock: true
+      when: bootstrap_user != 'ubuntu' or admin_user != 'ubuntu'
+      failed_when: false
+      tags: [security]
+
+  post_tasks:
+    - name: Display completion summary
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "Setup Complete!"
+          - "=============================================="
+          - ""
+          - "SSH Access:"
+          - "  ssh {{ admin_user }}@{{ tailscale_hostname }}"
+          - "  ssh {{ admin_user }}@{{ tailscale_ip.stdout | default('TAILSCALE_IP') }}"
+          - ""
+          - "Docker:"
+          - "  Status: /usr/local/bin/docker-status"
+          - "  Cleanup: /usr/local/bin/docker-cleanup"
+          - "  Directory: {{ docker_root }}"
+          - ""
+          - "Firewall: HTTP/HTTPS open, SSH blocked (use Tailscale)"
+          - ""
+          - "Reboot recommended:"
+          - "  ssh {{ admin_user }}@{{ tailscale_hostname }} 'sudo reboot'"
