@@ -4,7 +4,7 @@ services:
   immich:
     container_name: immich
     image: ghcr.io/immich-app/immich-server:release
-    
+
     # Environment configuration
     env_file:
       - .env
@@ -14,46 +14,46 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - DB_DATABASE_NAME=immich
       - REDIS_HOSTNAME=immich-redis
-    
+
     volumes:
       - /mnt/Data/Shared_Storage/Rishi/Selfhosted/data/photos:/usr/src/app/upload
       - /etc/localtime:/etc/localtime:ro
-    
+
     labels:
       # Enable Traefik
       - "traefik.enable=true"
-      
+
       # Web interface routing - HTTP
       - "traefik.http.routers.immich-http.rule=Host(`${IMMICH_DOMAIN}`)"
       - "traefik.http.routers.immich-http.entrypoints=web"
       - "traefik.http.routers.immich-http.service=immich"
-      
-      # Web interface routing - HTTPS  
+
+      # Web interface routing - HTTPS
       - "traefik.http.routers.immich-https.rule=Host(`${IMMICH_DOMAIN}`)"
       - "traefik.http.routers.immich-https.entrypoints=websecure"
       - "traefik.http.routers.immich-https.tls=true"
       - "traefik.http.routers.immich-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.immich-https.service=immich"
-      
+
       # Service configuration (Immich web interface on port 2283)
       - "traefik.http.services.immich.loadbalancer.server.port=2283"
-      
+
       # Middleware for large file uploads (50GB max)
       - "traefik.http.middlewares.immich-uploads.buffering.maxRequestBodyBytes=50000000000"  # 50GB
       - "traefik.http.middlewares.immich-uploads.buffering.maxResponseBodyBytes=50000000000" # 50GB
       - "traefik.http.middlewares.immich-uploads.buffering.memRequestBodyBytes=1048576"     # 1MB
       - "traefik.http.middlewares.immich-uploads.buffering.memResponseBodyBytes=1048576"    # 1MB
-      
+
       # HTTP to HTTPS redirect
       - "traefik.http.middlewares.immich-redirect.redirectscheme.scheme=https"
       - "traefik.http.routers.immich-http.middlewares=immich-redirect"
-      
+
       # Apply middleware to HTTPS router
       - "traefik.http.routers.immich-https.middlewares=immich-uploads"
-      
+
       # Network specification for Traefik
       - "traefik.docker.network=home-network"
-    
+
     networks:
       - home-network
     depends_on:
@@ -66,7 +66,7 @@ services:
   immich-machine-learning:
     container_name: immich_machine_learning
     image: ghcr.io/immich-app/immich-machine-learning:release
-    
+
     volumes:
       - /mnt/Data/Shared_Storage/Rishi/Selfhosted/config/immich-config/ml-cache:/cache
     networks:

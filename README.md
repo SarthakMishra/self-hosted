@@ -5,7 +5,7 @@ Complete automation for self-hosted server deployment with production-ready Dock
 ## 📦 Components
 
 - **`home-server/`** - Ansible automation for home lab deployment
-- **`remote-server/`** - Ansible automation for VPS/cloud deployment  
+- **`remote-server/`** - Ansible automation for VPS/cloud deployment
 - **`service-templates/`** - Production-ready Docker Compose services
 
 ---
@@ -31,7 +31,7 @@ Complete automation for self-hosted server deployment with production-ready Dock
 
 #### ARR Stack Components
 - **Sonarr** - TV show management | `sonarr.home.local`
-- **Radarr** - Movie management | `radarr.home.local`  
+- **Radarr** - Movie management | `radarr.home.local`
 - **Prowlarr** - Indexer management | `prowlarr.home.local`
 - **Bazarr** - Subtitle management | `bazarr.home.local`
 - **qBittorrent** - Torrent client with VPN | `qbt.home.local`
@@ -88,7 +88,7 @@ Complete automation for self-hosted server deployment with production-ready Dock
 cd home-server
 ansible-playbook -i inventory/stage1-bootstrap.yml playbooks/bootstrap.yml
 
-# Remote Server  
+# Remote Server
 cd remote-server
 ansible-playbook -i inventory/stage1-system-setup.yml playbooks/system-setup.yml
 ```
@@ -118,7 +118,7 @@ ansible-playbook -i inventory/stage2-hardened.yml playbooks/services.yml
 
 ### Network Design
 - **Home**: Bridge networks with Traefik SSL termination
-- **Remote**: App network with CrowdSec protection  
+- **Remote**: App network with CrowdSec protection
 - **Local**: Development network for local services
 
 ### Security Features

@@ -3,37 +3,37 @@ services:
     image: ghcr.io/toeverything/affine:${AFFINE_REVISION:-stable}
     container_name: affine_server
     restart: unless-stopped
-    
+
     # Environment configuration
     env_file:
       - .env
-    
+
     environment:
       # Core Affine configuration
       - AFFINE_SERVER_HOST=${AFFINE_DOMAIN}
       - AFFINE_SERVER_PORT=3010
       - NODE_ENV=production
-      
+
       # Database configuration
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@affine-postgres:5432/${POSTGRES_DB}
-      
+
       # Redis configuration
       - REDIS_SERVER_HOST=affine-redis
       - REDIS_SERVER_PORT=6379
       - REDIS_SERVER_PASSWORD=${REDIS_PASSWORD}
-      
+
       # Storage configuration
       - AFFINE_STORAGE_PATH=/root/.affine/storage
       - AFFINE_CONFIG_PATH=/root/.affine/config
-      
+
       # Feature toggles
       - AFFINE_INDEXER_ENABLED=${AFFINE_INDEXER_ENABLED:-false}
       - AFFINE_TELEMETRY_ENABLED=${AFFINE_TELEMETRY_ENABLED:-false}
-      
+
       # Security configuration
       - AFFINE_SECRET=${AFFINE_SECRET}
       - JWT_SECRET=${AFFINE_JWT_SECRET}
-      
+
       # Optional: Email configuration
       - MAILER_HOST=${AFFINE_MAILER_HOST}
       - MAILER_PORT=${AFFINE_MAILER_PORT:-587}
@@ -52,10 +52,10 @@ services:
     volumes:
       # Persistent storage for user data
       - affine_storage:/root/.affine/storage
-      
+
       # Configuration files
       - affine_config:/root/.affine/config
-      
+
       # Optional: Custom configurations
       # - ./custom-config:/root/.affine/custom:ro
 
@@ -76,26 +76,26 @@ services:
   affine-migration:
     image: ghcr.io/toeverything/affine:${AFFINE_REVISION:-stable}
     container_name: affine_migration_job
-    
+
     # Migration command
     command: ['sh', '-c', 'node ./scripts/self-host-predeploy.js']
-    
+
     # Environment configuration
     env_file:
       - .env
-    
+
     environment:
       # Database configuration
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@affine-postgres:5432/${POSTGRES_DB}
-      
+
       # Redis configuration
       - REDIS_SERVER_HOST=affine-redis
       - REDIS_SERVER_PORT=6379
       - REDIS_SERVER_PASSWORD=${REDIS_PASSWORD}
-      
+
       # Feature toggles
       - AFFINE_INDEXER_ENABLED=${AFFINE_INDEXER_ENABLED:-false}
-      
+
       # Security configuration
       - AFFINE_SECRET=${AFFINE_SECRET}
 
@@ -108,7 +108,7 @@ services:
     volumes:
       # Persistent storage for user data
       - affine_storage:/root/.affine/storage
-      
+
       # Configuration files
       - affine_config:/root/.affine/config
 
@@ -124,17 +124,17 @@ services:
     image: redis:7-alpine
     container_name: affine_redis
     restart: unless-stopped
-    
+
     # Redis configuration
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
-    
+
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
 
     volumes:
       # Persistent Redis data
       - affine_redis_data:/data
-      
+
       # Optional: Custom Redis configuration
       # - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
 
@@ -158,7 +158,7 @@ services:
     image: pgvector/pgvector:pg16
     container_name: affine_postgres
     restart: unless-stopped
-    
+
     # Environment configuration
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
@@ -166,7 +166,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_INITDB_ARGS=${POSTGRES_INITDB_ARGS:---data-checksums --encoding=UTF-8 --lc-collate=C --lc-ctype=C}
       - PGDATA=/var/lib/postgresql/data/pgdata
-    
+
     volumes:
       # Persistent database storage
       - affine_postgres_data:/var/lib/postgresql/data
@@ -192,7 +192,7 @@ networks:
   # External network for Traefik communication
   app-network:
     external: true
-    
+
   # Internal network for database communication
   affine-internal:
     driver: bridge

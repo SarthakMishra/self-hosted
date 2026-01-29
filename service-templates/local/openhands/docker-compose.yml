@@ -3,35 +3,35 @@ services:
     image: ghcr.io/all-hands-ai/openhands:0.53
     container_name: openhands
     restart: unless-stopped
-    
+
     # Enable access to host services
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    
+
     environment:
       - SANDBOX_RUNTIME_CONTAINER_IMAGE=docker.all-hands.dev/all-hands-ai/runtime:0.53-nikolaik
       - SANDBOX_USER_ID=1000
       - SANDBOX_VOLUMES=/home/sarthak/projects/openhands:/workspace:rw
-    
+
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ~/.openhands:/.openhands
-    
+
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.openhands.rule=Host(`code.local`)"
       - "traefik.http.routers.openhands.entrypoints=web"
       - "traefik.http.services.openhands.loadbalancer.server.port=3000"
       - "traefik.docker.network=local-network"
-    
+
     # Network configuration
     networks:
       - local-network
-    
+
     # Security options
     security_opt:
       - no-new-privileges:true
-    
+
     stdin_open: true
     tty: true
 

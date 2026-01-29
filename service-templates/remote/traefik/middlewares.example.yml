@@ -14,7 +14,7 @@ http:
         stsPreload: true
         frameDeny: true
         referrerPolicy: "strict-origin-when-cross-origin"
-    
+
     # CrowdSec bouncer middleware
     crowdsec:
       plugin:

@@ -3,44 +3,44 @@ services:
     image: adguard/adguardhome
     container_name: adguardhome
     restart: unless-stopped
-    
+
     # Environment configuration
     env_file:
       - .env
-    
+
     ports:
       # DNS ports on specific IP (same as Traefik but different ports)
       - "${ADGUARD_LOCAL_IP}:53:53/tcp"    # DNS (standard port)
-      - "${ADGUARD_LOCAL_IP}:53:53/udp"    # DNS (standard port)  
+      - "${ADGUARD_LOCAL_IP}:53:53/udp"    # DNS (standard port)
       - "${ADGUARD_LOCAL_IP}:853:853/udp"  # DNS-over-QUIC
       - "${ADGUARD_LOCAL_IP}:853:853/tcp"  # DNS-over-TLS
       - "${ADGUARD_LOCAL_IP}:8853:8853/tcp" # DNS-over-HTTPS alternative port
       - "${ADGUARD_LOCAL_IP}:3030:3000/tcp" # Initial setup (external:internal)
-      
+
     volumes:
       # AdGuard configuration and data
       - adguard_work:/opt/adguardhome/work
       - adguard_conf:/opt/adguardhome/conf
-      
+
       # Shared Let's Encrypt certificates from Traefik for encrypted DNS
       - traefik_letsencrypt:/etc/letsencrypt:ro
-    
+
     labels:
       # Enable Traefik
       - "traefik.enable=true"
-      
+
       # Web interface routing - HTTP
       - "traefik.http.routers.adguard-http.rule=Host(`${ADGUARD_DOMAIN}`)"
       - "traefik.http.routers.adguard-http.entrypoints=web"
       - "traefik.http.routers.adguard-http.service=adguard"
-      
-      # Web interface routing - HTTPS  
+
+      # Web interface routing - HTTPS
       - "traefik.http.routers.adguard-https.rule=Host(`${ADGUARD_DOMAIN}`)"
       - "traefik.http.routers.adguard-https.entrypoints=websecure"
       - "traefik.http.routers.adguard-https.tls=true"
       - "traefik.http.routers.adguard-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.adguard-https.service=adguard"
-      
+
       # Service configuration (AdGuard web interface on port 80 after setup)
       - "traefik.http.services.adguard.loadbalancer.server.port=80"
 
@@ -63,7 +63,7 @@ volumes:
     driver: local
   adguard_conf:
     driver: local
-  
+
   # External volume from Traefik
   traefik_letsencrypt:
     external: true

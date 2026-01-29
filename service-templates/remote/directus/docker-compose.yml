@@ -59,7 +59,7 @@ services:
 
       PUBLIC_URL: "https://${DOMAIN}"
     labels:
-      - "traefik.enable=true" 
+      - "traefik.enable=true"
       - "traefik.http.routers.directus.rule=Host(`${DOMAIN}`)"
       - "traefik.http.routers.directus.entrypoints=websecure"
       - "traefik.http.routers.directus.tls.certresolver=letsencrypt"

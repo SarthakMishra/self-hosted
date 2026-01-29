@@ -8,53 +8,53 @@ services:
     restart: unless-stopped
     stop_grace_period: 30s
     privileged: true  # May be needed for hardware access
-    
+
     # Increase shared memory size for multiple high-resolution cameras
     shm_size: "256mb"  # Increased from default 64mb to support 4+ cameras
-    
+
     env_file:
       - .env
-    
+
     environment:
       - TZ=UTC
       - FRIGATE_JWT_SECRET=${FRIGATE_JWT_SECRET}
-    
+
     volumes:
       - /mnt/Data/Shared_Storage/Rishi/Selfhosted/data/cctv:/media/frigate
       - type: tmpfs  # Cache for recordings - reduces SSD wear
         target: /tmp/cache
         tmpfs:
           size: 1000000000  # 1GB
-    
+
     devices:
       # Intel hardware acceleration (if available)
       - /dev/dri/renderD128:/dev/dri/renderD128
-    
+
     ports:
       - "5000:5000"        # Web interface and API
-      - "8554:8554"        # RTSP restreaming  
+      - "8554:8554"        # RTSP restreaming
       - "8555:8555/tcp"    # WebRTC over TCP
       - "8555:8555/udp"    # WebRTC over UDP
-    
+
     labels:
       # Enable Traefik
       - "traefik.enable=true"
-      
+
       # Web interface routing - HTTP
       - "traefik.http.routers.frigate-http.rule=Host(`${FRIGATE_DOMAIN}`)"
       - "traefik.http.routers.frigate-http.entrypoints=web"
       - "traefik.http.routers.frigate-http.service=frigate"
-      
-      # Web interface routing - HTTPS  
+
+      # Web interface routing - HTTPS
       - "traefik.http.routers.frigate-https.rule=Host(`${FRIGATE_DOMAIN}`)"
       - "traefik.http.routers.frigate-https.entrypoints=websecure"
       - "traefik.http.routers.frigate-https.tls=true"
       - "traefik.http.routers.frigate-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.frigate-https.service=frigate"
-      
+
       # Service configuration (Frigate web interface on port 5000)
       - "traefik.http.services.frigate.loadbalancer.server.port=5000"
-    
+
     networks:
       - home-network
 

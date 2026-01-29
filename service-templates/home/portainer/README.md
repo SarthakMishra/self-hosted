@@ -40,7 +40,7 @@ docker compose logs -f portainer
 ### Initial Setup
 
 1. **Access Interface**: Navigate to `http://portainer.home`
-2. **Create Admin User**: 
+2. **Create Admin User**:
    - Set admin username and password
    - Password must be at least 12 characters
 3. **Choose Environment**: Select "Docker" and verify connection
@@ -149,4 +149,4 @@ docker compose exec portainer portainer --version
 docker compose pull && docker compose up -d
 ```
 
-Your Docker management interface is ready at **http://portainer.home**! 🚀 
+Your Docker management interface is ready at **http://portainer.home**! 🚀

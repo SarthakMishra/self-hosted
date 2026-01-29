@@ -27,4 +27,4 @@ To prevent failed updates from breaking your services, it is strongly recommende
 
 1.  **Pin Image Versions**: Avoid using the `:latest` tag for critical services. Instead, pin to a specific major/minor version (e.g., `image: nocodb/nocodb:0.205`). This prevents unexpected, major breaking changes from being pulled automatically.
 2.  **Maintain Regular Backups**: Always have a robust backup strategy for your persistent data (Docker volumes), especially for databases. An image rollback cannot fix corrupted data.
-3.  **Enable Notifications**: For production environments, consider configuring Watchtower to send notifications (e.g., via email or Slack) so you are immediately aware when an update has occurred. 
+3.  **Enable Notifications**: For production environments, consider configuring Watchtower to send notifications (e.g., via email or Slack) so you are immediately aware when an update has occurred.

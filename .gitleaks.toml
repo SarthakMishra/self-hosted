@@ -1,0 +1,18 @@
+# Gitleaks configuration for self-hosted infrastructure repo
+# https://github.com/gitleaks/gitleaks
+
+[extend]
+useDefault = true
+
+# Allowlist paths that are intentionally example/template files
+[allowlist]
+  description = "Allowlist for example and template files"
+  paths = [
+    '''\.example$''',
+    '''\.example\.yml$''',
+    '''\.example\.yaml$''',
+    '''env\.example$''',
+    '''secrets\.example\.yml$''',
+    '''vault\.yml\.example$''',
+    '''cloud-config\.example\.yml$''',
+  ]

@@ -25,4 +25,4 @@ services:
 
 networks:
   home-network:
-    external: true 
+    external: true

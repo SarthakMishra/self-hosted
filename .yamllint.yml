@@ -1,0 +1,50 @@
+# yamllint configuration
+# https://yamllint.readthedocs.io/en/stable/configuration.html
+
+extends: default
+
+rules:
+  # Allow longer lines for Docker Compose and env examples
+  line-length:
+    max: 200
+    level: warning
+
+  # Allow 'on:' keys (used in GitHub Actions)
+  truthy:
+    check-keys: false
+
+  # Single space after comment marker is fine
+  comments:
+    min-spaces-from-content: 1
+
+  # Required by ansible-lint: disable comments-indentation check
+  comments-indentation: false
+
+  # Don't require document start marker (---)
+  document-start: disable
+
+  # Allow inline mappings for simple cases
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+
+  brackets:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+
+  # Flexible indentation - allow 2 or 4 spaces (some compose files use 4)
+  indentation:
+    spaces: consistent
+    indent-sequences: consistent
+
+  # Required by ansible-lint: forbid implicit and explicit octals
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true
+
+ignore:
+  # Ignore generated/runtime data directories
+  - "**/data/"
+  # Ignore example files (they may have placeholder content)
+  - "**/*.example"
+  - "**/*.example.yml"

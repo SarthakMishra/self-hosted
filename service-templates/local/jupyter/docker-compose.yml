@@ -3,27 +3,27 @@ services:
     image: jupyter/scipy-notebook:latest
     container_name: jupyter_notebook
     restart: unless-stopped
-    
+
     environment:
       - PYDEVD_DISABLE_FILE_VALIDATION=1
       - JUPYTER_ENABLE_LAB=yes
       - JUPYTER_RUNTIME_DIR=/tmp/jupyter
       - IPYTHONDIR=/tmp/ipython
-      
+
     volumes:
       - jupyter_data:/home/jovyan/work
-      
+
     ports:
       - "8888:8888"
-      
+
     # Network configuration - ensure it's on the same network as OpenWebUI
     networks:
       - local-network
-      
+
     # Security options
     user: root
     working_dir: /home/jovyan/work
-    
+
     command: >
       jupyter notebook
       --ip=0.0.0.0

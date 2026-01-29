@@ -3,33 +3,33 @@ services:
     image: prefecthq/prefect:3-latest
     container_name: prefect-server
     restart: unless-stopped
-    
+
     # Environment configuration
     env_file:
       - .env
-    
+
     environment:
       # Database configuration
       - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@prefect-db:5432/${POSTGRES_DB}
-      
+
       # Server configuration
       - PREFECT_SERVER_API_HOST=0.0.0.0
       - PREFECT_SERVER_API_PORT=4200
-      
+
       # Messaging configuration
       - PREFECT_MESSAGING_BROKER=prefect_redis.messaging
       - PREFECT_MESSAGING_CACHE=prefect_redis.messaging
       - PREFECT_REDIS_MESSAGING_HOST=prefect-redis
       - PREFECT_REDIS_MESSAGING_PORT=6379
       - PREFECT_REDIS_MESSAGING_DB=0
-      
+
       # Optional: External API URL for webhooks
       - PREFECT_API_URL=https://${PREFECT_DOMAIN}/api
 
       # Optional: Basic authentication string
       - PREFECT_SERVER_API_AUTH_STRING=${API_AUTH_STRING}
       - PREFECT_API_AUTH_STRING=${API_AUTH_STRING}
-      
+
       # Optional: Security settings
       - PREFECT_SERVER_ANALYTICS_ENABLED=${PREFECT_ANALYTICS_ENABLED:-false}
       - PREFECT_SERVER_TELEMETRY_ENABLED=${PREFECT_TELEMETRY_ENABLED:-false}
@@ -59,14 +59,14 @@ services:
     image: prefecthq/prefect:3-latest
     container_name: prefect-services
     restart: unless-stopped
-    
+
     env_file:
       - .env
-    
+
     environment:
       # Database configuration
       - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@prefect-db:5432/${POSTGRES_DB}
-      
+
       # Messaging configuration
       - PREFECT_MESSAGING_BROKER=prefect_redis.messaging
       - PREFECT_MESSAGING_CACHE=prefect_redis.messaging
@@ -94,10 +94,10 @@ services:
     image: prefecthq/prefect:3-latest
     container_name: prefect-worker
     restart: unless-stopped
-    
+
     env_file:
       - .env
-    
+
     environment:
       # API configuration
       - PREFECT_API_URL=http://prefect-server:4200/api
@@ -124,13 +124,13 @@ services:
     image: postgres:15-alpine
     container_name: prefect-db
     restart: unless-stopped
-    
+
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_INITDB_ARGS=${POSTGRES_INITDB_ARGS:---encoding=UTF-8 --lc-collate=C --lc-ctype=C}
-    
+
     volumes:
       - prefect_db_data:/var/lib/postgresql/data
 
@@ -151,9 +151,9 @@ services:
     image: redis:7-alpine
     container_name: prefect-redis
     restart: unless-stopped
-    
+
     command: redis-server --appendonly yes --maxmemory ${REDIS_MAX_MEMORY:-256mb} --maxmemory-policy allkeys-lru
-    
+
     volumes:
       - prefect_redis_data:/data
 
@@ -175,7 +175,7 @@ networks:
   # External network for Traefik communication
   app-network:
     external: true
-    
+
   # Internal network for service communication
   prefect-internal:
     driver: bridge
@@ -186,4 +186,4 @@ volumes:
   prefect_db_data:
     driver: local
   prefect_redis_data:
-    driver: local 
+    driver: local

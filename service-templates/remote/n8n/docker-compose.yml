@@ -3,11 +3,11 @@ services:
     image: docker.n8n.io/n8nio/n8n:latest
     container_name: n8n
     restart: unless-stopped
-    
+
     # Environment configuration
     env_file:
       - .env
-    
+
     environment:
       # Core n8n configuration
       - N8N_HOST=${N8N_DOMAIN}
@@ -15,26 +15,26 @@ services:
       - N8N_PROTOCOL=https
       - NODE_ENV=production
       - WEBHOOK_URL=https://${N8N_DOMAIN}/
-      
+
       # Timezone configuration
       - GENERIC_TIMEZONE=${N8N_TIMEZONE:-UTC}
-      
+
       # Database configuration (SQLite default, can be changed to PostgreSQL)
       - DB_TYPE=${N8N_DB_TYPE:-sqlite}
       - DB_SQLITE_DATABASE=/home/node/.n8n/database.sqlite
-      
+
       # PostgreSQL configuration (uncomment if using PostgreSQL)
       # - DB_POSTGRESDB_HOST=${N8N_DB_HOST}
       # - DB_POSTGRESDB_PORT=${N8N_DB_PORT:-5432}
       # - DB_POSTGRESDB_DATABASE=${N8N_DB_NAME}
       # - DB_POSTGRESDB_USER=${N8N_DB_USER}
       # - DB_POSTGRESDB_PASSWORD=${N8N_DB_PASSWORD}
-      
+
       # Security configuration
       - N8N_BASIC_AUTH_ACTIVE=${N8N_BASIC_AUTH_ACTIVE:-false}
       - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
       - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
-      
+
       # Email configuration (optional)
       - N8N_EMAIL_MODE=${N8N_EMAIL_MODE:-smtp}
       - N8N_SMTP_HOST=${N8N_SMTP_HOST}
@@ -42,26 +42,26 @@ services:
       - N8N_SMTP_USER=${N8N_SMTP_USER}
       - N8N_SMTP_PASS=${N8N_SMTP_PASS}
       - N8N_SMTP_SENDER=${N8N_SMTP_SENDER}
-      
+
       # Execution configuration
       - EXECUTIONS_PROCESS=${N8N_EXECUTIONS_PROCESS:-main}
       - EXECUTIONS_TIMEOUT=${N8N_EXECUTIONS_TIMEOUT:-3600}
       - EXECUTIONS_TIMEOUT_MAX=${N8N_EXECUTIONS_TIMEOUT_MAX:-7200}
-      
+
       # File system access
       - N8N_DEFAULT_LOCALE=${N8N_DEFAULT_LOCALE:-en}
       - N8N_PERSONALIZATION_ENABLED=${N8N_PERSONALIZATION_ENABLED:-true}
-      
+
     volumes:
       # Persistent data storage
       - n8n_data:/home/node/.n8n
-      
+
       # Local files directory for file operations
       - ./local-files:/files:rw
-      
+
       # Optional: Custom nodes (uncomment if needed)
       # - ./custom-nodes:/home/node/.n8n/custom
-      
+
       # Optional: SSL certificates (if using custom certs)
       # - ./certs:/home/node/certs:ro
 
@@ -98,7 +98,7 @@ services:
     # Security options
     security_opt:
       - no-new-privileges:true
-    
+
     # Run as non-root user for security
     user: "1000:1000"
 
@@ -110,4 +110,4 @@ networks:
 # Persistent volumes
 volumes:
   n8n_data:
-    driver: local 
+    driver: local

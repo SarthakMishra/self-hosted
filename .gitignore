@@ -72,6 +72,9 @@ ansible.log
 facts_cache/
 fact_cache/
 
+# Ansible lint cache
+.ansible/
+
 # =============================================================================
 # DEVELOPMENT AND IDE FILES
 # =============================================================================
@@ -192,11 +195,13 @@ kube-config
 *.p7r
 *.spc
 
-# Miscc
+# Misc
 wg0.conf
 cloudflare.ini
 *.secret.*
 middlewares.yml
-**/cronicle/data/
 mcp-config.json
 frigate_config.yaml
+
+# Generated data directories
+**/data/

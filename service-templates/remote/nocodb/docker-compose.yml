@@ -92,4 +92,4 @@ volumes:
   nocodb_db_data:
     driver: local
   nocodb_redis_data:
-    driver: local 
+    driver: local

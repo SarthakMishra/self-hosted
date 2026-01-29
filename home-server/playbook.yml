@@ -118,16 +118,16 @@
       shutdown-timeout: 15
 
   handlers:
-    - name: restart docker
+    - name: Restart Docker
       ansible.builtin.systemd:
         name: docker
         state: restarted
 
-    - name: reload sysctl
+    - name: Reload sysctl
       ansible.builtin.command: sysctl --system
       changed_when: true
 
-    - name: restart smbd
+    - name: Restart smbd
       ansible.builtin.systemd:
         name: smbd
         state: restarted
@@ -191,7 +191,7 @@
       tags: [users, always]
 
     - name: Install SSH public key for admin user
-      ansible.builtin.authorized_key:
+      ansible.posix.authorized_key:
         user: "{{ admin_user }}"
         key: "{{ admin_ssh_public_key }}"
       tags: [users, always]
@@ -229,7 +229,7 @@
           {% endfor %}
         dest: /etc/sysctl.d/99-security-hardening.conf
         mode: '0644'
-      notify: reload sysctl
+      notify: Reload sysctl
       tags: [hardening, always]
 
     - name: Configure system limits for Docker
@@ -255,12 +255,23 @@
         state: absent
       tags: [docker, always]
 
+    - name: Download Docker GPG key
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /tmp/docker.gpg
+        mode: '0644'
+      tags: [docker, always]
+
     - name: Add Docker GPG key
-      ansible.builtin.shell: |
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-        chmod 644 /usr/share/keyrings/docker-archive-keyring.gpg
-      args:
+      ansible.builtin.shell:
+        cmd: gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg < /tmp/docker.gpg
         creates: /usr/share/keyrings/docker-archive-keyring.gpg
+      tags: [docker, always]
+
+    - name: Set Docker GPG key permissions
+      ansible.builtin.file:
+        path: /usr/share/keyrings/docker-archive-keyring.gpg
+        mode: '0644'
       tags: [docker, always]
 
     - name: Add Docker repository
@@ -274,7 +285,7 @@
         name: [docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin, docker-compose-plugin]
         state: present
         update_cache: true
-      notify: restart docker
+      notify: Restart Docker
       tags: [docker, always]
 
     - name: Add admin user to docker group
@@ -289,7 +300,7 @@
         content: "{{ docker_daemon_config | to_nice_json }}"
         dest: /etc/docker/daemon.json
         mode: '0644'
-      notify: restart docker
+      notify: Restart Docker
       tags: [docker, always]
 
     - name: Enable and start Docker
@@ -337,7 +348,7 @@
           docker system info 2>/dev/null | grep -E "Containers|Images|Server Version|Storage Driver|Docker Root Dir"
           echo ""
           echo "=== Running Containers ==="
-          docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+          docker ps --format "table {% raw %}{{.Names}}\t{{.Status}}\t{{.Ports}}{% endraw %}"
           echo ""
           echo "=== Disk Usage ==="
           docker system df
@@ -398,6 +409,7 @@
         {% if tailscale_ssh_enabled %}--ssh{% endif %}
         --authkey={{ tailscale_auth_key }}
       when: tailscale_status.rc != 0 or (tailscale_status.stdout | from_json).BackendState != 'Running'
+      changed_when: true
       tags: [tailscale, always]
 
     - name: Get Tailscale IP
@@ -478,6 +490,7 @@
       when:
         - zfs_pool_check.rc != 0
         - zfs_devices | length > 0
+      changed_when: true
       tags: [zfs, never]
 
     - name: Create ZFS datasets
@@ -545,7 +558,7 @@
           passwd program = /usr/bin/passwd %u
           passwd chat = *Enter\snew\s*\spassword:* %n\n *Retype\snew\s*\spassword:* %n\n *password\supdated\ssuccessfully* .
           pam password change = yes
-          
+
           # Performance tuning
           socket options = TCP_NODELAY IPTOS_LOWDELAY
           read raw = yes
@@ -569,13 +582,16 @@
           {% endfor %}
         dest: /etc/samba/smb.conf
         mode: '0644'
-      notify: restart smbd
+      notify: Restart smbd
       when: samba_shares | length > 0
       tags: [samba, never]
 
     - name: Create Samba user
-      ansible.builtin.shell: |
-        (echo "{{ samba_password }}"; echo "{{ samba_password }}") | smbpasswd -a {{ samba_user }} -s
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          (echo "{{ samba_password }}"; echo "{{ samba_password }}") | smbpasswd -a {{ samba_user }} -s
+        executable: /bin/bash
       when: samba_password | length > 0
       changed_when: true
       no_log: true
