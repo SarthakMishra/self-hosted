@@ -73,6 +73,29 @@ collections:
   - community.general
 ```
 
+## Keeping Documentation Updated
+
+**Always update `README.md` when:**
+- Creating/removing service templates
+- Changing repository structure
+- Adding new top-level directories
+
+### Service Template Changes
+
+When adding a new service to `service-templates/{home,remote,local}/`:
+1. Add entry to the corresponding table in README.md under "Service Templates"
+2. Format: `| [service-name](service-templates/{category}/service-name/) | Brief description |`
+3. Keep services alphabetically sorted within each table
+
+When removing a service:
+1. Remove its entry from the README.md service table
+
+### Structure Changes
+
+If modifying top-level directories:
+1. Update the "Repository Structure" tree in both README.md and AGENTS.md
+2. Ensure both files stay in sync
+
 ## File Conventions
 
 - YAML indentation: 2 spaces (consistent within file)
