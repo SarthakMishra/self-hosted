@@ -2,14 +2,17 @@
 # =============================================================================
 # Hetzner Cloud-Init Configuration
 # =============================================================================
-# This cloud-config sets up a secure Ubuntu server with:
+# Sets up a secure Ubuntu server with:
 # - Admin user with SSH key authentication
 # - Kernel security hardening
 # - Docker CE with security configurations
-# - Tailscale VPN for secure access (SSH access via Tailscale only)
+# - Tailscale VPN for secure access
 #
-# IMPORTANT: Copy secrets.yml.example to secrets.yml and fill in your values
-# Then use envsubst or manual replacement before deploying
+# Usage:
+#   1. cp cloud-config.example.yml cloud-config.yml
+#   2. Replace placeholders: <ADMIN_USERNAME>, <SSH_PUBLIC_KEY>,
+#      <TAILSCALE_AUTH_KEY>, <TAILSCALE_HOSTNAME>
+#   3. Paste into Hetzner Cloud Console → Create Server → Cloud config
 # =============================================================================
 
 # -----------------------------------------------------------------------------

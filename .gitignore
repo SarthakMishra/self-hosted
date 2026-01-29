@@ -11,8 +11,7 @@
 **/secrets.yml
 
 # Hetzner cloud-config with secrets
-hetzner/secrets.yml
-hetzner/cloud-config-generated.yml
+hetzner/cloud-config.yml
 
 # Ansible vault password files
 .vault_pass
