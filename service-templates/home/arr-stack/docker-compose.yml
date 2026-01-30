@@ -204,11 +204,16 @@ services:
       TZ: ${TZ_MAIN}
       PLEX_UID: 1010
       PLEX_GID: 3000
+      ADVERTISE_IP: http://192.168.29.131:32400
     volumes:
       - ${BASE_CONFIG_PATH}/plex-config:/config
       - ${BASE_DATA_PATH}:/data
     ports:
-      - "192.168.29.131:32400:32400"
+      - "192.168.29.131:32400:32400/tcp" # Plex Media Server
+      - "192.168.29.131:32410:32410/udp" # GDM discovery
+      - "192.168.29.131:32412:32412/udp" # GDM discovery
+      - "192.168.29.131:32413:32413/udp" # GDM discovery
+      - "192.168.29.131:32414:32414/udp" # GDM discovery
     labels:
       <<: *traefik-common
       traefik.http.routers.plex-http.rule: Host(`${PLEX_DOMAIN}`)
