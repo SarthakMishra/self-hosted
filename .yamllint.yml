@@ -34,8 +34,8 @@ rules:
 
   # Flexible indentation - allow 2 or 4 spaces (some compose files use 4)
   indentation:
-    spaces: consistent
-    indent-sequences: consistent
+    spaces: 2
+    indent-sequences: true
 
   # Required by ansible-lint: forbid implicit and explicit octals
   octal-values:
