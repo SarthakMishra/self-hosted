@@ -57,12 +57,13 @@ docker compose up -d
 
 | Service | Description |
 |---------|-------------|
-| [traefik](service-templates/home/traefik/) | Reverse proxy with Let's Encrypt |
 | [adguard](service-templates/home/adguard/) | DNS ad-blocking |
-| [portainer](service-templates/home/portainer/) | Docker management UI |
-| [immich](service-templates/home/immich/) | Photo management |
-| [frigate](service-templates/home/frigate/) | NVR with AI detection |
 | [arr-stack](service-templates/home/arr-stack/) | Media automation suite |
+| [frigate](service-templates/home/frigate/) | NVR with AI detection |
+| [immich](service-templates/home/immich/) | Photo management |
+| [portainer](service-templates/home/portainer/) | Docker management UI |
+| [speedtest-tracker](service-templates/home/speedtest-tracker/) | Internet speed and uptime monitoring |
+| [traefik](service-templates/home/traefik/) | Reverse proxy with Let's Encrypt |
 
 ### Remote Services
 

@@ -1,0 +1,45 @@
+---
+services:
+  speedtest-tracker:
+    image: lscr.io/linuxserver/speedtest-tracker:latest
+    container_name: speedtest-tracker
+    restart: unless-stopped
+
+    env_file:
+      - .env
+    environment:
+      - DB_CONNECTION=sqlite
+
+    volumes:
+      - speedtest-tracker-data:/config
+      - /etc/localtime:/etc/localtime:ro
+
+    labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.routers.speedtest-tracker-http.rule=Host(`${SPEEDTEST_TRACKER_DOMAIN}`)"
+      - "traefik.http.routers.speedtest-tracker-http.entrypoints=web"
+      - "traefik.http.routers.speedtest-tracker-http.service=speedtest-tracker"
+
+      - "traefik.http.routers.speedtest-tracker-https.rule=Host(`${SPEEDTEST_TRACKER_DOMAIN}`)"
+      - "traefik.http.routers.speedtest-tracker-https.entrypoints=websecure"
+      - "traefik.http.routers.speedtest-tracker-https.tls=true"
+      - "traefik.http.routers.speedtest-tracker-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.speedtest-tracker-https.service=speedtest-tracker"
+
+      - "traefik.http.services.speedtest-tracker.loadbalancer.server.port=80"
+
+      - "traefik.http.middlewares.speedtest-tracker-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.speedtest-tracker-http.middlewares=speedtest-tracker-redirect"
+
+      - "traefik.docker.network=home-network"
+
+    networks:
+      - home-network
+
+networks:
+  home-network:
+    external: true
+
+volumes:
+  speedtest-tracker-data:
