@@ -179,6 +179,36 @@ services:
       traefik.http.middlewares.bazarr-redirect.redirectscheme.scheme: https
 
   # ---------------------------------------------------------------------------
+  # Cleanuparr - Arr Cleanup Automation
+  # ---------------------------------------------------------------------------
+  cleanuparr:
+    image: ghcr.io/cleanuparr/cleanuparr:latest
+    container_name: cleanuparr
+    hostname: cleanuparr.internal
+    <<: *common-settings
+    environment:
+      PORT: ${CLEANUPARR_PORT:-11011}
+      BASE_PATH: ${CLEANUPARR_BASE_PATH:-}
+      PUID: ${PUID_CLEANUPARR:-1010}
+      <<: *common-env
+    volumes:
+      - ${BASE_CONFIG_PATH}/cleanuparr-config:/config
+      - ${BASE_DATA_PATH}/downloads:/downloads
+    labels:
+      <<: *traefik-common
+      traefik.http.routers.cleanuparr-http.rule: Host(`${CLEANUPARR_DOMAIN}`)
+      traefik.http.routers.cleanuparr-http.entrypoints: web
+      traefik.http.routers.cleanuparr-http.service: cleanuparr
+      traefik.http.routers.cleanuparr-http.middlewares: cleanuparr-redirect
+      traefik.http.routers.cleanuparr-https.rule: Host(`${CLEANUPARR_DOMAIN}`)
+      traefik.http.routers.cleanuparr-https.entrypoints: websecure
+      traefik.http.routers.cleanuparr-https.tls: "true"
+      traefik.http.routers.cleanuparr-https.tls.certresolver: letsencrypt
+      traefik.http.routers.cleanuparr-https.service: cleanuparr
+      traefik.http.services.cleanuparr.loadbalancer.server.port: ${CLEANUPARR_PORT:-11011}
+      traefik.http.middlewares.cleanuparr-redirect.redirectscheme.scheme: https
+
+  # ---------------------------------------------------------------------------
   # FlareSolverr - Cloudflare Bypass
   # ---------------------------------------------------------------------------
   flaresolverr:
