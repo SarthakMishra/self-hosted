@@ -13,8 +13,9 @@ x-vpn-env: &vpn-env
   VPN_PROVIDER: pia
   VPN_PIA_USER: ${PIA_USERNAME}
   VPN_PIA_PASS: ${PIA_PASSWORD}
-  VPN_PIA_PREFERRED_REGION: ${PIA_REGION}
+  VPN_PIA_PREFERRED_REGION: ${PIA_REGION:-}
   VPN_LAN_NETWORK: ${VPN_LAN_NETWORK}
+  VPN_HEALTHCHECK_ENABLED: "true"
 
 x-common-settings: &common-settings
   restart: unless-stopped
@@ -259,34 +260,34 @@ services:
       traefik.http.middlewares.plex-redirect.redirectscheme.scheme: https
 
   # ---------------------------------------------------------------------------
-  # Jellyseerr - Media Request Management (VPN Enabled)
+  # Seerr - Media Request Management (VPN Enabled)
   # ---------------------------------------------------------------------------
-  jellyseerr:
+  seerr:
     image: ghcr.io/hotio/seerr:release
-    container_name: jellyseerr
-    hostname: jellyseerr.internal
+    container_name: seerr
+    hostname: seerr.internal
     <<: [*common-settings, *vpn-cap]
     environment:
-      PUID: ${PUID_JELLYSEERR:-1000}
+      PUID: ${PUID_SEERR:-1000}
       LOG_LEVEL: debug
-      PORT: ${JELLYSEERR_PORT:-5055}
-      WEBUI_PORTS: ${JELLYSEERR_PORT:-5055}/tcp
+      PORT: ${SEERR_PORT:-5055}
+      WEBUI_PORTS: ${SEERR_PORT:-5055}/tcp
       <<: [*common-env, *vpn-env]
     volumes:
-      - ${BASE_CONFIG_PATH}/jellyseerr-config:/config
+      - ${BASE_CONFIG_PATH}/seerr-config:/config
     labels:
       <<: *traefik-common
-      traefik.http.routers.jellyseerr-http.rule: Host(`${JELLYSEERR_DOMAIN}`)
-      traefik.http.routers.jellyseerr-http.entrypoints: web
-      traefik.http.routers.jellyseerr-http.service: jellyseerr
-      traefik.http.routers.jellyseerr-http.middlewares: jellyseerr-redirect
-      traefik.http.routers.jellyseerr-https.rule: Host(`${JELLYSEERR_DOMAIN}`)
-      traefik.http.routers.jellyseerr-https.entrypoints: websecure
-      traefik.http.routers.jellyseerr-https.tls: "true"
-      traefik.http.routers.jellyseerr-https.tls.certresolver: letsencrypt
-      traefik.http.routers.jellyseerr-https.service: jellyseerr
-      traefik.http.services.jellyseerr.loadbalancer.server.port: ${JELLYSEERR_PORT:-5055}
-      traefik.http.middlewares.jellyseerr-redirect.redirectscheme.scheme: https
+      traefik.http.routers.seerr-http.rule: Host(`${SEERR_DOMAIN}`)
+      traefik.http.routers.seerr-http.entrypoints: web
+      traefik.http.routers.seerr-http.service: seerr
+      traefik.http.routers.seerr-http.middlewares: seerr-redirect
+      traefik.http.routers.seerr-https.rule: Host(`${SEERR_DOMAIN}`)
+      traefik.http.routers.seerr-https.entrypoints: websecure
+      traefik.http.routers.seerr-https.tls: "true"
+      traefik.http.routers.seerr-https.tls.certresolver: letsencrypt
+      traefik.http.routers.seerr-https.service: seerr
+      traefik.http.services.seerr.loadbalancer.server.port: ${SEERR_PORT:-5055}
+      traefik.http.middlewares.seerr-redirect.redirectscheme.scheme: https
 
 # =============================================================================
 # Networks
