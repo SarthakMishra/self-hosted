@@ -260,21 +260,21 @@ services:
       traefik.http.middlewares.plex-redirect.redirectscheme.scheme: https
 
   # ---------------------------------------------------------------------------
-  # Seerr - Media Request Management (VPN Enabled)
+  # Seerr - Media Request Management (Official Image)
   # ---------------------------------------------------------------------------
   seerr:
-    image: ghcr.io/hotio/seerr:release
+    image: ghcr.io/seerr-team/seerr:latest
     container_name: seerr
     hostname: seerr.internal
-    <<: [*common-settings, *vpn-cap]
+    init: true
+    <<: *common-settings
     environment:
-      PUID: ${PUID_SEERR:-1000}
+      TZ: ${TZ_MAIN}
       LOG_LEVEL: debug
       PORT: ${SEERR_PORT:-5055}
-      WEBUI_PORTS: ${SEERR_PORT:-5055}/tcp
-      <<: [*common-env, *vpn-env]
+    user: "1000:3000"
     volumes:
-      - ${BASE_CONFIG_PATH}/seerr-config:/config
+      - ${BASE_CONFIG_PATH}/seerr-config:/app/config
     labels:
       <<: *traefik-common
       traefik.http.routers.seerr-http.rule: Host(`${SEERR_DOMAIN}`)
