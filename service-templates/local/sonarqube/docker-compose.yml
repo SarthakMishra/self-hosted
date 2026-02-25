@@ -41,6 +41,24 @@ services:
       - sonarqube-net
     restart: unless-stopped
 
+  sonarqube-mcp:
+    image: mcp/sonarqube
+    container_name: sonarqube-mcp
+    pull_policy: missing
+    depends_on:
+      - sonarqube
+    environment:
+      SONARQUBE_TOKEN: ${SONARQUBE_TOKEN}
+      SONARQUBE_URL: http://sonarqube:9000
+      SONARQUBE_TRANSPORT: http
+      SONARQUBE_HTTP_HOST: 0.0.0.0
+      SONARQUBE_HTTP_PORT: ${MCP_PORT:-9003}
+    ports:
+      - "${MCP_PORT:-9003}:${MCP_PORT:-9003}"
+    networks:
+      - sonarqube-net
+    restart: unless-stopped
+
 networks:
   sonarqube-net:
     driver: bridge
