@@ -94,6 +94,7 @@ docker compose up -d
 | [searxng](service-templates/local/searxng/) | Search engine |
 | [openhands](service-templates/local/openhands/) | AI coding agent |
 | [qbittorrent](service-templates/local/qbittorrent/) | Torrent client with VPN |
+| [sonarqube](service-templates/local/sonarqube/) | Code quality and security analysis |
 
 ## Development
 
