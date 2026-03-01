@@ -1,0 +1,13 @@
+# Rook-Ceph Operator — Home Server overrides
+#
+# Install with both base and overlay values:
+#   helm install rook-ceph rook-release/rook-ceph -n rook-ceph --create-namespace \
+#     -f infrastructure/base/rook-ceph/helm-values.yaml \
+#     -f infrastructure/overlays/home/rook-ceph/helm-values.yaml
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi

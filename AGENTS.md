@@ -7,7 +7,7 @@ home-server/       # Ansible playbook for home lab
 remote-server/     # Ansible playbook for VPS/cloud
 kubernetes/        # k3s cluster configuration (base + overlays)
   ├── bootstrap/   # Per-environment setup scripts ({home,remote,local}/)
-  ├── infrastructure/ # Core cluster infra (Traefik, Argo stack, Harbor, MinIO)
+  ├── infrastructure/ # Core cluster infra (Traefik, Argo stack, Harbor, Rook-Ceph)
   │   ├── base/    # Shared defaults
   │   └── overlays/ # Environment overrides ({home,remote,local}/)
   ├── apps/        # Application workloads

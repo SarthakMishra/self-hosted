@@ -5,15 +5,15 @@
 #     -f infrastructure/base/argo-workflows/helm-values.yaml \
 #     -f infrastructure/overlays/home/argo-workflows/helm-values.yaml
 
-# Artifact repository: MinIO running in the cluster
+# Artifact repository: Ceph Object Store (RGW) via Rook
 artifactRepository:
   s3:
     bucket: argo-artifacts
-    endpoint: minio.minio.svc.cluster.local:9000
+    endpoint: rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local:80
     insecure: true
     accessKeySecret:
-      name: argo-artifacts-minio
-      key: accesskey
+      name: argo-artifacts
+      key: AWS_ACCESS_KEY_ID
     secretKeySecret:
-      name: argo-artifacts-minio
-      key: secretkey
+      name: argo-artifacts
+      key: AWS_SECRET_ACCESS_KEY

@@ -19,9 +19,10 @@ kubernetes/
       argo-workflows/                 # CI pipeline engine (home only)
       argo-events/                    # Webhook listener (home only)
       harbor/                         # Container registry (home only)
-      minio/                          # Artifact storage for Workflows (home only)
+      rook-ceph/                      # Ceph operator (home only)
+      rook-ceph-cluster/              # Ceph cluster + object store (home only)
     overlays/
-      home/                           # Full stack: MetalLB + Traefik + Argo + Harbor + MinIO
+      home/                           # Full stack: MetalLB + Traefik + Argo + Harbor + Rook-Ceph
       remote/                         # Traefik + Argo CD + Argo Rollouts
       local/                          # Traefik only
   apps/                               # Application workloads
@@ -69,7 +70,7 @@ kubectl apply -k apps/overlays/remote/whoami/
 | Harbor | Yes | No (pull from home) | No (pull from home) |
 | Argo Workflows | Yes | No | No |
 | Argo Events | Yes | No | No |
-| MinIO | Yes | No | No |
+| Rook-Ceph | Yes | No | No |
 
 ### Adding a New App
 
@@ -168,7 +169,7 @@ kubectl get gateway -n traefik
 
 ### 7. Install the CI/CD Stack (Home Only)
 
-Harbor, Argo Workflows, Argo Events, Argo Rollouts, and MinIO only run on the home cluster.
+Harbor, Argo Workflows, Argo Events, Argo Rollouts, and Rook-Ceph only run on the home cluster.
 
 ```bash
 # Argo Rollouts
@@ -177,11 +178,24 @@ helm install argo-rollouts argo/argo-rollouts -n argo-rollouts --create-namespac
   -f infrastructure/base/argo-rollouts/helm-values.yaml \
   -f infrastructure/overlays/home/argo-rollouts/helm-values.yaml
 
-# MinIO (artifact storage for Workflows)
-helm repo add minio https://charts.min.io/
-helm install minio minio/minio -n minio --create-namespace \
-  -f infrastructure/base/minio/helm-values.yaml \
-  -f infrastructure/overlays/home/minio/helm-values.yaml
+# Rook-Ceph Operator (S3-compatible object storage via Ceph RGW — replaces MinIO)
+helm repo add rook-release https://charts.rook.io/release
+helm install rook-ceph rook-release/rook-ceph -n rook-ceph --create-namespace \
+  -f infrastructure/base/rook-ceph/helm-values.yaml \
+  -f infrastructure/overlays/home/rook-ceph/helm-values.yaml
+
+# Wait for operator to be ready
+kubectl -n rook-ceph wait --for=condition=ready pod \
+  -l app=rook-ceph-operator --timeout=300s
+
+# Rook-Ceph Cluster (CephCluster, CephObjectStore, StorageClasses)
+helm install rook-ceph-cluster rook-release/rook-ceph-cluster \
+  -n rook-ceph --set operatorNamespace=rook-ceph \
+  -f infrastructure/base/rook-ceph-cluster/helm-values.yaml \
+  -f infrastructure/overlays/home/rook-ceph-cluster/helm-values.yaml
+
+# Wait for Ceph cluster to be healthy (takes several minutes on first deploy)
+kubectl -n rook-ceph exec deploy/rook-ceph-tools -- ceph status
 
 # Argo Workflows
 helm install argo-workflows argo/argo-workflows -n argo-workflows --create-namespace \
@@ -265,7 +279,7 @@ Git push → Argo Events (webhook) → Argo Workflows (clone + Kaniko build → 
 | **Argo Events** | Listens for GitHub/Gitea webhooks | `argo-events` |
 | **Argo Workflows** | Runs CI pipelines (clone, build, push) | `argo-workflows` |
 | **Harbor** | Stores container images with vulnerability scanning | `harbor` |
-| **MinIO** | S3-compatible artifact storage for Workflows | `minio` |
+| **Rook-Ceph** | S3-compatible object storage via Ceph RGW | `rook-ceph` |
 | **Argo CD** | GitOps: syncs manifests from Git to cluster | `argocd` |
 | **Argo Rollouts** | Progressive delivery: canary/blue-green deploys | `argo-rollouts` |
 
@@ -313,7 +327,7 @@ kubectl argo rollouts abort whoami -n whoami
 | Argo CD | `argocd.k8s.home.example.com` |
 | Argo Workflows | `workflows.k8s.home.example.com` |
 | Harbor | `harbor.k8s.home.example.com` |
-| MinIO Console | `minio.k8s.home.example.com` |
+| Ceph Dashboard | `ceph.k8s.home.example.com` |
 | Webhooks | `webhooks.k8s.home.example.com/github` |
 
 ## Useful kubectl Commands

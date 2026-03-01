@@ -1,0 +1,153 @@
+# Rook-Ceph Cluster Helm chart — shared defaults
+# Chart: rook-release/rook-ceph-cluster (https://charts.rook.io/release)
+#
+# Install with base + overlay values:
+#   helm install rook-ceph-cluster rook-release/rook-ceph-cluster \
+#     -n rook-ceph --set operatorNamespace=rook-ceph \
+#     -f infrastructure/base/rook-ceph-cluster/helm-values.yaml \
+#     -f infrastructure/overlays/{env}/rook-ceph-cluster/helm-values.yaml
+
+operatorNamespace: rook-ceph
+
+# Monitoring (enable when Prometheus is available)
+monitoring:
+  enabled: false
+
+# Toolbox pod for ceph CLI debugging
+toolbox:
+  enabled: true
+
+# ---------------------------------------------------------------------------
+# CephCluster spec
+# ---------------------------------------------------------------------------
+cephClusterSpec:
+  dataDirHostPath: /var/lib/rook
+
+  # Single-node: one monitor, one manager
+  mon:
+    count: 1
+    allowMultiplePerNode: true
+
+  mgr:
+    count: 1
+    allowMultiplePerNode: true
+    modules:
+      - name: dashboard
+        enabled: true
+      - name: pg_autoscaler
+        enabled: true
+
+  dashboard:
+    enabled: true
+    ssl: false
+
+  crashCollector:
+    disable: false
+
+  logCollector:
+    enabled: true
+    periodicity: daily
+    maxLogSize: 500M
+
+  # Resource limits for Ceph daemons
+  resources:
+    mon:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+    mgr:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+    osd:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        memory: 1Gi
+
+  # PVC-based OSDs (no raw block devices needed)
+  storage:
+    useAllNodes: false
+    useAllDevices: false
+    storageClassDeviceSets:
+      - name: set1
+        count: 1
+        portable: false
+        tuneDeviceClass: true
+        tuneFastDeviceClass: false
+        encrypted: false
+        placement: {}
+        preparePlacement: {}
+        volumeClaimTemplates:
+          - metadata:
+              name: data
+            spec:
+              resources:
+                requests:
+                  storage: 50Gi
+              storageClassName: local-path
+              volumeMode: Filesystem
+              accessModes:
+                - ReadWriteOnce
+
+# ---------------------------------------------------------------------------
+# CephBlockPool (for block PVCs — useful for databases, etc.)
+# ---------------------------------------------------------------------------
+cephBlockPools:
+  - name: ceph-blockpool
+    spec:
+      failureDomain: host
+      replicated:
+        size: 1
+    storageClass:
+      enabled: true
+      name: ceph-block
+      isDefault: false
+      reclaimPolicy: Delete
+      allowVolumeExpansion: true
+      parameters:
+        imageFormat: "2"
+        imageFeatures: layering
+
+# ---------------------------------------------------------------------------
+# CephObjectStore (S3-compatible via RGW — replaces MinIO)
+# ---------------------------------------------------------------------------
+cephObjectStores:
+  - name: ceph-objectstore
+    spec:
+      metadataPool:
+        failureDomain: host
+        replicated:
+          size: 1
+      dataPool:
+        failureDomain: host
+        replicated:
+          size: 1
+      preservePoolsOnDelete: false
+      gateway:
+        port: 80
+        instances: 1
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 512Mi
+    storageClass:
+      enabled: true
+      name: ceph-bucket
+      reclaimPolicy: Delete
+      parameters:
+        region: us-east-1
+
+# CephFilesystem — not needed for now
+cephFileSystems: []
+
+# Ingress — we use Gateway API HTTPRoutes instead
+ingress:
+  dashboard: {}

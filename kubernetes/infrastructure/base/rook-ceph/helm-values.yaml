@@ -1,0 +1,21 @@
+# Rook-Ceph Operator Helm chart — shared defaults
+# Chart: rook-release/rook-ceph (https://charts.rook.io/release)
+#
+# Install with base + overlay values:
+#   helm install rook-ceph rook-release/rook-ceph -n rook-ceph --create-namespace \
+#     -f infrastructure/base/rook-ceph/helm-values.yaml \
+#     -f infrastructure/overlays/{env}/rook-ceph/helm-values.yaml
+
+crds:
+  enabled: true
+
+# Discovery daemon not needed for PVC-based OSDs
+enableDiscoveryDaemon: false
+
+# CSI driver configuration
+csi:
+  enableRbdDriver: true
+  enableCephfsDriver: true
+  # Single node: one replica is sufficient
+  provisionerReplicas: 1
+  enableCSIHostNetworking: true

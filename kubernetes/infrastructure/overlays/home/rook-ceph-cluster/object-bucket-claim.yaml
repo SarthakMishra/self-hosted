@@ -1,0 +1,11 @@
+# ObjectBucketClaim for Argo Workflows artifact storage.
+# Rook auto-creates a ConfigMap and Secret named "argo-artifacts"
+# in the argo-workflows namespace with S3 endpoint and credentials.
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: argo-artifacts
+  namespace: argo-workflows
+spec:
+  bucketName: argo-artifacts
+  storageClassName: ceph-bucket

@@ -1,0 +1,7 @@
+# Cluster resources deploy into the rook-ceph namespace (created by rook-ceph operator)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rook-ceph
+  labels:
+    app.kubernetes.io/name: rook-ceph

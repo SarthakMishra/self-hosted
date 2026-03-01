@@ -1,0 +1,30 @@
+# Rook-Ceph Cluster — Home Server overrides
+#
+# Install with both base and overlay values:
+#   helm install rook-ceph-cluster rook-release/rook-ceph-cluster \
+#     -n rook-ceph --set operatorNamespace=rook-ceph \
+#     -f infrastructure/base/rook-ceph-cluster/helm-values.yaml \
+#     -f infrastructure/overlays/home/rook-ceph-cluster/helm-values.yaml
+
+cephClusterSpec:
+  storage:
+    storageClassDeviceSets:
+      - name: set1
+        count: 1
+        portable: false
+        tuneDeviceClass: true
+        tuneFastDeviceClass: false
+        encrypted: false
+        placement: {}
+        preparePlacement: {}
+        volumeClaimTemplates:
+          - metadata:
+              name: data
+            spec:
+              resources:
+                requests:
+                  storage: 50Gi
+              storageClassName: local-path
+              volumeMode: Filesystem
+              accessModes:
+                - ReadWriteOnce
