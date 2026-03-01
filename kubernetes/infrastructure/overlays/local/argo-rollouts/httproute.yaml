@@ -1,0 +1,17 @@
+# HTTPRoute for Argo Rollouts Dashboard — Local Development
+# Routes traffic to the Argo Rollouts dashboard via the Traefik Gateway.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: argo-rollouts-dashboard
+  namespace: argo-rollouts
+spec:
+  parentRefs:
+    - name: traefik-gateway
+      namespace: traefik
+  hostnames:
+    - rollouts.k8s.local
+  rules:
+    - backendRefs:
+        - name: argo-rollouts-dashboard
+          port: 3100

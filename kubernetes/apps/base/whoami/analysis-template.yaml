@@ -1,6 +1,8 @@
 # AnalysisTemplate for automated canary promotion
 # Used by Argo Rollouts to decide whether to promote or rollback.
-# This simple template checks that the whoami service returns HTTP 200.
+# This simple template checks that the whoami service is reachable and
+# returns a non-empty response. The web provider treats non-2xx responses
+# as errors automatically.
 # Replace with Prometheus queries for real-world apps.
 apiVersion: argoproj.io/v1alpha1
 kind: AnalysisTemplate
@@ -12,11 +14,8 @@ spec:
     - name: http-success
       interval: 10s
       count: 3
-      successCondition: result == "200"
+      successCondition: len(result) > 0
       failureLimit: 1
       provider:
         web:
-          url: http://whoami.whoami.svc.cluster.local
-          method: GET
-          expectedStatusCodes:
-            - 200
+          url: http://whoami-stable.whoami.svc.cluster.local

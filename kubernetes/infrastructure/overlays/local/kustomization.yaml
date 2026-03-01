@@ -1,6 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# No MetalLB locally — only Traefik
 resources:
   - traefik
+  - argocd
+  - argo-rollouts
+  - argo-workflows
+  - argo-events
+  - harbor

@@ -1,6 +1,8 @@
 # HTTPRoute for whoami — Local Development
 # Uses the Gateway API (successor to Ingress/IngressRoute).
 # References the Traefik Gateway deployed by the Helm chart.
+# Both stable and canary backendRefs are required for Argo Rollouts
+# Gateway API plugin to manage traffic weights during canary deployments.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -14,5 +16,7 @@ spec:
     - whoami.k8s.local
   rules:
     - backendRefs:
-        - name: whoami
+        - name: whoami-stable
+          port: 80
+        - name: whoami-canary
           port: 80

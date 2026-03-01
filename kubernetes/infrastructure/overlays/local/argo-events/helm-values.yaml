@@ -1,0 +1,16 @@
+# Argo Events Helm chart — Local Development overrides
+#
+# Install with both base and overlay values:
+#   helm install argo-events argo/argo-events -n argo-events --create-namespace \
+#     -f infrastructure/base/argo-events/helm-values.yaml \
+#     -f infrastructure/overlays/local/argo-events/helm-values.yaml
+
+# Minimal resource footprint for local development
+controller:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi

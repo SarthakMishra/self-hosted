@@ -1,0 +1,29 @@
+# Argo Workflows Helm chart — Local Development overrides
+#
+# Install with both base and overlay values:
+#   helm install argo-workflows argo/argo-workflows -n argo-workflows --create-namespace \
+#     -f infrastructure/base/argo-workflows/helm-values.yaml \
+#     -f infrastructure/overlays/local/argo-workflows/helm-values.yaml
+
+# No S3 artifact repository locally (no Rook-Ceph/MinIO)
+# Workflows that need artifacts will use emptyDir or local volumes
+useDefaultArtifactRepo: false
+
+# Minimal resource footprint for local development
+controller:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+server:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi

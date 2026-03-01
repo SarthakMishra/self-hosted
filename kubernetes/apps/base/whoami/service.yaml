@@ -1,7 +1,26 @@
+# whoami services — stable + canary for Argo Rollouts traffic splitting
+# The Gateway API plugin requires two services so it can adjust HTTPRoute
+# weights during canary deployments. Both select the same app label;
+# Argo Rollouts injects a rollouts-pod-template-hash selector to route
+# traffic to the correct ReplicaSet.
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: whoami
+  name: whoami-stable
+  namespace: whoami
+spec:
+  selector:
+    app: whoami
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: whoami-canary
   namespace: whoami
 spec:
   selector:

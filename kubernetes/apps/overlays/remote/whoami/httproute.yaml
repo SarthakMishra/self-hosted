@@ -14,5 +14,7 @@ spec:
     - whoami.k8s.example.com
   rules:
     - backendRefs:
-        - name: whoami
+        - name: whoami-stable
+          port: 80
+        - name: whoami-canary
           port: 80

@@ -10,11 +10,10 @@
 dashboard:
   enabled: true
 
-# Install the Gateway API traffic router plugin for Traefik
+# Install the Gateway API traffic router plugin
 # This allows Rollouts to manage HTTPRoute weights during canary deployments
-providerConfigs:
-  - name: gatewayAPI
-    configMap:
-      trafficRouterPlugins: |-
-        - name: "argoproj-labs/gatewayAPI"
-          location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.5.0/gateway-api-plugin-linux-amd64"
+# Ref: https://argo-rollouts.readthedocs.io/en/stable/features/traffic-management/plugins/
+controller:
+  trafficRouterPlugins:
+    - name: "argoproj-labs/gatewayAPI"
+      location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.11.0/gatewayapi-plugin-linux-amd64"

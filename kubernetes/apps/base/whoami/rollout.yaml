@@ -17,6 +17,8 @@ spec:
       app: whoami
   strategy:
     canary:
+      stableService: whoami-stable
+      canaryService: whoami-canary
       steps:
         - setWeight: 20
         - pause: {duration: 30s}

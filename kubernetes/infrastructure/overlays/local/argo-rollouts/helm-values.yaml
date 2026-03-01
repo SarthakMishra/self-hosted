@@ -1,0 +1,25 @@
+# Argo Rollouts Helm chart — Local Development overrides
+#
+# Install with both base and overlay values:
+#   helm install argo-rollouts argo/argo-rollouts -n argo-rollouts --create-namespace \
+#     -f infrastructure/base/argo-rollouts/helm-values.yaml \
+#     -f infrastructure/overlays/local/argo-rollouts/helm-values.yaml
+
+# Minimal resource footprint for local development
+controller:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+dashboard:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi

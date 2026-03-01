@@ -1,5 +1,6 @@
-# Harbor UI and Docker API
-# Docker push/pull: docker login harbor.k8s.home.example.com
+# HTTPRoute for Harbor — Local Development
+# Routes traffic to the Harbor core service via the Traefik Gateway.
+# Docker push/pull: docker login harbor.k8s.local
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -10,7 +11,7 @@ spec:
     - name: traefik-gateway
       namespace: traefik
   hostnames:
-    - harbor.k8s.home.example.com
+    - harbor.k8s.local
   rules:
     # Harbor nginx frontend (routes to core, portal, registry internally)
     - backendRefs:

@@ -1,0 +1,33 @@
+# Harbor Helm chart — Local Development overrides
+#
+# Install with both base and overlay values:
+#   helm install harbor harbor/harbor -n harbor --create-namespace \
+#     -f infrastructure/base/harbor/helm-values.yaml \
+#     -f infrastructure/overlays/local/harbor/helm-values.yaml
+
+# External URL (how users and Docker clients reach Harbor)
+externalURL: http://harbor.k8s.local
+
+# Disable TLS — Traefik handles routing over HTTP locally
+expose:
+  tls:
+    enabled: false
+
+# Admin password for local development
+harborAdminPassword: changeme
+
+# Smaller PVCs for local dev (using k3s local-path provisioner)
+persistence:
+  persistentVolumeClaim:
+    registry:
+      storageClass: local-path
+      size: 5Gi
+    database:
+      storageClass: local-path
+      size: 1Gi
+    redis:
+      storageClass: local-path
+      size: 1Gi
+    trivy:
+      storageClass: local-path
+      size: 1Gi

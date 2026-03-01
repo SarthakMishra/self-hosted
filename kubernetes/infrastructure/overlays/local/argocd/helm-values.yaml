@@ -1,0 +1,48 @@
+# Argo CD Helm chart — Local Development overrides
+#
+# Install with both base and overlay values:
+#   helm install argocd argo/argo-cd -n argocd --create-namespace \
+#     -f infrastructure/base/argocd/helm-values.yaml \
+#     -f infrastructure/overlays/local/argocd/helm-values.yaml
+
+# Run in insecure mode (no TLS — Traefik handles routing over HTTP)
+configs:
+  params:
+    server.insecure: true
+
+# Minimal resource footprint for local development
+controller:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+server:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+repoServer:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+redis:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
