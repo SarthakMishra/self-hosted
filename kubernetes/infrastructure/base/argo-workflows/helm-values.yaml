@@ -1,0 +1,20 @@
+# Argo Workflows Helm chart — shared defaults
+# Chart: https://argoproj.github.io/argo-helm (argo-workflows)
+#
+# Install with base + overlay values:
+#   helm install argo-workflows argo/argo-workflows -n argo-workflows \
+#     -f infrastructure/base/argo-workflows/helm-values.yaml \
+#     -f infrastructure/overlays/{env}/argo-workflows/helm-values.yaml
+
+# Workflow controller
+controller:
+  # Emissary executor (default, no Docker socket needed)
+  containerRuntimeExecutor: emissary
+
+# Argo Server (UI)
+server:
+  extraArgs:
+    - --auth-mode=server
+
+# Artifact repository (configured per overlay to point at MinIO)
+useDefaultArtifactRepo: true

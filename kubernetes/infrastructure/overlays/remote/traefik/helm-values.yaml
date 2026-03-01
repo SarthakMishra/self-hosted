@@ -1,0 +1,17 @@
+# Traefik Helm chart — Remote Server (Hetzner) overrides
+#
+# Install with both base and overlay values:
+#   helm install traefik traefik/traefik -n traefik \
+#     -f infrastructure/base/traefik/helm-values.yaml \
+#     -f infrastructure/overlays/remote/traefik/helm-values.yaml
+
+# On cloud servers without MetalLB, use NodePort
+# or Hetzner Cloud Controller Manager for cloud LB
+service:
+  type: NodePort
+
+ports:
+  web:
+    nodePort: 30080
+  websecure:
+    nodePort: 30443

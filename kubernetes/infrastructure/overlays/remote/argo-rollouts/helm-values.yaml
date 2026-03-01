@@ -1,0 +1,6 @@
+# Argo Rollouts Helm chart — Remote Server (Hetzner) overrides
+#
+# Install with both base and overlay values:
+#   helm install argo-rollouts argo/argo-rollouts -n argo-rollouts \
+#     -f infrastructure/base/argo-rollouts/helm-values.yaml \
+#     -f infrastructure/overlays/remote/argo-rollouts/helm-values.yaml

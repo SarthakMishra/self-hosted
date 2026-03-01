@@ -63,3 +63,13 @@ repos:
         language: script
         files: \.(example|env\.example)$
         pass_filenames: false
+
+  # Kubernetes manifest validation
+  # TODO: Add kubeconform as a local hook once installed
+  # - repo: local
+  #   hooks:
+  #     - id: kubeconform
+  #       name: Validate Kubernetes manifests
+  #       entry: kubeconform -strict -ignore-missing-schemas -skip kustomization.yaml
+  #       language: system
+  #       files: ^kubernetes/.*\.ya?ml$

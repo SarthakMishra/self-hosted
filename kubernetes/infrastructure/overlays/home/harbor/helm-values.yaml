@@ -1,0 +1,24 @@
+# Harbor Helm chart — Home Server overrides
+#
+# Install with both base and overlay values:
+#   helm install harbor harbor/harbor -n harbor \
+#     -f infrastructure/base/harbor/helm-values.yaml \
+#     -f infrastructure/overlays/home/harbor/helm-values.yaml
+
+# External URL (how users and Docker clients reach Harbor)
+externalURL: https://harbor.k8s.home.example.com
+
+# Admin password (change this!)
+harborAdminPassword: changeme
+
+# Persistent storage for registry images (TrueNAS NFS via democratic-csi)
+persistence:
+  persistentVolumeClaim:
+    registry:
+      size: 50Gi
+    database:
+      size: 5Gi
+    redis:
+      size: 1Gi
+    trivy:
+      size: 2Gi

@@ -1,0 +1,6 @@
+# Argo Rollouts Helm chart — Home Server overrides
+#
+# Install with both base and overlay values:
+#   helm install argo-rollouts argo/argo-rollouts -n argo-rollouts \
+#     -f infrastructure/base/argo-rollouts/helm-values.yaml \
+#     -f infrastructure/overlays/home/argo-rollouts/helm-values.yaml

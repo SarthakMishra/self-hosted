@@ -1,0 +1,81 @@
+# Argo Workflow Template: Build and Push to Harbor
+# Clones a Git repo, builds a container image with Kaniko, and pushes to Harbor.
+#
+# Usage: Submit a Workflow referencing this template with parameters:
+#   argo submit --from workflowtemplate/build-and-push \
+#     -p repo=https://github.com/user/app \
+#     -p branch=main \
+#     -p image=harbor.k8s.home.example.com/library/app \
+#     -p tag=latest
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: build-and-push
+  namespace: argo-workflows
+spec:
+  entrypoint: build-pipeline
+  arguments:
+    parameters:
+      - name: repo
+        value: ""
+      - name: branch
+        value: main
+      - name: image
+        value: ""
+      - name: tag
+        value: latest
+      - name: dockerfile
+        value: Dockerfile
+      - name: context
+        value: .
+
+  templates:
+    - name: build-pipeline
+      steps:
+        - - name: clone
+            template: git-clone
+        - - name: build-and-push
+            template: kaniko-build
+
+    - name: git-clone
+      container:
+        image: alpine/git:latest
+        command: [sh, -c]
+        args:
+          - |
+            git clone --branch {{workflow.parameters.branch}} \
+              --single-branch --depth 1 \
+              {{workflow.parameters.repo}} /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: kaniko-build
+      container:
+        image: gcr.io/kaniko-project/executor:latest
+        args:
+          - --dockerfile={{workflow.parameters.dockerfile}}
+          - --context=dir:///workspace/{{workflow.parameters.context}}
+          - --destination={{workflow.parameters.image}}:{{workflow.parameters.tag}}
+          - --cache=true
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+          - name: docker-config
+            mountPath: /kaniko/.docker
+      volumes:
+        - name: docker-config
+          secret:
+            secretName: harbor-registry-credentials
+            items:
+              - key: .dockerconfigjson
+                path: config.json
+
+  volumeClaimTemplates:
+    - metadata:
+        name: workspace
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 1Gi

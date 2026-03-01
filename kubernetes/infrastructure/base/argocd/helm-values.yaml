@@ -1,0 +1,29 @@
+# Argo CD Helm chart — shared defaults
+# Chart: https://argoproj.github.io/argo-helm (argo-cd)
+#
+# Install with base + overlay values:
+#   helm install argocd argo/argo-cd -n argocd \
+#     -f infrastructure/base/argocd/helm-values.yaml \
+#     -f infrastructure/overlays/{env}/argocd/helm-values.yaml
+
+# Run insecure (TLS terminated at Traefik Gateway)
+server:
+  extraArgs:
+    - --insecure
+
+# Resource tracking method
+controller:
+  args:
+    appResyncPeriod: "180"
+
+# Disable built-in Dex (use Argo CD's built-in auth for now)
+dex:
+  enabled: false
+
+# Disable notifications (can enable later)
+notifications:
+  enabled: false
+
+# ApplicationSet controller (for app-of-apps pattern)
+applicationSet:
+  enabled: true

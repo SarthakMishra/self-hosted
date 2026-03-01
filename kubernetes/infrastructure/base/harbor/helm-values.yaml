@@ -1,0 +1,30 @@
+# Harbor Helm chart — shared defaults
+# Chart: https://helm.goharbor.io (harbor)
+#
+# Install with base + overlay values:
+#   helm install harbor harbor/harbor -n harbor \
+#     -f infrastructure/base/harbor/helm-values.yaml \
+#     -f infrastructure/overlays/{env}/harbor/helm-values.yaml
+
+# Disable the built-in ingress (we use Gateway API HTTPRoute)
+expose:
+  type: clusterIP
+
+# Internal components
+database:
+  type: internal
+redis:
+  type: internal
+
+# Trivy vulnerability scanner
+trivy:
+  enabled: true
+
+# Disable chartmuseum (use OCI artifacts instead)
+chartmuseum:
+  enabled: false
+
+# Image cache and garbage collection
+jobservice:
+  jobLoggers:
+    - stdout

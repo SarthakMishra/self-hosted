@@ -8,6 +8,7 @@ Ansible automation and Docker Compose templates for self-hosted server deploymen
 home-server/       # Ansible playbook for home lab deployment
 remote-server/     # Ansible playbook for VPS/cloud deployment
 hetzner/           # Hetzner cloud-init configuration
+kubernetes/        # k3s cluster configuration and manifests
 service-templates/ # Docker Compose service templates
   ├── home/        # Home network services
   ├── remote/      # Production/cloud services
@@ -96,6 +97,10 @@ docker compose up -d
 | [qbittorrent](service-templates/local/qbittorrent/) | Torrent client with VPN |
 | [sonarqube](service-templates/local/sonarqube/) | Code quality and security analysis |
 
+## Kubernetes (k3s)
+
+Single-node k3s cluster for learning Kubernetes. Runs alongside Docker Compose services. See [kubernetes/README.md](kubernetes/README.md) for setup instructions and learning roadmap.
+
 ## Development
 
 ### Pre-commit Hooks
@@ -110,4 +115,4 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-Hooks include: gitleaks, yamllint, ansible-lint, docker-compose validation.
+Hooks include: gitleaks, yamllint, ansible-lint, docker-compose validation, kubeconform.

@@ -1,0 +1,14 @@
+# Argo Events Helm chart — shared defaults
+# Chart: https://argoproj.github.io/argo-helm (argo-events)
+#
+# Install with base + overlay values:
+#   helm install argo-events argo/argo-events -n argo-events \
+#     -f infrastructure/base/argo-events/helm-values.yaml \
+#     -f infrastructure/overlays/{env}/argo-events/helm-values.yaml
+
+# EventBus: NATS (lightweight, default)
+eventBus:
+  nats:
+    native:
+      replicas: 1
+      auth: none

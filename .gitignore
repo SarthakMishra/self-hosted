@@ -187,6 +187,9 @@ kubeconfig
 *.kubeconfig
 kube-config
 
+# Helm chart downloads
+kubernetes/**/charts/
+
 # SSL/TLS certificates
 *.csr
 *.der

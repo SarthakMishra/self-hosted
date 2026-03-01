@@ -1,0 +1,6 @@
+# Argo Events Helm chart — Home Server overrides
+#
+# Install with both base and overlay values:
+#   helm install argo-events argo/argo-events -n argo-events \
+#     -f infrastructure/base/argo-events/helm-values.yaml \
+#     -f infrastructure/overlays/home/argo-events/helm-values.yaml

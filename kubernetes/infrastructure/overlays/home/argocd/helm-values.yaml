@@ -1,0 +1,12 @@
+# Argo CD Helm chart — Home Server overrides
+#
+# Install with both base and overlay values:
+#   helm install argocd argo/argo-cd -n argocd \
+#     -f infrastructure/base/argocd/helm-values.yaml \
+#     -f infrastructure/overlays/home/argocd/helm-values.yaml
+
+# Admin password (generate with: argocd account bcrypt --password <password>)
+# Override via --set or secrets in production
+configs:
+  params:
+    server.insecure: true

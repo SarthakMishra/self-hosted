@@ -1,0 +1,32 @@
+# MetalLB IP Address Pool — Home Server
+# Allocates LAN IPs for LoadBalancer-type Services (e.g., Traefik).
+#
+# These IPs must be:
+#   - On the same subnet as your TrueNAS server
+#   - Outside your router's DHCP range
+#   - Different from both the TrueNAS primary IP and the k3s node IP alias
+#
+# Apply AFTER MetalLB Helm chart is installed:
+#   kubectl apply -f ip-address-pool.yaml
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: default-pool
+  namespace: metallb-system
+spec:
+  addresses:
+    # Example layout (adjust for your LAN):
+    #   192.168.1.100 = TrueNAS primary IP (web UI)
+    #   192.168.1.101 = k3s node IP alias (K3S_NODE_IP)
+    #   192.168.1.200-210 = MetalLB pool (LoadBalancer services)
+    - 192.168.1.200-192.168.1.210
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: default
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - default-pool

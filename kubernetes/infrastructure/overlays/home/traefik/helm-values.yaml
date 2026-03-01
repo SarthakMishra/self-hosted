@@ -1,0 +1,10 @@
+# Traefik Helm chart — Home Server overrides
+#
+# Install with both base and overlay values:
+#   helm install traefik traefik/traefik -n traefik \
+#     -f infrastructure/base/traefik/helm-values.yaml \
+#     -f infrastructure/overlays/home/traefik/helm-values.yaml
+
+# MetalLB assigns a LAN IP for LoadBalancer services
+service:
+  type: LoadBalancer

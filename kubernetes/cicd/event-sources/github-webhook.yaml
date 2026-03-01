@@ -1,0 +1,32 @@
+# Argo Events EventSource: GitHub Webhook
+# Listens for push events from GitHub/Gitea repositories.
+#
+# Configure the webhook URL in your Git provider:
+#   https://webhooks.k8s.home.example.com/github
+#
+# The webhook secret must be stored in a K8s Secret:
+#   kubectl -n argo-events create secret generic github-webhook-secret \
+#     --from-literal=token=changeme
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: github
+  namespace: argo-events
+spec:
+  service:
+    ports:
+      - port: 12000
+        targetPort: 12000
+  github:
+    default:
+      port: "12000"
+      endpoint: /github
+      method: POST
+      events:
+        - push
+      webhook:
+        url: https://webhooks.k8s.home.example.com
+        endpoint: /github
+      webhookSecret:
+        name: github-webhook-secret
+        key: token

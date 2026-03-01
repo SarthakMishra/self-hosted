@@ -1,0 +1,19 @@
+# MinIO Helm chart — Home Server overrides
+#
+# Install with both base and overlay values:
+#   helm install minio minio/minio -n minio \
+#     -f infrastructure/base/minio/helm-values.yaml \
+#     -f infrastructure/overlays/home/minio/helm-values.yaml
+
+# Storage (TrueNAS NFS via democratic-csi or local-path)
+persistence:
+  enabled: true
+  size: 20Gi
+
+# Resource limits
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 512Mi

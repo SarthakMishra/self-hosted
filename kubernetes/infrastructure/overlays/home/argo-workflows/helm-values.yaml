@@ -1,0 +1,19 @@
+# Argo Workflows Helm chart — Home Server overrides
+#
+# Install with both base and overlay values:
+#   helm install argo-workflows argo/argo-workflows -n argo-workflows \
+#     -f infrastructure/base/argo-workflows/helm-values.yaml \
+#     -f infrastructure/overlays/home/argo-workflows/helm-values.yaml
+
+# Artifact repository: MinIO running in the cluster
+artifactRepository:
+  s3:
+    bucket: argo-artifacts
+    endpoint: minio.minio.svc.cluster.local:9000
+    insecure: true
+    accessKeySecret:
+      name: argo-artifacts-minio
+      key: accesskey
+    secretKeySecret:
+      name: argo-artifacts-minio
+      key: secretkey

@@ -1,0 +1,54 @@
+# Traefik Helm chart — shared defaults
+# Chart: https://traefik.github.io/charts
+#
+# These values are shared across all environments.
+# Environment-specific overrides are in overlays/{home,remote,local}/traefik/
+#
+# Uses Gateway API (the successor to Ingress). Routes are defined as
+# HTTPRoute resources that reference a Gateway, not Ingress/IngressRoute.
+
+# Expose HTTP and HTTPS entrypoints
+ports:
+  web:
+    port: 8000
+    exposedPort: 80
+    protocol: TCP
+  websecure:
+    port: 8443
+    exposedPort: 443
+    protocol: TCP
+
+# Deploy the GatewayClass resource (tells K8s that Traefik handles Gateways)
+gatewayClass:
+  enabled: true
+
+# Deploy a default Gateway resource
+# Environment overlays customize listeners and namespacePolicy
+gateway:
+  enabled: true
+  listeners:
+    web:
+      port: 8000
+      protocol: HTTP
+      namespacePolicy: All
+
+# Enable Gateway API provider (replaces kubernetesIngress and kubernetesCRD)
+providers:
+  kubernetesGateway:
+    enabled: true
+  kubernetesIngress:
+    enabled: false
+  kubernetesCRD:
+    enabled: false
+
+# Enable the Traefik dashboard (access via port-forward)
+ingressRoute:
+  dashboard:
+    enabled: true
+
+# Logging
+logs:
+  general:
+    level: INFO
+  access:
+    enabled: true

@@ -1,0 +1,56 @@
+# Argo Events Sensor: Trigger build on Git push
+# When the GitHub EventSource receives a push event, this Sensor
+# triggers the build-and-push WorkflowTemplate.
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: build-on-push
+  namespace: argo-events
+spec:
+  dependencies:
+    - name: github-push
+      eventSourceName: github
+      eventName: default
+
+  triggers:
+    - template:
+        name: trigger-build
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: build-
+                namespace: argo-workflows
+              spec:
+                workflowTemplateRef:
+                  name: build-and-push
+                arguments:
+                  parameters:
+                    - name: repo
+                    - name: branch
+                    - name: image
+                    - name: tag
+          # Extract values from the GitHub push event payload
+          parameters:
+            - src:
+                dependencyName: github-push
+                dataKey: body.repository.clone_url
+              dest: spec.arguments.parameters.0.value
+            - src:
+                dependencyName: github-push
+                dataKey: body.ref
+                dataTemplate: "{{ trimPrefix \"refs/heads/\" .Input }}"
+              dest: spec.arguments.parameters.1.value
+            - src:
+                dependencyName: github-push
+                dataKey: body.repository.name
+                dataTemplate: "harbor.k8s.home.example.com/library/{{ .Input }}"
+              dest: spec.arguments.parameters.2.value
+            - src:
+                dependencyName: github-push
+                dataKey: body.after
+                dataTemplate: "{{ slice .Input 0 7 }}"
+              dest: spec.arguments.parameters.3.value

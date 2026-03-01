@@ -1,0 +1,10 @@
+# Argo CD Helm chart — Remote Server (Hetzner) overrides
+#
+# Install with both base and overlay values:
+#   helm install argocd argo/argo-cd -n argocd \
+#     -f infrastructure/base/argocd/helm-values.yaml \
+#     -f infrastructure/overlays/remote/argocd/helm-values.yaml
+
+configs:
+  params:
+    server.insecure: true

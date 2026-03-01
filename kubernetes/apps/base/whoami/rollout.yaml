@@ -1,0 +1,48 @@
+# whoami - Argo Rollout with canary strategy
+# Replaces a standard Deployment. During updates, traffic is shifted
+# gradually: 20% → 50% → 80% → 100% using Gateway API HTTPRoute weights.
+# Argo Rollouts manages the HTTPRoute automatically via the Gateway API plugin.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: whoami
+  namespace: whoami
+  labels:
+    app: whoami
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: whoami
+  strategy:
+    canary:
+      steps:
+        - setWeight: 20
+        - pause: {duration: 30s}
+        - setWeight: 50
+        - pause: {duration: 30s}
+        - setWeight: 80
+        - pause: {duration: 30s}
+      trafficRouting:
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoute: whoami
+            namespace: whoami
+  template:
+    metadata:
+      labels:
+        app: whoami
+    spec:
+      containers:
+        - name: whoami
+          image: traefik/whoami:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
