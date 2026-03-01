@@ -30,7 +30,8 @@ gateway:
     web:
       port: 8000
       protocol: HTTP
-      namespacePolicy: All
+      namespacePolicy:
+        from: All
 
 # Enable Gateway API provider (replaces kubernetesIngress and kubernetesCRD)
 providers:

@@ -1,6 +1,6 @@
 # Kubernetes (k3s)
 
-k3s clusters for home, remote (Hetzner), and local environments. Uses the Kustomize **base + overlays** pattern so shared manifests live in `base/` and environment-specific config (IP ranges, domains, storage, TLS) lives in `overlays/{home,remote,local}/`.
+k3s clusters for home, remote (Hetzner), and local (k3d) environments. Uses the Kustomize **base + overlays** pattern so shared manifests live in `base/` and environment-specific config (IP ranges, domains, storage, TLS) lives in `overlays/{home,remote,local}/`.
 
 ## Directory Structure
 
@@ -9,7 +9,7 @@ kubernetes/
   bootstrap/                          # Per-environment cluster setup
     home/                             # TrueNAS homelab (k3s + Argo CD)
     remote/                           # Hetzner VPS
-    local/                            # Local dev machine
+    local/                            # Local dev machine (k3d — k3s-in-Docker)
   infrastructure/                     # Core cluster components
     base/                             # Shared defaults
       metallb/                        # Bare-metal load balancer (home only)
@@ -56,12 +56,13 @@ kubectl apply -k apps/overlays/remote/whoami/
 
 ### What Differs Per Environment
 
-| Concern | Home | Remote | Local |
-|---------|------|--------|-------|
-| MetalLB | Yes (bare-metal LB) | No (NodePort) | No (NodePort) |
-| k3s node IP | Dedicated alias (avoids TrueNAS port conflict) | Primary server IP | 127.0.0.1 |
+| Concern | Home | Remote | Local (k3d) |
+|---------|------|--------|-------------|
+| Runtime | Bare-metal k3s | Bare-metal k3s | k3d (k3s-in-Docker) |
+| MetalLB | Yes (bare-metal LB) | No (NodePort) | No (NodePort via k3d) |
+| k3s node IP | Dedicated alias (avoids TrueNAS port conflict) | Primary server IP | Container network |
 | IP pool | 192.168.x.200-210 | N/A | N/A |
-| Traefik service | LoadBalancer | NodePort (30080/30443) | NodePort (30080) |
+| Traefik service | LoadBalancer | NodePort (30080/30443) | NodePort (30080, host:80 via k3d) |
 | TLS | cert-manager + Cloudflare | cert-manager + Cloudflare | HTTP only |
 | Storage | democratic-csi (TrueNAS NFS) | Hetzner CSI / local-path | local-path |
 | HTTPRoute domain | `*.k8s.home.example.com` | `*.k8s.example.com` | `*.k8s.local` |
@@ -243,6 +244,78 @@ kubectl -n whoami get httproute
 
 # Check the Argo Rollout status
 kubectl argo rollouts get rollout whoami -n whoami
+```
+
+## Getting Started (Local — k3d)
+
+Local development uses [k3d](https://k3d.io) to run k3s inside Docker. This avoids
+WSL2 compatibility issues (cgroup parsing, Docker Desktop 9p mounts) and gives you
+a one-command cluster that matches the k3s distribution used in home/remote.
+
+### Prerequisites
+
+- Docker (Docker Desktop or Docker Engine)
+- [k3d](https://k3d.io): `brew install k3d` or `curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash`
+- kubectl
+- Helm
+
+### 1. Create the k3d cluster
+
+```bash
+cd kubernetes/bootstrap/local
+cp env.example .env   # Edit if you want to change cluster name or port
+./install-k3s.sh
+```
+
+The script creates a k3d cluster with Traefik and ServiceLB disabled, maps
+host port 80 to NodePort 30080 on the k3s node, waits for the node to be
+Ready, and merges the kubeconfig into `~/.kube/config`.
+
+### 2. Install Gateway API CRDs
+
+```bash
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
+```
+
+### 3. Install Traefik
+
+```bash
+helm repo add traefik https://traefik.github.io/charts
+helm install traefik traefik/traefik -n traefik --create-namespace \
+  -f infrastructure/base/traefik/helm-values.yaml \
+  -f infrastructure/overlays/local/traefik/helm-values.yaml
+
+# Verify
+kubectl -n traefik get pods           # Should be Running
+kubectl -n traefik get svc traefik    # Should be NodePort 80:30080
+kubectl get gatewayclass              # Should show "traefik" (Accepted: True)
+kubectl get gateway -n traefik        # Should show traefik-gateway (Programmed: True)
+```
+
+### 4. Deploy the test app
+
+```bash
+kubectl apply -k apps/overlays/local/whoami/
+```
+
+### 5. Test access
+
+```bash
+# Add hostname to /etc/hosts (WSL2: use the Windows hosts file too)
+echo "127.0.0.1 whoami.k8s.local" | sudo tee -a /etc/hosts
+
+# Test via Gateway API
+curl -H "Host: whoami.k8s.local" http://localhost
+
+# Or test via port-forward
+kubectl -n whoami port-forward svc/whoami 8080:80
+curl http://localhost:8080
+```
+
+### Destroy
+
+```bash
+k3d cluster delete local
 ```
 
 ## Getting Started (Remote Server)

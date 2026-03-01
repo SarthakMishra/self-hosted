@@ -1,11 +1,15 @@
-# Traefik Helm chart — Local Development overrides
+# Traefik Helm chart — Local Development overrides (k3d)
+#
+# k3d maps host port 80 to NodePort 30080 at cluster creation
+# (--port "80:30080@server:0"), so Traefik uses a NodePort service
+# with a fixed nodePort of 30080.
 #
 # Install with both base and overlay values:
-#   helm install traefik traefik/traefik -n traefik \
+#   helm install traefik traefik/traefik -n traefik --create-namespace \
 #     -f infrastructure/base/traefik/helm-values.yaml \
 #     -f infrastructure/overlays/local/traefik/helm-values.yaml
 
-# Use NodePort for local dev (no MetalLB needed)
+# Use NodePort — k3d maps host:80 -> node:30080
 service:
   type: NodePort
 
