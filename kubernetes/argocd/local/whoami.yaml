@@ -36,6 +36,7 @@ spec:
     - group: argoproj.io
       kind: Rollout
       jsonPointers:
+        - /metadata/annotations/rollout.argoproj.io~1revision
         - /status
     - group: ""
       kind: Service
