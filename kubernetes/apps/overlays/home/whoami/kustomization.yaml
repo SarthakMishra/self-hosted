@@ -4,3 +4,11 @@ kind: Kustomization
 resources:
   - ../../../base/whoami
   - httproute.yaml
+
+# Image override — points whoami at the home Harbor registry.
+# The tag is updated automatically by the CI/CD pipeline's
+# update-manifests step (kustomize edit set image).
+images:
+  - name: traefik/whoami
+    newName: harbor.k8s.home.example.com/library/whoami
+    newTag: latest

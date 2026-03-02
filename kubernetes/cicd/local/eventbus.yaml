@@ -1,0 +1,16 @@
+# Argo Events EventBus: NATS — Local Development
+# Required message transport layer between EventSources and Sensors.
+# Must be deployed before any EventSource or Sensor can function.
+#
+# The "default" name is required — Argo Events looks for an EventBus
+# named "default" in the same namespace unless overridden.
+apiVersion: argoproj.io/v1alpha1
+kind: EventBus
+metadata:
+  name: default
+  namespace: argo-events
+spec:
+  nats:
+    native:
+      replicas: 1
+      auth: none

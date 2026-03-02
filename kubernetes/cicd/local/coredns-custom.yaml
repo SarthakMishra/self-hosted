@@ -1,0 +1,35 @@
+# CoreDNS Custom Configuration — Local Development
+# Resolves *.k8s.local domains to their in-cluster Services so that
+# pods (e.g. BuildKit pushing to Harbor) can reach services by their
+# external local-dev hostnames without leaving the cluster.
+#
+# k3s mounts the "coredns-custom" ConfigMap (optional) into CoreDNS
+# at /etc/coredns/custom/. The Corefile imports *.override files into
+# the main server block and *.server files as new server blocks.
+#
+# After applying, restart CoreDNS to pick up the changes:
+#   kubectl apply -f coredns-custom.yaml
+#   kubectl -n kube-system rollout restart deployment coredns
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+data:
+  # Loaded via "import /etc/coredns/custom/*.override" in the main
+  # .:53 server block. Uses the "rewrite" plugin to map *.k8s.local
+  # hostnames to their Kubernetes Service FQDNs, then lets the
+  # existing "kubernetes" plugin resolve them normally.
+  k8s-local.override: |
+    # Harbor — harbor.k8s.local -> harbor.harbor.svc.cluster.local
+    rewrite name harbor.k8s.local harbor.harbor.svc.cluster.local
+    # Argo CD — argocd.k8s.local -> argocd-server.argocd.svc.cluster.local
+    rewrite name argocd.k8s.local argocd-server.argocd.svc.cluster.local
+    # Argo Workflows — workflows.k8s.local -> argo-workflows-server.argo-workflows.svc.cluster.local
+    rewrite name workflows.k8s.local argo-workflows-server.argo-workflows.svc.cluster.local
+    # Argo Rollouts Dashboard — rollouts.k8s.local -> argo-rollouts-dashboard.argo-rollouts.svc.cluster.local
+    rewrite name rollouts.k8s.local argo-rollouts-dashboard.argo-rollouts.svc.cluster.local
+    # Webhooks (Argo Events) — webhooks.k8s.local -> github-eventsource-svc.argo-events.svc.cluster.local
+    rewrite name webhooks.k8s.local github-eventsource-svc.argo-events.svc.cluster.local
+    # whoami test app — whoami.k8s.local -> whoami-stable.whoami.svc.cluster.local
+    rewrite name whoami.k8s.local whoami-stable.whoami.svc.cluster.local

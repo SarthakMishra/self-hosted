@@ -138,7 +138,7 @@ Uses Kustomize base/overlay pattern for multi-environment support:
 - **EventSources** go in `cicd/event-sources/` — webhook listeners
 - **Sensors** go in `cicd/sensors/` — event-to-workflow triggers
 - Pipeline resources are applied directly (not via Kustomize) to the home cluster only
-- Use Kaniko for container image builds (no Docker-in-Docker)
+- Use BuildKit rootless for container image builds (no Docker-in-Docker)
 - Images are pushed to Harbor (`harbor.k8s.home.example.com`)
 
 ### Conventions

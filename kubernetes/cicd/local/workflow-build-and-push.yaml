@@ -1,5 +1,6 @@
-# Argo Workflow Template: Build and Push to Harbor
-# Clones a Git repo, builds a container image with BuildKit, and pushes to Harbor.
+# Argo Workflow Template: Build and Push to Harbor — Local Development
+# Clones a Git repo, builds a container image with BuildKit, and pushes
+# to Harbor over HTTP (insecure, no TLS for local dev).
 #
 # After a successful build, the update-manifests step clones the GitOps
 # repo (self-hosted), runs `kustomize edit set image` to update the
@@ -11,18 +12,37 @@
 # BuildKit is actively maintained, supports better caching, multi-platform
 # builds, and full Dockerfile feature parity with `docker build`.
 #
-# Usage: Submit a Workflow referencing this template with parameters:
-#   argo submit --from workflowtemplate/build-and-push \
+# Differences from home/production:
+#   - BuildKit is configured with registry.insecure=true for HTTP-only Harbor
+#   - Uses a custom buildkitd.toml mounted via ConfigMap to allow insecure push
+#   - Uses volumeClaimTemplates so the cloned source persists across
+#     step pods (emptyDir is per-pod and does NOT share between steps)
+#
+# Usage — submit manually:
+#   argo submit -n argo-workflows --from workflowtemplate/build-and-push \
 #     -p repo=https://github.com/user/app \
 #     -p branch=main \
-#     -p image=harbor.k8s.home.example.com/library/app \
+#     -p image=harbor.k8s.local/library/app \
 #     -p tag=latest
+#
+# Prerequisites:
+#   kubectl -n argo-workflows create secret docker-registry harbor-registry-credentials \
+#     --docker-server=harbor.k8s.local \
+#     --docker-username=admin \
+#     --docker-password=changeme
+#
+#   kubectl -n argo-workflows create configmap buildkitd-config \
+#     --from-file=buildkitd.toml  (see setup-cicd.sh for automatic creation)
+#
+#   kubectl -n argo-workflows create secret generic git-deploy-key \
+#     --from-file=ssh-privatekey=/path/to/deploy_key
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: build-and-push
   namespace: argo-workflows
 spec:
+  serviceAccountName: argo-workflow
   entrypoint: build-pipeline
   arguments:
     parameters:
@@ -47,11 +67,43 @@ spec:
         value: kubernetes
       # Kustomize overlay path (relative to the deploy-repo root) where
       # `kustomize edit set image` will be run. The Sensor maps the app
-      # repo name to the correct overlay directory. If a bare app name
-      # is passed (e.g. "whoami"), the update-manifests step expands it
-      # to kubernetes/apps/overlays/home/<name>.
+      # repo name to the correct overlay directory.
       - name: overlay
-        value: kubernetes/apps/overlays/home/whoami
+        value: kubernetes/apps/overlays/local/whoami
+
+  # Docker config secret for BuildKit to authenticate with Harbor.
+  # Mounted as a workflow-level volume so any template can use it.
+  volumes:
+    - name: docker-config
+      secret:
+        secretName: harbor-registry-credentials
+        items:
+          - key: .dockerconfigjson
+            path: config.json
+    # BuildKit daemon configuration — allows insecure (HTTP) registries
+    # for local development. Created by setup-cicd.sh.
+    - name: buildkitd-config
+      configMap:
+        name: buildkitd-config
+    # SSH deploy key for pushing manifest updates back to the GitOps repo.
+    # Must have write access to the deploy-repo. Created by setup-cicd.sh.
+    - name: git-deploy-key
+      secret:
+        secretName: git-deploy-key
+        defaultMode: 256
+
+  # PVC shared across all step pods within a single workflow run.
+  # The cloned source persists from the git-clone step to the
+  # buildkit-build step even though they run in separate pods.
+  volumeClaimTemplates:
+    - metadata:
+        name: workspace
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
 
   templates:
     - name: build-pipeline
@@ -81,13 +133,6 @@ spec:
             mountPath: /workspace
 
     - name: buildkit-build
-      volumes:
-        - name: docker-config
-          secret:
-            secretName: harbor-registry-credentials
-            items:
-              - key: .dockerconfigjson
-                path: config.json
       container:
         image: moby/buildkit:rootless
         volumeMounts:
@@ -95,6 +140,8 @@ spec:
             mountPath: /workspace
           - name: docker-config
             mountPath: /.docker
+          - name: buildkitd-config
+            mountPath: /home/user/.config/buildkit
         workingDir: /workspace/source/{{workflow.parameters.context}}
         env:
           - name: BUILDKITD_FLAGS
@@ -108,11 +155,11 @@ spec:
             # Build the full image name.
             # When triggered by the Sensor, "image" is just the repo name
             # (e.g. "whoami"). When submitted manually, it may already be
-            # a full path (e.g. "harbor.k8s.home.example.com/library/whoami").
+            # a full path (e.g. "harbor.k8s.local/library/whoami").
             IMAGE="{{workflow.parameters.image}}"
             case "${IMAGE}" in
               */*) ;; # already contains a slash — assume full path
-              *)  IMAGE="harbor.k8s.home.example.com/library/${IMAGE}" ;;
+              *)  IMAGE="harbor.k8s.local/library/${IMAGE}" ;;
             esac
 
             # Truncate tag to 7 chars (short SHA) if it looks like a
@@ -142,11 +189,6 @@ spec:
     # push the commit back to the GitOps repo so Argo CD syncs it.
     # ---------------------------------------------------------------
     - name: update-manifests
-      volumes:
-        - name: git-deploy-key
-          secret:
-            secretName: git-deploy-key
-            defaultMode: 256
       container:
         image: alpine/git:latest
         volumeMounts:
@@ -168,7 +210,7 @@ spec:
             IMAGE="{{workflow.parameters.image}}"
             case "${IMAGE}" in
               */*) ;;
-              *)  IMAGE="harbor.k8s.home.example.com/library/${IMAGE}" ;;
+              *)  IMAGE="harbor.k8s.local/library/${IMAGE}" ;;
             esac
 
             TAG="{{workflow.parameters.tag}}"
@@ -217,13 +259,13 @@ spec:
               "{{workflow.parameters.deploy-repo}}" /workspace/deploy
 
             # Resolve overlay path: if the value contains a slash, treat
-            # it as a full relative path (e.g. kubernetes/apps/overlays/home/whoami).
+            # it as a full relative path (e.g. kubernetes/apps/overlays/local/whoami).
             # Otherwise it's a bare app name from the Sensor (e.g. "whoami")
             # and we expand it to the conventional overlay directory.
             OVERLAY="{{workflow.parameters.overlay}}"
             case "${OVERLAY}" in
               */*) ;; # already a path
-              *)  OVERLAY="kubernetes/apps/overlays/home/${OVERLAY}" ;;
+              *)  OVERLAY="kubernetes/apps/overlays/local/${OVERLAY}" ;;
             esac
 
             cd /workspace/deploy/${OVERLAY}
@@ -232,7 +274,7 @@ spec:
             # 5. Determine the base image name to replace
             # ----------------------------------------------------------
             # Read the existing images entry from kustomization.yaml.
-            # The newName might already be set (e.g. harbor.k8s.home.example.com/library/whoami).
+            # The newName might already be set (e.g. harbor.k8s.local/library/whoami).
             # We need the *original* image name (e.g. traefik/whoami) that
             # kustomize uses as the match key.
             #
@@ -243,7 +285,7 @@ spec:
             # The YAML structure is:
             #   images:
             #   - name: traefik/whoami     <-- this is what we need
-            #     newName: harbor.k8s.home.example.com/library/whoami
+            #     newName: harbor.k8s.local/library/whoami
             #     newTag: latest
             ORIGINAL_IMAGE=""
             if [ -f kustomization.yaml ]; then
@@ -277,7 +319,7 @@ spec:
             # ----------------------------------------------------------
             # 7. Commit and push (skip if no changes)
             # ----------------------------------------------------------
-            git config user.email "argo-workflows@k8s.home.example.com"
+            git config user.email "argo-workflows@k8s.local"
             git config user.name "Argo Workflows"
 
             git add kustomization.yaml
@@ -299,12 +341,3 @@ spec:
 
             echo ""
             echo "Manifests updated and pushed. Argo CD will sync shortly."
-
-  volumeClaimTemplates:
-    - metadata:
-        name: workspace
-      spec:
-        accessModes: [ReadWriteOnce]
-        resources:
-          requests:
-            storage: 1Gi

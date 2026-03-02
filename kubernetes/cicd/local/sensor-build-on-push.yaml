@@ -1,13 +1,29 @@
-# Argo Events Sensor: Trigger build on Git push
-# When the GitHub EventSource receives a push event, this Sensor
-# triggers the build-and-push WorkflowTemplate.
+# Argo Events Sensor: Trigger build on Git push — Local Development
+# When the webhook EventSource receives a POST event, this Sensor
+# triggers the build-and-push WorkflowTemplate in argo-workflows.
+#
+# Uses the sensor-workflow-submit ServiceAccount for cross-namespace
+# Workflow creation (see sensor-rbac.yaml).
+#
+# Harbor URL uses harbor.k8s.local (HTTP-only for local dev).
+#
+# With the generic "webhook" EventSource type, the event payload is:
+#   {
+#     "context": { ... },       # CloudEvent metadata
+#     "data": {
+#       "header": { ... },      # HTTP headers
+#       "body": { ... }         # The JSON body we POST
+#     }
+#   }
+#
+# So fields like repository.clone_url are at body.repository.clone_url
+# (relative to the event data root).
 #
 # NOTE: dataTemplate is unreliable in Argo Events v1.9 — the .Input
 # variable receives the wrong type (map instead of string) when the
 # event payload is a nested object. Instead, we extract raw values
 # and let the WorkflowTemplate handle any transformations (e.g.
-# stripping refs/heads/ prefix, prepending registry URL, truncating
-# commit SHA).
+# stripping refs/heads/ prefix, truncating commit SHA).
 #
 # The [skip ci] filter prevents infinite loops: after the pipeline
 # updates manifests, it commits with "[skip ci]" in the message.
@@ -18,6 +34,9 @@ metadata:
   name: build-on-push
   namespace: argo-events
 spec:
+  template:
+    serviceAccountName: sensor-workflow-submit
+
   dependencies:
     - name: github-push
       eventSourceName: github
@@ -53,7 +72,8 @@ spec:
                     - name: image
                     - name: tag
                     - name: overlay
-          # Extract values from the GitHub push event payload.
+          # Extract values from the webhook event payload.
+          # Generic webhook wraps the POST body under body.
           # No dataTemplate — raw values only for v1.9 compatibility.
           # The WorkflowTemplate handles ref prefix stripping, image
           # path construction, commit SHA truncation, and overlay
@@ -76,7 +96,7 @@ spec:
                 dataKey: body.after
               dest: spec.arguments.parameters.3.value
             # Map the app repo name to the Kustomize overlay path.
-            # The WorkflowTemplate default is kubernetes/apps/overlays/home/whoami
+            # The WorkflowTemplate default is kubernetes/apps/overlays/local/whoami
             # which works when there's only one app. For multiple apps,
             # this uses the repo name to build the path dynamically.
             - src:

@@ -341,9 +341,15 @@ kubectl apply -k apps/overlays/remote/whoami/
 End-to-end flow from code push to production deployment:
 
 ```
-Git push → Argo Events (webhook) → Argo Workflows (clone + Kaniko build → push to Harbor)
-  → Update manifests in Git → Argo CD (sync) → Argo Rollouts (canary deploy)
+Git push → Argo Events (webhook) → Argo Workflows:
+  1. Clone source repo
+  2. BuildKit build → push image to Harbor
+  3. Clone GitOps repo → kustomize edit set image → git push [skip ci]
+  → Argo CD (sync) → Argo Rollouts (canary deploy)
 ```
+
+The `[skip ci]` tag in the manifest-update commit prevents the Sensor from
+re-triggering the pipeline on its own commit (infinite loop prevention).
 
 ### Components
 
@@ -360,9 +366,9 @@ Git push → Argo Events (webhook) → Argo Workflows (clone + Kaniko build → 
 
 Templates live in `cicd/` and are applied to the home cluster:
 
-- **`workflow-templates/build-and-push.yaml`** — WorkflowTemplate that clones a repo, builds with Kaniko, and pushes to Harbor
+- **`workflow-templates/build-and-push.yaml`** — WorkflowTemplate that clones a repo, builds with BuildKit, pushes to Harbor, then updates the Kustomize overlay image tag in Git
 - **`event-sources/github-webhook.yaml`** — EventSource listening for GitHub push events on port 12000
-- **`sensors/build-on-push.yaml`** — Sensor that triggers the build workflow when a push event is received
+- **`sensors/build-on-push.yaml`** — Sensor that triggers the build workflow when a push event is received (filters out `[skip ci]` commits to prevent loops)
 
 ### Triggering a Build Manually
 
@@ -371,8 +377,22 @@ argo submit --from workflowtemplate/build-and-push \
   -p repo=https://github.com/user/app \
   -p branch=main \
   -p image=harbor.k8s.home.example.com/library/app \
-  -p tag=latest
+  -p tag=latest \
+  -p overlay=kubernetes/apps/overlays/home/app
 ```
+
+### How Image Promotion Works
+
+After a successful build, the WorkflowTemplate's `update-manifests` step:
+
+1. Clones the GitOps repo (`self-hosted`) via SSH deploy key
+2. Runs `kustomize edit set image` in the target overlay directory
+3. Commits with `[skip ci]` in the message and pushes to the `kubernetes` branch
+4. Argo CD detects the new commit, syncs, and the Rollout begins a canary deployment
+
+Each app overlay's `kustomization.yaml` contains an `images:` block that maps the base image (e.g. `traefik/whoami`) to the Harbor registry path. The pipeline updates the `newTag` field automatically.
+
+**Required secret:** A `git-deploy-key` secret in `argo-workflows` namespace containing an SSH private key with write access to the GitOps repo. Created by `setup-cicd.sh`.
 
 ### Argo Rollouts (Canary Deployments)
 
@@ -451,7 +471,7 @@ argocd app get APP_NAME
 |-------|-------|-------------------|
 | 1 | Cluster + Manual Deploys | Pods, Deployments, Services, Gateway API, Helm |
 | 2 | GitOps with Argo CD | App-of-apps pattern, Kustomize, cert-manager |
-| 3 | CI/CD Pipeline | Harbor, Argo Workflows, Argo Events, Kaniko builds |
+| 3 | CI/CD Pipeline | Harbor, Argo Workflows, Argo Events, BuildKit builds |
 | 4 | Progressive Delivery | Argo Rollouts, canary/blue-green, AnalysisTemplates |
 | 5 | Storage + Monitoring | PVCs, democratic-csi, Prometheus, Grafana |
 | 6 | Autoscaling | HPA, VPA, KEDA, resource management |

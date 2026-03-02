@@ -1,0 +1,46 @@
+# Argo Events EventSource: Webhook — Local Development
+# Uses the generic "webhook" type instead of "github" type because
+# the github type requires repositories/organizations fields and
+# attempts to register webhooks via the GitHub API (which needs
+# a public URL and API token — neither available locally).
+#
+# The generic webhook type simply listens for HTTP POST requests,
+# making it ideal for local testing where events are sent manually
+# via curl or tunnelled through smee.io/ngrok.
+#
+# The EventSource controller automatically creates a Service named
+# "github-eventsource-svc" which the HTTPRoute references.
+#
+# Prerequisites:
+#   kubectl -n argo-events create secret generic github-webhook-secret \
+#     --from-literal=token=changeme
+#
+# Simulate a GitHub push event:
+#   curl -X POST http://webhooks.k8s.local/github \
+#     -H "Content-Type: application/json" \
+#     -d '{
+#       "ref": "refs/heads/main",
+#       "after": "abc1234def5678",
+#       "repository": {
+#         "name": "myapp",
+#         "clone_url": "https://github.com/user/myapp.git"
+#       }
+#     }'
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: github
+  namespace: argo-events
+spec:
+  service:
+    ports:
+      - port: 12000
+        targetPort: 12000
+  webhook:
+    default:
+      port: "12000"
+      endpoint: /github
+      method: POST
+      authSecret:
+        name: github-webhook-secret
+        key: token
