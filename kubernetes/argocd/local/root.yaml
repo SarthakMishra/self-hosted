@@ -1,0 +1,28 @@
+# Root app-of-apps — Local Development
+# This is the only Application you apply manually. It manages all other
+# Applications in this directory (whoami, infrastructure, etc.).
+# Argo CD watches this directory in Git and auto-syncs any Application
+# manifests added, changed, or removed here.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/SarthakMishra/self-hosted.git
+    targetRevision: kubernetes
+    path: kubernetes/argocd/local
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

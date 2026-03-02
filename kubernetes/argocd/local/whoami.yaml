@@ -1,0 +1,28 @@
+# Argo CD Application for whoami — Local Development
+# Syncs the whoami app from the local Kustomize overlay in this Git repo.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: whoami
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/SarthakMishra/self-hosted.git
+    targetRevision: kubernetes
+    path: kubernetes/apps/overlays/local/whoami
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: whoami
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

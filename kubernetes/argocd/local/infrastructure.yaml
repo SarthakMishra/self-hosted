@@ -1,0 +1,27 @@
+# Argo CD Application for infrastructure — Local Development
+# Syncs namespaces and HTTPRoutes from the local Kustomize overlay.
+# Helm releases are managed separately (not via this Application).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: infrastructure
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/SarthakMishra/self-hosted.git
+    targetRevision: kubernetes
+    path: kubernetes/infrastructure/overlays/local
+
+  destination:
+    server: https://kubernetes.default.svc
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
