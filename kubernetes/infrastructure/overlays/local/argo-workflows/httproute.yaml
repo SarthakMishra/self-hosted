@@ -7,11 +7,20 @@ metadata:
   namespace: argo-workflows
 spec:
   parentRefs:
-    - name: traefik-gateway
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: traefik-gateway
       namespace: traefik
   hostnames:
     - workflows.k8s.local
   rules:
-    - backendRefs:
-        - name: argo-workflows-server
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: argo-workflows-server
           port: 2746
+          weight: 1

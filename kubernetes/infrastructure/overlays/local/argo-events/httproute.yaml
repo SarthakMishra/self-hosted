@@ -8,7 +8,9 @@ metadata:
   namespace: argo-events
 spec:
   parentRefs:
-    - name: traefik-gateway
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: traefik-gateway
       namespace: traefik
   hostnames:
     - webhooks.k8s.local
@@ -18,5 +20,8 @@ spec:
             type: PathPrefix
             value: /github
       backendRefs:
-        - name: github-eventsource-svc
+        - group: ""
+          kind: Service
+          name: github-eventsource-svc
           port: 12000
+          weight: 1

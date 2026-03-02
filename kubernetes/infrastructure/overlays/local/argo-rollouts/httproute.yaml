@@ -7,11 +7,20 @@ metadata:
   namespace: argo-rollouts
 spec:
   parentRefs:
-    - name: traefik-gateway
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: traefik-gateway
       namespace: traefik
   hostnames:
     - rollouts.k8s.local
   rules:
-    - backendRefs:
-        - name: argo-rollouts-dashboard
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: argo-rollouts-dashboard
           port: 3100
+          weight: 1
