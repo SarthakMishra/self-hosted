@@ -64,7 +64,7 @@ spec:
       - name: deploy-repo
         value: git@github.com:SarthakMishra/self-hosted.git
       - name: deploy-branch
-        value: kubernetes
+        value: main
       # Kustomize overlay path (relative to the deploy-repo root) where
       # `kustomize edit set image` will be run. The Sensor maps the app
       # repo name to the correct overlay directory.

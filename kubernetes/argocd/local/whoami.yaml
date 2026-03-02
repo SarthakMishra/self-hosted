@@ -12,7 +12,7 @@ spec:
 
   source:
     repoURL: https://github.com/SarthakMishra/self-hosted.git
-    targetRevision: kubernetes
+    targetRevision: main
     path: kubernetes/apps/overlays/local/whoami
 
   destination:

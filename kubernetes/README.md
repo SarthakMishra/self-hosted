@@ -387,7 +387,7 @@ After a successful build, the WorkflowTemplate's `update-manifests` step:
 
 1. Clones the GitOps repo (`self-hosted`) via SSH deploy key
 2. Runs `kustomize edit set image` in the target overlay directory
-3. Commits with `[skip ci]` in the message and pushes to the `kubernetes` branch
+3. Commits with `[skip ci]` in the message and pushes to the `main` branch
 4. Argo CD detects the new commit, syncs, and the Rollout begins a canary deployment
 
 Each app overlay's `kustomization.yaml` contains an `images:` block that maps the base image (e.g. `traefik/whoami`) to the Harbor registry path. The pipeline updates the `newTag` field automatically.
