@@ -19,35 +19,15 @@ spec:
     server: https://kubernetes.default.svc
     namespace: whoami
 
-  # Ignore fields that Kubernetes auto-populates on resources.
-  # Without these, Argo CD sees perpetual OutOfSync diffs between
-  # the minimal manifests in Git and the server-defaulted live state.
+  # Kubernetes auto-adds the metadata.name label to namespaces.
+  # ServerSideApply handles all other server-defaulted fields, but
+  # this label diff persists because the namespace was created before
+  # Argo CD took ownership via SSA.
   ignoreDifferences:
     - group: ""
       kind: Namespace
       jsonPointers:
         - /metadata/labels/kubernetes.io~1metadata.name
-        - /spec/finalizers
-        - /status
-    - group: gateway.networking.k8s.io
-      kind: HTTPRoute
-      jsonPointers:
-        - /status
-    - group: argoproj.io
-      kind: Rollout
-      jsonPointers:
-        - /metadata/annotations/rollout.argoproj.io~1revision
-        - /status
-    - group: ""
-      kind: Service
-      jsonPointers:
-        - /spec/clusterIP
-        - /spec/clusterIPs
-        - /spec/internalTrafficPolicy
-        - /spec/ipFamilies
-        - /spec/ipFamilyPolicy
-        - /spec/sessionAffinity
-        - /status
 
   syncPolicy:
     automated:
