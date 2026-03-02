@@ -109,6 +109,11 @@ K3D_CMD=(
   --k3s-arg "--disable=traefik@server:*"
   --k3s-arg "--disable=servicelb@server:*"
 
+  # Configure containerd to allow insecure (HTTP) pulls from Harbor.
+  # The registries.yaml is a template — setup-cicd.sh updates the
+  # endpoint with Harbor's actual ClusterIP after it's deployed.
+  --registry-config "${SCRIPT_DIR}/registries.yaml"
+
   # Wait for the cluster to be ready
   --wait
   --timeout 120s

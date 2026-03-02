@@ -10,6 +10,7 @@
 #   5. Deploys the WorkflowTemplate (BuildKit build + manifest update pipeline)
 #   6. Deploys the EventSource (GitHub webhook listener)
 #   7. Deploys the Sensor (event-to-workflow trigger)
+#   8. Configures k3d containerd to pull from Harbor over HTTP
 #
 # Prerequisites:
 #   - k3d cluster running (./bootstrap/local/install-k3s.sh)
@@ -115,28 +116,38 @@ if [[ "${DELETE_MODE}" == "true" ]]; then
   echo "=============================================="
   echo ""
 
-  echo "[1/7] Deleting Sensor..."
+  echo "[1/8] Deleting Sensor..."
   kubectl delete -f "${SCRIPT_DIR}/sensor-build-on-push.yaml" --ignore-not-found 2>/dev/null || true
 
-  echo "[2/7] Deleting EventSource..."
+  echo "[2/8] Deleting EventSource..."
   kubectl delete -f "${SCRIPT_DIR}/eventsource-github.yaml" --ignore-not-found 2>/dev/null || true
 
-  echo "[3/7] Deleting WorkflowTemplate..."
+  echo "[3/8] Deleting WorkflowTemplate..."
   kubectl delete -f "${SCRIPT_DIR}/workflow-build-and-push.yaml" --ignore-not-found 2>/dev/null || true
 
-  echo "[4/7] Deleting Sensor RBAC..."
+  echo "[4/8] Deleting Sensor RBAC..."
   kubectl delete -f "${SCRIPT_DIR}/sensor-rbac.yaml" --ignore-not-found 2>/dev/null || true
 
-  echo "[5/7] Deleting EventBus..."
+  echo "[5/8] Deleting EventBus..."
   kubectl delete -f "${SCRIPT_DIR}/eventbus.yaml" --ignore-not-found 2>/dev/null || true
 
-  echo "[6/7] Deleting BuildKit config..."
+  echo "[6/8] Deleting BuildKit config..."
   kubectl -n argo-workflows delete configmap buildkitd-config --ignore-not-found 2>/dev/null || true
 
-  echo "[7/7] Deleting secrets..."
+  echo "[7/8] Deleting secrets..."
   kubectl -n argo-events delete secret github-webhook-secret --ignore-not-found 2>/dev/null || true
   kubectl -n argo-workflows delete secret harbor-registry-credentials --ignore-not-found 2>/dev/null || true
   kubectl -n argo-workflows delete secret git-deploy-key --ignore-not-found 2>/dev/null || true
+
+  echo "[8/8] Removing k3d registry configuration..."
+  K3D_NODE="k3d-${K3D_CLUSTER_NAME:-local}-server-0"
+  if docker exec "${K3D_NODE}" test -f /etc/rancher/k3s/registries.yaml 2>/dev/null; then
+    docker exec "${K3D_NODE}" rm -f /etc/rancher/k3s/registries.yaml
+    echo "  ✓ registries.yaml removed — restart the k3d node to take effect:"
+    echo "    docker restart ${K3D_NODE}"
+  else
+    echo "  registries.yaml not found — skipping."
+  fi
   echo ""
   echo "CI/CD pipeline teardown complete."
   exit 0
@@ -160,7 +171,7 @@ echo ""
 # Step 1: Create secrets
 # -------------------------------------------------------
 
-echo "[1/7] Creating secrets..."
+echo "[1/8] Creating secrets..."
 
 # GitHub webhook secret (used by EventSource to validate incoming webhooks)
 if kubectl -n argo-events get secret github-webhook-secret &>/dev/null; then
@@ -199,7 +210,7 @@ echo ""
 # Step 2: Create BuildKit daemon configuration
 # -------------------------------------------------------
 
-echo "[2/7] Creating BuildKit daemon configuration..."
+echo "[2/8] Creating BuildKit daemon configuration..."
 
 # BuildKit needs a buildkitd.toml to allow pushing to insecure (HTTP)
 # registries. This is only needed for local development where Harbor
@@ -230,7 +241,7 @@ echo ""
 # Step 3: Deploy EventBus
 # -------------------------------------------------------
 
-echo "[3/7] Deploying EventBus (NATS)..."
+echo "[3/8] Deploying EventBus (NATS)..."
 kubectl apply -f "${SCRIPT_DIR}/eventbus.yaml"
 
 # Wait for EventBus to be ready
@@ -260,7 +271,7 @@ echo ""
 # Step 4: Deploy Sensor RBAC
 # -------------------------------------------------------
 
-echo "[4/7] Deploying Sensor RBAC..."
+echo "[4/8] Deploying Sensor RBAC..."
 kubectl apply -f "${SCRIPT_DIR}/sensor-rbac.yaml"
 echo "  ✓ ServiceAccount, Role, and RoleBinding created"
 echo ""
@@ -269,7 +280,7 @@ echo ""
 # Step 5: Deploy WorkflowTemplate
 # -------------------------------------------------------
 
-echo "[5/7] Deploying WorkflowTemplate..."
+echo "[5/8] Deploying WorkflowTemplate..."
 kubectl apply -f "${SCRIPT_DIR}/workflow-build-and-push.yaml"
 echo "  ✓ WorkflowTemplate 'build-and-push' deployed to argo-workflows"
 echo ""
@@ -278,7 +289,7 @@ echo ""
 # Step 6: Deploy EventSource
 # -------------------------------------------------------
 
-echo "[6/7] Deploying EventSource..."
+echo "[6/8] Deploying EventSource..."
 kubectl apply -f "${SCRIPT_DIR}/eventsource-github.yaml"
 
 # Wait for the EventSource pod and service to come up
@@ -322,7 +333,7 @@ echo ""
 # Step 7: Deploy Sensor
 # -------------------------------------------------------
 
-echo "[7/7] Deploying Sensor..."
+echo "[7/8] Deploying Sensor..."
 kubectl apply -f "${SCRIPT_DIR}/sensor-build-on-push.yaml"
 
 echo "  Waiting for Sensor pods..."
@@ -346,6 +357,76 @@ fi
 echo ""
 
 # -------------------------------------------------------
+# Step 8: Configure k3d containerd for Harbor HTTP pulls
+# -------------------------------------------------------
+
+echo "[8/8] Configuring k3d containerd for Harbor..."
+
+# Get Harbor's ClusterIP so containerd can reach it directly.
+# Kubernetes Service DNS doesn't resolve at the node level (containerd
+# uses Docker's DNS, not CoreDNS), so we inject the ClusterIP.
+HARBOR_CLUSTER_IP=$(kubectl -n harbor get svc harbor -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)
+K3D_NODE="k3d-${K3D_CLUSTER_NAME:-local}-server-0"
+
+if [[ -z "${HARBOR_CLUSTER_IP}" ]]; then
+  echo "  ⚠ Harbor service not found — skipping registry configuration."
+  echo "    Deploy Harbor first, then re-run this script."
+elif ! docker info &>/dev/null; then
+  echo "  ⚠ Docker not available — skipping registry configuration."
+  echo "    Manually create /etc/rancher/k3s/registries.yaml on the k3d node."
+else
+  # Write registries.yaml with Harbor's ClusterIP as the mirror endpoint.
+  # This tells containerd to use HTTP (not HTTPS) when pulling from
+  # harbor.k8s.local, and routes traffic to the in-cluster service.
+  REGISTRIES_YAML=$(cat <<REGEOF
+# Generated by setup-cicd.sh — DO NOT EDIT
+# Harbor ClusterIP: ${HARBOR_CLUSTER_IP}
+mirrors:
+  "harbor.k8s.local":
+    endpoint:
+      - "http://${HARBOR_CLUSTER_IP}"
+REGEOF
+)
+
+  echo "${REGISTRIES_YAML}" | docker exec -i "${K3D_NODE}" tee /etc/rancher/k3s/registries.yaml >/dev/null
+
+  echo "  ✓ registries.yaml injected into ${K3D_NODE}"
+  echo "    Mirror: harbor.k8s.local → http://${HARBOR_CLUSTER_IP}"
+
+  # Restart the k3d node so k3s/containerd picks up the new config.
+  echo "  Restarting ${K3D_NODE} to apply registry config..."
+  docker restart "${K3D_NODE}" >/dev/null 2>&1
+
+  # Wait for the node to come back
+  TIMEOUT=60
+  INTERVAL=5
+  ELAPSED=0
+  while [[ ${ELAPSED} -lt ${TIMEOUT} ]]; do
+    if kubectl get nodes "${K3D_NODE}" --no-headers 2>/dev/null | grep -q " Ready "; then
+      echo "  ✓ Node is Ready"
+      break
+    fi
+    echo "    waiting for node... (${ELAPSED}s/${TIMEOUT}s)"
+    sleep "${INTERVAL}"
+    ELAPSED=$(( ELAPSED + INTERVAL ))
+  done
+
+  if [[ ${ELAPSED} -ge ${TIMEOUT} ]]; then
+    echo "  ⚠ Node not ready after ${TIMEOUT}s."
+    echo "    Check with: kubectl get nodes"
+  fi
+
+  # Verify containerd picked up the config
+  if docker exec "${K3D_NODE}" test -d "/var/lib/rancher/k3s/agent/etc/containerd/certs.d/harbor.k8s.local" 2>/dev/null; then
+    echo "  ✓ containerd registry config verified"
+  else
+    echo "  ⚠ containerd registry config not found — the node may need more time."
+  fi
+fi
+
+echo ""
+
+# -------------------------------------------------------
 # Summary
 # -------------------------------------------------------
 
@@ -360,6 +441,7 @@ echo "  Sensor:           kubectl -n argo-events get sensors"
 echo "  WorkflowTemplate: kubectl -n argo-workflows get workflowtemplates"
 echo "  BuildKit Config:  kubectl -n argo-workflows get configmap buildkitd-config"
 echo "  Deploy Key:       kubectl -n argo-workflows get secret git-deploy-key"
+echo "  Registry Config:  docker exec k3d-${K3D_CLUSTER_NAME:-local}-server-0 cat /etc/rancher/k3s/registries.yaml"
 echo ""
 echo "Verify the full chain:"
 echo "  kubectl -n argo-events get pods"

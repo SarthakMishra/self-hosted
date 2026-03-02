@@ -1,0 +1,18 @@
+# k3s Private Registry Configuration — Local Development
+# Configures containerd to pull from Harbor over HTTP (no TLS).
+#
+# This file is a TEMPLATE. The setup-cicd.sh script injects the actual
+# Harbor ClusterIP after Harbor is deployed:
+#   1. install-k3s.sh creates the cluster with --registry-config registries.yaml
+#      (containerd loads the file but the mirror has no effect until Harbor exists)
+#   2. setup-cicd.sh updates the endpoint IP and restarts the k3d node
+#
+# Without this, containerd defaults to HTTPS and fails to pull from
+# the in-cluster Harbor instance (which runs HTTP-only in local dev).
+#
+# NOTE: k3s requires a node restart to pick up changes:
+#   docker restart k3d-<cluster-name>-server-0
+mirrors:
+  "harbor.k8s.local":
+    endpoint:
+      - "http://harbor.k8s.local"
