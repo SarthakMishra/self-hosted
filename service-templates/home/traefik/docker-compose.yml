@@ -9,11 +9,8 @@ services:
       - .env
 
     environment:
-      # Cloudflare DNS API for Let's Encrypt DNS-01 challenge
-      - CF_API_EMAIL=${CLOUDFLARE_EMAIL}
-      - CF_API_KEY=${CLOUDFLARE_API_KEY}
-      # Alternative: CF_DNS_API_TOKEN (for API tokens instead of Global API Key)
-      # - CF_DNS_API_TOKEN=${CLOUDFLARE_DNS_API_TOKEN}
+      # Cloudflare scoped API token for Let's Encrypt DNS-01 challenge
+      - CF_DNS_API_TOKEN=${CLOUDFLARE_DNS_API_TOKEN}
 
     command:
       # Ping endpoint for healthcheck
