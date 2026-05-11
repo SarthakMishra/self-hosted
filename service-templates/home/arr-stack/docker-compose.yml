@@ -180,48 +180,66 @@ services:
       traefik.http.middlewares.bazarr-redirect.redirectscheme.scheme: https
 
   # ---------------------------------------------------------------------------
-  # Cleanuparr - Arr Cleanup Automation
+  # Bitmagnet - BitTorrent DHT Crawler & Indexer
   # ---------------------------------------------------------------------------
-  cleanuparr:
-    image: ghcr.io/cleanuparr/cleanuparr:latest
-    container_name: cleanuparr
-    hostname: cleanuparr.internal
+  bitmagnet:
+    image: ghcr.io/bitmagnet-io/bitmagnet:latest
+    container_name: bitmagnet
+    hostname: bitmagnet.internal
     <<: *common-settings
     environment:
-      PORT: ${CLEANUPARR_PORT:-11011}
-      BASE_PATH: ${CLEANUPARR_BASE_PATH:-}
-      PUID: ${PUID_CLEANUPARR:-1010}
-      <<: *common-env
+      POSTGRES_HOST: bitmagnet-postgres
+      POSTGRES_PASSWORD: ${BITMAGNET_POSTGRES_PASSWORD:-postgres}
+      TMDB_API_KEY: ${TMDB_API_KEY:-}
+      TZ: ${TZ_MAIN}
     volumes:
-      - ${BASE_CONFIG_PATH}/cleanuparr-config:/config
-      - ${BASE_DATA_PATH}/downloads:/downloads
+      - ${BASE_CONFIG_PATH}/bitmagnet-config:/root/.config/bitmagnet
+    ports:
+      - "${BITMAGNET_BT_PORT:-3334}:3334/tcp"
+      - "${BITMAGNET_BT_PORT:-3334}:3334/udp"
+    command:
+      - worker
+      - run
+      - --keys=http_server
+      - --keys=queue_server
+      - --keys=dht_crawler
+    depends_on:
+      bitmagnet-postgres:
+        condition: service_healthy
     labels:
       <<: *traefik-common
-      traefik.http.routers.cleanuparr-http.rule: Host(`${CLEANUPARR_DOMAIN}`)
-      traefik.http.routers.cleanuparr-http.entrypoints: web
-      traefik.http.routers.cleanuparr-http.service: cleanuparr
-      traefik.http.routers.cleanuparr-http.middlewares: cleanuparr-redirect
-      traefik.http.routers.cleanuparr-https.rule: Host(`${CLEANUPARR_DOMAIN}`)
-      traefik.http.routers.cleanuparr-https.entrypoints: websecure
-      traefik.http.routers.cleanuparr-https.tls: "true"
-      traefik.http.routers.cleanuparr-https.tls.certresolver: letsencrypt
-      traefik.http.routers.cleanuparr-https.service: cleanuparr
-      traefik.http.services.cleanuparr.loadbalancer.server.port: ${CLEANUPARR_PORT:-11011}
-      traefik.http.middlewares.cleanuparr-redirect.redirectscheme.scheme: https
+      traefik.http.routers.bitmagnet-http.rule: Host(`${BITMAGNET_DOMAIN}`)
+      traefik.http.routers.bitmagnet-http.entrypoints: web
+      traefik.http.routers.bitmagnet-http.service: bitmagnet
+      traefik.http.routers.bitmagnet-http.middlewares: bitmagnet-redirect
+      traefik.http.routers.bitmagnet-https.rule: Host(`${BITMAGNET_DOMAIN}`)
+      traefik.http.routers.bitmagnet-https.entrypoints: websecure
+      traefik.http.routers.bitmagnet-https.tls: "true"
+      traefik.http.routers.bitmagnet-https.tls.certresolver: letsencrypt
+      traefik.http.routers.bitmagnet-https.service: bitmagnet
+      traefik.http.services.bitmagnet.loadbalancer.server.port: "3333"
+      traefik.http.middlewares.bitmagnet-redirect.redirectscheme.scheme: https
 
   # ---------------------------------------------------------------------------
-  # FlareSolverr - Cloudflare Bypass
+  # Bitmagnet Postgres - Database backing Bitmagnet
   # ---------------------------------------------------------------------------
-  flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr:latest
-    container_name: flaresolverr
-    hostname: flaresolverr.internal
+  bitmagnet-postgres:
+    image: postgres:16-alpine
+    container_name: bitmagnet-postgres
+    hostname: bitmagnet-postgres.internal
     <<: *common-settings
     environment:
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-      LOG_HTML: ${LOG_HTML:-false}
-      CAPTCHA_SOLVER: ${CAPTCHA_SOLVER:-none}
+      POSTGRES_PASSWORD: ${BITMAGNET_POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: bitmagnet
+      PGUSER: postgres
       TZ: ${TZ_MAIN}
+    volumes:
+      - bitmagnet-postgres-data:/var/lib/postgresql/data
+    shm_size: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      start_period: 20s
+      interval: 10s
 
   # ---------------------------------------------------------------------------
   # Plex - Media Server
@@ -296,3 +314,10 @@ services:
 networks:
   home-network:
     external: true
+
+# =============================================================================
+# Volumes
+# =============================================================================
+
+volumes:
+  bitmagnet-postgres-data:
