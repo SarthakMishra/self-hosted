@@ -1,0 +1,93 @@
+# qbit_manage starter config — copy to ${BASE_CONFIG_PATH}/qbit-manage-config/config.yml
+# Schema reference: https://github.com/StuffAnThings/qbit_manage/blob/master/config/config.yml.sample
+#
+# Flip dry_run: true if you want to audit a few runs before any deletion happens.
+
+commands:
+  dry_run: false
+  cross_seed: false
+  recheck: false
+  cat_update: false
+  tag_update: true               # add tracker tags
+  rem_unregistered: false
+  tag_tracker_error: true
+  rem_orphaned: true             # move files in /data/torrents not claimed by any torrent
+  tag_nohardlinks: true          # tag torrents whose files no longer have a library hardlink
+  share_limits: true             # apply share-limit groups (drives noHL auto-removal)
+  skip_qb_version_check: false
+  skip_cleanup: false
+
+qbt:
+  host: http://qbittorrent:8080
+  user: REPLACE_WITH_QBIT_USER
+  pass: REPLACE_WITH_QBIT_PASS
+
+settings:
+  force_auto_tmm: false
+  tracker_error_tag: issue
+  nohardlinks_tag: noHL
+  share_limits_tag: ~share_limit
+
+# qbit_manage runs in a container that shares /data with qBittorrent, so paths
+# are identical from both sides. Do NOT set remote_dir.
+directory:
+  root_dir: /data/torrents
+  recycle_bin: /data/torrents/.RecycleBin
+  orphaned_dir: /data/torrents/orphaned_data
+
+# Categories → save paths. Match what Sonarr/Radarr push to qBit. Update the keys
+# below if your *arr download-client categories are named differently
+# (e.g., 'tv-sonarr' / 'movies-radarr').
+cat:
+  radarr: /data/torrents/movies
+  tv-sonarr: /data/torrents/tv
+
+tracker:
+  other:
+    tag: other
+
+# Per-category nohardlinks tagging. Torrents in these categories whose files
+# have zero hardlinks outside root_dir get tagged with `noHL`.
+nohardlinks:
+  radarr:
+    ignore_root_dir: true
+  tv-sonarr:
+    ignore_root_dir: true
+
+# share_limits groups apply ratio/seed-time/cleanup rules. The `noHL` group is
+# what actually deletes torrents flagged by tag_nohardlinks after a grace period.
+share_limits:
+  noHL:
+    priority: 1
+    include_all_tags:
+      - noHL
+    cleanup: true                # delete torrent + files once max_seeding_time hits
+    max_ratio: -1                # ratio doesn't matter for this group
+    max_seeding_time: 7d         # torrent must hold the noHL tag for 7 days before delete
+    min_seeding_time: 0
+    limit_upload_speed: -1
+    resume_torrent_after_change: false
+  default:
+    priority: 999
+    max_ratio: -1
+    max_seeding_time: -1
+    cleanup: false
+
+# Recycle bin disabled — share_limits cleanup deletes torrents + files immediately,
+# with no rescue window. Library copies survive (separate inodes / different paths).
+recyclebin:
+  enabled: false
+
+# Orphan handling: anything under root_dir not referenced by qBit (subs, extras,
+# samples, NFOs, leftover dirs) is moved to orphaned_dir, then immediately
+# emptied in the same run (empty_after_x_days: 0).
+orphaned:
+  empty_after_x_days: 0
+  min_file_age_minutes: 30       # ignore in-flight downloads (<30 min old)
+  max_orphaned_files_to_delete: -1
+  exclude_patterns:
+    - "**/.RecycleBin/**"
+    - "**/.qBittorrent/**"
+    - "**/orphaned_data/**"
+    - "**/*.!qB"
+    - "**/*.parts"

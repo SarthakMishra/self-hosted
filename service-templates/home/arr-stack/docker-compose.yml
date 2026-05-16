@@ -216,6 +216,30 @@ services:
       traefik.http.middlewares.plex-redirect.redirectscheme.scheme: https
 
   # ---------------------------------------------------------------------------
+  # qbit_manage - qBittorrent housekeeping (noHL tagging, orphan cleanup)
+  # ---------------------------------------------------------------------------
+  qbit-manage:
+    image: ghcr.io/stuffanthings/qbit_manage:latest
+    container_name: qbit-manage
+    hostname: qbit-manage.internal
+    <<: *common-settings
+    environment:
+      TZ: ${TZ_MAIN}
+      PUID: ${PUID_QBITMANAGE:-1010}
+      PGID: ${PGID_SHARED:-3000}
+      UMASK: "002"
+      QBT_RUN: "false"
+      QBT_SCHEDULE: ${QBT_MANAGE_SCHEDULE:-1440}
+      QBT_CONFIG: config.yml
+      QBT_LOGFILE: activity.log
+      QBT_LOG_LEVEL: ${QBT_MANAGE_LOG_LEVEL:-INFO}
+    volumes:
+      - ${BASE_CONFIG_PATH}/qbit-manage-config:/config
+      - ${BASE_DATA_PATH}:/data
+    depends_on:
+      - qbittorrent
+
+  # ---------------------------------------------------------------------------
   # Seerr - Media Request Management (Official Image)
   # ---------------------------------------------------------------------------
   seerr:
